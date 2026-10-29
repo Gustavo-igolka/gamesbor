@@ -206,6 +206,22 @@
 </div>
 
 <script>
+    /* ===== RKCPlay: API достижений ===== */
+    function rkcUnlock(id){
+        try{
+            if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+            else if(window.parent && window.parent !== window)
+                window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+        }catch(e){}
+    }
+    function rkcProgress(id, cur){
+        try{
+            if(window.parent && window.parent.RKC && window.parent.RKC.progress) window.parent.RKC.progress(id, cur);
+            else if(window.parent && window.parent !== window)
+                window.parent.postMessage({type:'rkc:ach:progress', id:id, cur:cur}, '*');
+        }catch(e){}
+    }
+
     const db = [
         { n: "Новый Эдем", c: "77" },
         { n: "Сектор Зеро", c: "00" },
@@ -303,10 +319,17 @@
                 let bonus = 0.5;
                 if (input === "CANVAS") bonus = 1.0;
                 if (input === "РАДУЙСЯ КСИЗУС ТЫ ВЫЖИЛ!") bonus = 5.0;
-                
+
                 coolMultiplier += bonus;
                 document.getElementById('cool-multiplier').innerText = coolMultiplier.toFixed(1);
                 if (coolMultiplier >= 5.0) term.classList.add('omega');
+
+                // --- достижения ---
+                if (foundSecrets.size === 1) rkcUnlock('secret1');
+                rkcProgress('secret5', Math.min(foundSecrets.size, 5));
+                rkcProgress('allsecret', foundSecrets.size);
+                if (coolMultiplier >= 5.0) rkcUnlock('omega');
+                if (input === "РАДУЙСЯ КСИЗУС ТЫ ВЫЖИЛ!") rkcUnlock('awake');
             }
             showSecret(input);
             res.innerHTML = `<span style='color: var(--xizus-gold)'>> ОБНАРУЖЕНО: ${secrets[input].t}</span>`;
@@ -336,22 +359,18 @@
     function pickSector() {
         const roll = Math.random();
         if (roll < 0.55) {
-            // корректная пара: настоящее название + настоящий код
             const b = db[Math.floor(Math.random()*db.length)];
             return { name: b.n, code: b.c, valid: true };
         } else if (roll < 0.72) {
-            // полностью фейковая зона — название и код правдоподобны, но их нет в системе
             const f = fakeZones[Math.floor(Math.random()*fakeZones.length)];
             return { name: f.n, code: f.c, valid: false };
         } else if (roll < 0.9) {
-            // рассинхрон: настоящее название, но код от другого сектора
             const b1 = db[Math.floor(Math.random()*db.length)];
             let b2 = db[Math.floor(Math.random()*db.length)];
             let guard = 0;
             while (b2.c === b1.c && guard < 10) { b2 = db[Math.floor(Math.random()*db.length)]; guard++; }
             return { name: b1.n, code: b2.c, valid: false };
         } else {
-            // повреждённый код
             const b = db[Math.floor(Math.random()*db.length)];
             return { name: b.n, code: "X-BAD", valid: false };
         }
@@ -366,7 +385,7 @@
         const slot = document.getElementById('paper-slot');
         slot.innerHTML = '';
         document.getElementById('code-input').value = '';
-        
+
         const sector = pickSector();
         const isAnomaly = Math.random() < 0.25;
         const goal = [...validGoals, ...anomalyGoals][Math.floor(Math.random()*(validGoals.length + anomalyGoals.length))];
@@ -388,19 +407,19 @@
                 <span>XIZUS ARCHIVE</span>
                 <span class="text-red-600">ID: ${docsChecked + 1}/45</span>
             </div>
-            
+
             <span class="doc-label">Сектор прибытия (Код):</span>
             <span class="doc-value" style="background: rgba(0,0,0,0.05); border: 1px dashed black; padding: 2px;">${currentDoc.c}</span>
-            
+
             <span class="doc-label">Сектор прибытия (Название):</span>
             <span class="doc-value">${currentDoc.r}</span>
 
             <span class="doc-label">Имя субъекта:</span>
             <span class="doc-value">${currentDoc.n}</span>
-            
+
             <span class="doc-label">Цель:</span>
             <span class="doc-value" style="${anomalyGoals.includes(currentDoc.g) ? 'color: #c00' : ''}">${currentDoc.g}</span>
-            
+
             <span class="doc-label">Биологический статус:</span>
             <span class="doc-value">${currentDoc.h === 'ДА' ? 'ЧЕЛОВЕК' : 'АНОМАЛИЯ'}</span>
 
@@ -420,10 +439,15 @@
             triggerDeath("ОТКЛОНЕНИЕ", "Вы допустили ошибку в обработке. Система вас заменит.");
             return;
         }
-        
+
         docsChecked++;
         document.getElementById('doc-counter').innerText = docsChecked;
-        
+
+        // --- достижения ---
+        if (docsChecked === 1)  rkcUnlock('doc1');
+        if (docsChecked === 15) rkcUnlock('doc15');
+        if (docsChecked === 45) rkcUnlock('doc45');
+
         const p = document.querySelector('.paper');
         p.classList.add(ok ? 'slide-right' : 'slide-left');
         setTimeout(spawn, 400);
@@ -435,11 +459,14 @@
         const baseScore = 10;
         const secretPoints = foundSecrets.size * 5;
         const finalCool = (coolMultiplier * (baseScore + secretPoints)).toFixed(0);
-        
+
+        // --- достижения ---
+        if (parseFloat(finalCool) >= 600) rkcUnlock('rankomega');
+
         document.getElementById('final-count').innerText = docsChecked;
         document.getElementById('final-bonus').innerText = foundSecrets.size;
         document.getElementById('final-coolness').innerText = finalCool + "%";
-        
+
         let desc = "";
         if(finalCool < 250) desc = "Ты — деталь машины. Эффективная, но не значимая.";
         else if(finalCool < 600) desc = "Архивариус XIZUS. Ты знаешь, что за шторами.";
@@ -457,5 +484,3 @@
 </script>
 </body>
 </html>
-
-

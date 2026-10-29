@@ -109,7 +109,6 @@
         #gameOverlay {
             padding-bottom: max(1rem, env(safe-area-inset-bottom));
         }
-        /* Все блоки в палитре и в скрипте — не меньше 44px по высоте (комфортный тап пальцем) */
         .block, .category-title {
             min-height: 44px;
             display: flex;
@@ -118,7 +117,6 @@
         .category-blocks .block {
             display: flex;
         }
-        /* Переключатель "Блоки / Скрипт" — виден только на мобильных (аналог aside/section как вкладок) */
         .mobile-tabs {
             display: flex;
             background: #18181b;
@@ -149,7 +147,6 @@
                 display: none !important;
             }
         }
-        /* D-pad раскладка кнопок управления в игре: крестовина, крупные кнопки под палец */
         #gameControls {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -163,21 +160,19 @@
             min-height: 56px;
             font-size: 1.5rem;
         }
-        /* --- ПК: управление с клавиатуры --- */
         #pcHint { display: none; text-align: center; color: #a1a1aa; font-size: 0.9rem; margin-top: 12px; }
         #pcHint kbd {
             background: #3f3f46; border-radius: 6px; padding: 2px 8px; margin: 0 2px;
             color: #ffd966; font-family: inherit; font-weight: bold; box-shadow: 0 2px 0 #18181b;
         }
         @media (hover: hover) and (pointer: fine) {
-            #gameControls { display: none; }   /* экранные стрелки только для тач-устройств */
+            #gameControls { display: none; }
             #pcHint.on { display: block; }
         }
     </style>
 </head>
 <body class="flex flex-col h-screen">
 
-    <!-- Header -->
     <header class="p-3 bg-zinc-900 flex justify-between items-center border-b border-zinc-700 gap-2">
         <h1 class="text-sm sm:text-lg font-bold text-yellow-500 flex items-center gap-2 truncate">🧱 <span class="hidden xs:inline sm:inline">Aiblok Engine</span> <span class="text-xs bg-zinc-800 px-2 py-1 rounded-full">2.1</span></h1>
         <div class="flex gap-2 shrink-0">
@@ -186,21 +181,15 @@
         </div>
     </header>
 
-    <!-- Переключатель вкладок для телефона: палитра блоков / скрипт -->
     <div class="mobile-tabs">
         <button id="tabPalette" class="mobile-tab-btn active">📚 Блоки</button>
         <button id="tabWorkspace" class="mobile-tab-btn">📝 Скрипт</button>
     </div>
 
-    <!-- Main Editor -->
     <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
-        
-        <!-- Palette (расширенная, с категориями) -->
         <aside id="palettePanel" class="w-full md:w-80 bg-zinc-800 p-2 overflow-y-auto border-r border-zinc-700 scroll-hide">
             <p class="text-xs text-zinc-400 mb-3 uppercase font-bold flex items-center gap-1">📚 БИБЛИОТЕКА БЛОКОВ</p>
-            
             <div id="palette-categories">
-                <!-- Категория События -->
                 <div class="category-title" data-cat="events">🔔 События <span>▼</span></div>
                 <div class="category-blocks open" id="cat-events">
                     <div class="block bg-yellow-600 p-2 rounded text-sm font-bold mb-2" draggable="true" data-type="onStart">🚩 При старте</div>
@@ -208,7 +197,6 @@
                     <div class="block bg-orange-500 p-2 rounded text-sm mb-2" draggable="true" data-type="onCollide">💥 Когда [объект1] сталкивается с [объект2]</div>
                 </div>
 
-                <!-- Категория Объекты -->
                 <div class="category-title" data-cat="objects">🧩 Объекты <span>▼</span></div>
                 <div class="category-blocks open" id="cat-objects">
                     <div class="block bg-blue-600 p-2 rounded text-sm mb-2" draggable="true" data-type="createChar">👤 Создать персонажа [имя]</div>
@@ -217,13 +205,11 @@
                     <div class="block bg-emerald-600 p-2 rounded text-sm mb-2" draggable="true" data-type="setPosition">📍 Точка появления [объект] X [x] Y [y]</div>
                 </div>
 
-                <!-- Категория Управление -->
                 <div class="category-title" data-cat="control">🎮 Управление <span>▼</span></div>
                 <div class="category-blocks open" id="cat-control">
                     <div class="block bg-purple-600 p-2 rounded text-sm mb-2" draggable="true" data-type="controlObj">🕹️ Управление [предмет] стрелками</div>
                 </div>
 
-                <!-- Категория Переменные -->
                 <div class="category-title" data-cat="vars">📊 Переменные <span>▼</span></div>
                 <div class="category-blocks open" id="cat-vars">
                     <div class="block bg-teal-600 p-2 rounded text-sm mb-2" draggable="true" data-type="createVar">💎 Создать переменную [имя]</div>
@@ -231,7 +217,6 @@
                     <div class="block bg-teal-400 p-2 rounded text-sm mb-2" draggable="true" data-type="incVar">➕ Увеличить [имя] на [1]</div>
                 </div>
 
-                <!-- Категория Физика / Действия -->
                 <div class="category-title" data-cat="physics">⚙️ Физика и действия <span>▼</span></div>
                 <div class="category-blocks open" id="cat-physics">
                     <div class="block bg-rose-600 p-2 rounded text-sm mb-2" draggable="true" data-type="moveAway">↩️ двигаться от [объект]</div>
@@ -243,7 +228,6 @@
             </div>
         </aside>
 
-        <!-- Workspace (зона скрипта) -->
         <section class="flex-1 workspace relative overflow-y-auto p-4 space-y-2 panel-hidden-mobile" id="workspace" dropzone="move" @dragover.prevent @drop="dropHandler">
             <div class="text-xs text-zinc-500 mb-2 bg-zinc-900/60 p-2 rounded border border-zinc-700">
                 💡 Блоки действий (⚙️ Физика и действия) привязываются к <b>ближайшему блоку-событию над ними</b> — они выполнятся только для объектов из этого события, а не для всех объектов сразу.
@@ -252,23 +236,17 @@
         </section>
     </main>
 
-    <!-- Preview Overlay (игровая область) -->
     <div id="gameOverlay" class="fixed inset-0 bg-black/90 hidden flex flex-col p-4 z-50">
         <div class="flex justify-between items-center mb-2">
             <h2 class="text-xl font-bold text-yellow-500">🎮 Игровой процесс</h2>
             <button id="closeGame" class="bg-zinc-700 px-4 py-2 rounded-full text-sm">✕ Выход</button>
         </div>
-        <div id="canvasContainer" class="game-canvas flex-1 relative">
-            <!-- Сюда будут добавляться объекты -->
-        </div>
-        <div id="gameControls" class="mt-4">
-            <!-- Кнопки управления (появятся динамически, D-pad) -->
-        </div>
+        <div id="canvasContainer" class="game-canvas flex-1 relative"></div>
+        <div id="gameControls" class="mt-4"></div>
         <div id="pcHint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> или <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> — движение · <kbd>Esc</kbd> — выход</div>
         <div id="varPanel" class="absolute top-20 left-6 text-sm"></div>
     </div>
 
-    <!-- Модальное окно для ввода параметров -->
     <div id="modal" class="fixed inset-0 bg-black/80 hidden items-center justify-center z-[100] p-4">
         <div class="bg-zinc-800 p-6 rounded-xl w-full max-w-sm border border-yellow-700 max-h-[85vh] overflow-y-auto scroll-hide">
             <h3 id="modalTitle" class="text-lg mb-4 font-bold text-yellow-500">Параметры блока</h3>
@@ -282,7 +260,22 @@
 
     <script>
         (function() {
-            // --- Константы и состояния ---
+            /* ===== RKCPlay: API достижений ===== */
+            function rkcUnlock(id){
+                try{
+                    if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+                    else if(window.parent && window.parent !== window)
+                        window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+                }catch(e){}
+            }
+            function rkcProgress(id, cur){
+                try{
+                    if(window.parent && window.parent.RKC && window.parent.RKC.progress) window.parent.RKC.progress(id, cur);
+                    else if(window.parent && window.parent !== window)
+                        window.parent.postMessage({type:'rkc:ach:progress', id:id, cur:cur}, '*');
+                }catch(e){}
+            }
+
             const palette = document.getElementById('palette-categories');
             const workspace = document.getElementById('workspace');
             const runBtn = document.getElementById('runBtn');
@@ -298,7 +291,6 @@
             const tabPalette = document.getElementById('tabPalette');
             const tabWorkspace = document.getElementById('tabWorkspace');
 
-            // --- Мобильные вкладки: показываем либо палитру, либо скрипт ---
             function showMobileTab(tab) {
                 if (tab === 'palette') {
                     palettePanel.classList.remove('panel-hidden-mobile');
@@ -315,27 +307,21 @@
             tabPalette.addEventListener('click', () => showMobileTab('palette'));
             tabWorkspace.addEventListener('click', () => showMobileTab('workspace'));
 
-            let script = [];                   // массив блоков { type, params }
+            let script = [];
             let currentEditingIdx = -1;
 
-            // Определения блоков (метаданные)
             const BLOCK_DEFS = {
-                // события
                 onStart:           { title: "При старте", params: [], category: 'events' },
                 onButtonTouch:     { title: "Когда касается кнопки", params: ['имя_кнопки'], category: 'events' },
                 onCollide:         { title: "Когда сталкиваются", params: ['объект1', 'объект2'], category: 'events' },
-                // объекты
                 createChar:        { title: "Создать персонажа", params: ['имя'], category: 'objects' },
                 createBlock:       { title: "Создать блок", params: ['имя'], category: 'objects' },
                 createBtn:         { title: "Создать кнопку", params: ['имя'], category: 'objects' },
                 setPosition:       { title: "Точка появления", params: ['объект', 'x', 'y'], category: 'objects' },
-                // управление
                 controlObj:        { title: "Управление стрелками", params: ['предмет'], category: 'control' },
-                // переменные
                 createVar:         { title: "Создать переменную", params: ['имя'], category: 'vars' },
                 setVar:            { title: "Присвоить", params: ['имя', 'значение'], category: 'vars' },
                 incVar:            { title: "Увеличить", params: ['имя', 'на сколько'], category: 'vars' },
-                // физика / действия
                 moveAway:          { title: "двигаться от", params: ['объект'], category: 'physics' },
                 blockPass:         { title: "не пропускать", params: ['объект'], category: 'physics' },
                 disappear:         { title: "исчезнуть", params: ['объект'], category: 'physics' },
@@ -343,16 +329,10 @@
                 endGame:           { title: "завершить игру", params: [], category: 'physics' }
             };
 
-            // --- Классификация блоков для привязки действий к событиям ---
-            // Блок-событие открывает "группу". Все идущие сразу после него блоки-действия
-            // привязываются именно к этому событию (а не выполняются глобально для всех объектов).
             const EVENT_TYPES = ['onStart', 'onButtonTouch', 'onCollide'];
             const ACTION_TYPES = ['moveAway', 'blockPass', 'disappear', 'changeVarOnTouch', 'endGame'];
             const SETUP_TYPES = ['createVar', 'setVar', 'incVar', 'createChar', 'createBlock', 'createBtn', 'setPosition', 'controlObj'];
 
-            // Разбивает плоский script[] на группы { event, actions[] }.
-            // Любой блок, который не является действием, прерывает текущую группу —
-            // так действия однозначно относятся к конкретному объекту/событию, а не "ко всем сразу".
             function groupScript() {
                 const groups = [];
                 let current = null;
@@ -369,7 +349,6 @@
                 return groups;
             }
 
-            // --- Перетаскивание из палитры (drag & drop) ---
             document.querySelectorAll('.block[draggable="true"]').forEach(block => {
                 block.addEventListener('dragstart', e => {
                     e.dataTransfer.setData('text/plain', block.dataset.type);
@@ -385,12 +364,10 @@
                 addBlockByType(type);
             });
 
-            // Также можно добавлять блоки кликом (для мобильных)
             palette.addEventListener('click', (e) => {
                 const blockEl = e.target.closest('.block');
                 if (!blockEl) return;
-                const type = blockEl.dataset.type;
-                addBlockByType(type);
+                addBlockByType(blockEl.dataset.type);
             });
 
             function addBlockByType(type) {
@@ -406,11 +383,14 @@
                     })
                 };
                 script.push(newBlock);
+
+                // --- достижения ---
+                if (script.length === 1) rkcUnlock('firstblock');
+
                 renderWorkspace();
                 if (window.innerWidth < 768) showMobileTab('workspace');
             }
 
-            // --- Работа с модальным окном редактирования ---
             window.editBlock = (idx) => {
                 currentEditingIdx = idx;
                 const b = script[idx];
@@ -464,11 +444,10 @@
                 renderWorkspace();
             };
 
-            // --- Отрисовка рабочей области ---
             function renderWorkspace() {
                 dropHint.style.display = script.length ? 'none' : 'block';
 
-                let openEvent = null; // блок-событие, к которому сейчас привязываются действия
+                let openEvent = null;
                 const blocksHtml = script.map((b, idx) => {
                     const def = BLOCK_DEFS[b.type];
                     let bgColor = "bg-zinc-700";
@@ -494,12 +473,11 @@
                         nestClass = 'ml-6 border-l-4 border-dashed border-yellow-600/50 pl-3';
                         prefix = '<span class="text-yellow-500 mr-1">↳</span>';
                     } else if (isAction && !openEvent) {
-                        // Действие без события-родителя не будет выполняться — предупреждаем
                         nestClass = 'ml-6 border-l-4 border-red-600 pl-3';
                         prefix = '<span class="text-red-400 mr-1" title="Нет события-родителя">⚠️</span>';
                         openEvent = null;
                     } else {
-                        openEvent = null; // блоки настройки (объекты/переменные) закрывают текущую группу
+                        openEvent = null;
                     }
 
                     return `
@@ -517,7 +495,6 @@
                 workspace.insertAdjacentHTML('beforeend', blocksHtml);
             }
 
-            // --- Очистка скрипта ---
             clearBtn.onclick = () => {
                 if (confirm("Очистить весь скрипт?")) {
                     script = [];
@@ -525,7 +502,6 @@
                 }
             };
 
-            // --- Сворачивание/разворачивание категорий ---
             document.querySelectorAll('.category-title').forEach(title => {
                 title.addEventListener('click', () => {
                     const catId = title.dataset.cat;
@@ -535,14 +511,13 @@
                 });
             });
 
-            // --- === ИГРОВОЙ ДВИЖОК === ---
             let runtimeVars = {};
-            let runtimeObjects = {};        // { имя: { el, x, y, type } }
-            let eventGroups = [];           // [{ type, params, actions[] }] — действия, привязанные к своему событию
+            let runtimeObjects = {};
+            let eventGroups = [];
             let gameInterval;
             let gameActive = false;
-            let controlled = [];            // имена объектов, которыми управляют с клавиатуры
-            const heldKeys = new Set();     // удерживаемые направления: u / d / l / r
+            let controlled = [];
+            const heldKeys = new Set();
             const pcHint = document.getElementById('pcHint');
 
             function resetGame() {
@@ -562,10 +537,8 @@
                 gameOverlay.style.display = 'flex';
                 resetGame();
 
-                // Строим группы "событие -> его собственные действия" из текущего скрипта
                 eventGroups = groupScript();
 
-                // Первый проход: создание объектов, переменных и установка позиций (не зависит от событий)
                 script.forEach(block => {
                     const p = block.params;
                     switch (block.type) {
@@ -595,23 +568,18 @@
                             }
                             break;
                         }
-                        // onButtonTouch / onCollide / onStart и связанные с ними действия
-                        // теперь выполняются через eventGroups — по своей группе, а не глобально.
                     }
                 });
 
-                // Выполняем действия, привязанные к "При старте" — один раз, сразу при запуске
                 eventGroups
                     .filter(g => g.type === 'onStart')
                     .forEach(g => performActions(g.actions, {}));
 
-                // Запуск игрового цикла
                 gameInterval = setInterval(() => {
                     if (!gameActive) return;
                     updateGame();
-                }, 100); // ~10 fps для плавности
+                }, 100);
 
-                // Обновление панели переменных
                 updateUIVars();
             };
 
@@ -642,44 +610,31 @@
                 varPanel.innerHTML = '📊 ' + Object.entries(runtimeVars).map(([k,v]) => `${k}: ${v}`).join(' • ');
             }
 
-            // --- Игровой цикл: проверка коллизий и выполнение действий ---
             function updateGame() {
-                // 1. Получаем список всех объектов
                 const objects = Object.values(runtimeObjects);
-                // 2. Проверяем попарные столкновения (упрощённо: пересечение по позиции +-5%)
                 for (let i = 0; i < objects.length; i++) {
                     for (let j = i+1; j < objects.length; j++) {
                         const a = objects[i];
                         const b = objects[j];
                         const dist = Math.hypot(a.x - b.x, a.y - b.y);
-                        if (dist < 8) { // условное столкновение
+                        if (dist < 8) {
                             handleCollision(a, b);
                             handleCollision(b, a);
                         }
                     }
                 }
-
-                // 3. Проверка касания кнопок (объекты типа 'btn')
                 objects.forEach(obj => {
                     if (obj.type === 'btn') {
                         objects.forEach(other => {
                             if (other === obj) return;
                             const dist = Math.hypot(obj.x - other.x, obj.y - other.y);
-                            if (dist < 8) {
-                                // Объект стоит на кнопке
-                                triggerButtonTouch(obj, other);
-                            }
+                            if (dist < 8) triggerButtonTouch(obj, other);
                         });
                     }
                 });
-
                 updateUIVars();
             }
 
-            // Выполняет список действий (block.type из ACTION_TYPES), привязанных к конкретному
-            // событию, в контексте конкретной пары объектов. ctx = { self, other }.
-            // Благодаря этому "двигаться от [X]" реагирует ТОЛЬКО на столкновение, к которому
-            // оно было привязано в редакторе — а не на любое столкновение объекта X в игре.
             function performActions(actions, ctx) {
                 actions.forEach(block => {
                     switch (block.type) {
@@ -730,15 +685,12 @@
                             break;
                         }
                         case 'blockPass':
-                            // Зарезервировано под физическую блокировку прохода (пока не мешает движению).
                             break;
                     }
                 });
             }
 
             function handleCollision(a, b) {
-                // Выполняем только те группы onCollide, что реально привязаны к паре (a, b) —
-                // остальные объекты на сцене эту привязку не затрагивают.
                 eventGroups.forEach(group => {
                     if (group.type !== 'onCollide') return;
                     const [obj1, obj2] = group.params;
@@ -758,7 +710,6 @@
                 });
             }
 
-            // --- Управление с клавиатуры (блок controlObj) ---
             function setupController(targetName) {
                 const obj = runtimeObjects[targetName];
                 if (!obj) return;
@@ -772,8 +723,6 @@
                     updateObjectPos(obj);
                 };
 
-                // Создаём кнопки крестовиной (D-pad): пусто-вверх-пусто / влево-пусто-вправо / пусто-вниз-пусто
-                // так удобнее держать телефон и попадать пальцем, чем в один ряд из 4 кнопок.
                 const layout = [
                     null, '⬆️', null,
                     '⬅️', null, '➡️',
@@ -798,8 +747,6 @@
                 });
             }
 
-            // --- Интеграция controlObj при запуске ---
-            // В цикле запуска уже созданы объекты, теперь надо проверить блоки controlObj
             function setupAllControllers() {
                 script.forEach(block => {
                     if (block.type === 'controlObj') {
@@ -808,22 +755,28 @@
                 });
             }
 
-            // Немного изменим runBtn: после создания объектов вызовем setupAllControllers
             const originalRun = runBtn.onclick;
             runBtn.onclick = () => {
-                originalRun(); // выполнит создание объектов и т.д.
+                originalRun();
                 setTimeout(() => {
-                    setupAllControllers(); // добавим кнопки управления после отрисовки
+                    setupAllControllers();
+
+                    // --- достижения: запусковые ---
+                    rkcUnlock('firstrun');
+                    const objCount = Object.keys(runtimeObjects).length;
+                    if (objCount > 0) rkcUnlock('scene');
+                    const types = new Set(script.map(b => b.type));
+                    if (objCount > 0 && types.has('controlObj') && types.has('createVar')) {
+                        rkcUnlock('realgame');
+                    }
                 }, 50);
             };
 
-            // --- Управление с клавиатуры (ПК) ---
-            // Используем e.code, поэтому WASD работает и на русской раскладке.
             const KEYMAP = {
                 ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd',
                 ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r'
             };
-            const MOVE_SPEED = 40; // % поля в секунду
+            const MOVE_SPEED = 40;
             const clamp = v => Math.min(95, Math.max(5, v));
             let lastFrame = 0;
 
@@ -835,7 +788,7 @@
                 const dx = (heldKeys.has('r') ? 1 : 0) - (heldKeys.has('l') ? 1 : 0);
                 const dy = (heldKeys.has('d') ? 1 : 0) - (heldKeys.has('u') ? 1 : 0);
                 if (!dx && !dy) return;
-                const len = Math.hypot(dx, dy);   // по диагонали не быстрее
+                const len = Math.hypot(dx, dy);
                 controlled.forEach(name => {
                     const obj = runtimeObjects[name];
                     if (!obj) return;
@@ -847,14 +800,14 @@
             requestAnimationFrame(moveLoop);
 
             window.addEventListener('keydown', e => {
-                if (gameOverlay.style.display === 'flex') {          // идёт игра
+                if (gameOverlay.style.display === 'flex') {
                     if (e.key === 'Escape') { closeGame.click(); e.preventDefault(); return; }
                     const d = KEYMAP[e.code];
                     if (d) { heldKeys.add(d); e.preventDefault(); }
-                } else if (modal.style.display === 'flex') {         // окно параметров блока
+                } else if (modal.style.display === 'flex') {
                     if (e.key === 'Escape') { document.getElementById('cancelBlock').click(); e.preventDefault(); }
                     else if (e.key === 'Enter') { document.getElementById('saveBlock').click(); e.preventDefault(); }
-                } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {   // редактор
+                } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     runBtn.click(); e.preventDefault();
                 }
             });
@@ -873,7 +826,6 @@
                 gameOverlay.style.display = 'none';
             };
 
-            // Инициализация
             renderWorkspace();
         })();
     </script>

@@ -42,7 +42,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 #info h2{margin:0;font-size:clamp(26px,4.4vw,40px);font-weight:300}
 #info p{margin:6px 0 4px;color:var(--dim);font-size:clamp(14px,2vw,17px);font-weight:300}
 #meta{display:flex;gap:18px;justify-content:center;color:var(--dim);font-size:13px;min-height:18px;margin-bottom:12px}
-#acts{display:flex;gap:10px;justify-content:center}
+#acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .pill{padding:11px 30px;border-radius:999px;border:0;font-size:16px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5);transition:background .2s,color .2s}
 .pill:hover,.pill:focus-visible{background:#fff;color:#0a1230;outline:none}
 #favb{padding:11px 18px;color:#ffd84a}
@@ -55,9 +55,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 #splash h1{margin:0;font-size:clamp(40px,9vw,92px);font-weight:200;letter-spacing:.12em}
 #splash p{margin:0;color:var(--dim);font-weight:300;animation:pulse 1.8s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
-.pan{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(3,5,12,.82);backdrop-filter:blur(8px)}
-.pan.on{display:flex}
-.box{width:min(460px,92vw);max-height:84vh;overflow:auto;background:rgba(20,26,50,.92);border-radius:22px;padding:20px 22px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+
+/* ===== DRAWER-ПАНЕЛИ (все меню, не связанные с игрой) ===== */
+.pan{position:fixed;inset:0;z-index:25;display:block;background:rgba(3,5,12,0);backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0);opacity:0;pointer-events:none;transition:opacity .3s,background .35s,backdrop-filter .35s}
+.pan.on{opacity:1;pointer-events:auto;background:rgba(3,5,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pan .box{position:absolute;left:0;top:0;bottom:0;width:min(440px,100vw);height:100%;max-height:100%!important;background:linear-gradient(180deg,rgba(18,24,46,.985),rgba(12,16,36,.97));border-radius:0 24px 24px 0;box-shadow:8px 0 48px rgba(0,0,0,.6),inset -1px 0 0 rgba(255,255,255,.08);padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);overflow-y:auto;overflow-x:hidden;transform:translateX(-100%);transition:transform .42s cubic-bezier(.2,.85,.2,1);will-change:transform}
+.pan.on .box{transform:translateX(0)}
+.pan .box h3{padding-right:52px}
+
 .box h3{margin:0 0 4px;font-weight:300;font-size:24px}
 .box small{color:var(--dim)}
 .tr{display:flex;gap:14px;align-items:center;padding:11px 0;border-top:1px solid rgba(255,255,255,.08)}
@@ -74,6 +79,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
 .st2{display:flex;gap:18px;flex-wrap:wrap;color:var(--dim);font-size:14px}
 .st2 b{color:var(--txt);font-weight:600}
+
+/* Кнопка ✕ для закрытия drawer (фиксированная в правом верхнем углу) */
+#panClose{position:fixed;top:calc(env(safe-area-inset-top) + 16px);right:calc(env(safe-area-inset-right) + 16px);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:20px;cursor:pointer;z-index:26;opacity:0;pointer-events:none;transform:scale(.9);transition:opacity .25s,transform .25s,background .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#panClose.on{opacity:1;pointer-events:auto;transform:scale(1)}
+#panClose:hover,#panClose:focus-visible{background:rgba(255,255,255,.24);outline:none}
+
 #toast{position:fixed;z-index:40;left:50%;top:calc(env(safe-area-inset-top) + 16px);transform:translate(-50%,-140%);display:flex;gap:12px;align-items:center;padding:12px 20px;border-radius:16px;background:rgba(18,24,46,.96);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 12px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
 #toast.on{transform:translate(-50%,0)}
 #toast i{font-style:normal;font-size:30px}#toast b{display:block;font-size:15px}#toast span{font-size:13px;color:var(--dim)}
@@ -103,9 +114,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 @media(max-width:700px){#bShop,#bTro,#bMute,#bFs{display:none}#top{padding:calc(env(safe-area-inset-top) + 10px) 12px 0}#tools button{width:42px;height:42px}#tools{gap:4px}
  #clock{display:none}#tabs{top:calc(env(safe-area-inset-top) + 62px)}#tabs button{padding:10px 16px;font-size:16px}
  .pill{padding:13px 26px}#info{min-height:170px}#count{right:14px}
- .pan{align-items:flex-end}.box{width:100vw;max-height:88vh;border-radius:22px 22px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}}
+ .pan .box{width:100vw;border-radius:0 20px 20px 0;padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px)}}
 
-/* АФК-экран */
 #afk{position:fixed;inset:0;z-index:35;background:rgba(2,4,10,.78);display:flex;align-items:center;justify-content:flex-end;padding:0 clamp(20px,6vw,90px);opacity:0;pointer-events:none;transition:opacity 1.2s}
 #afk.on{opacity:1;pointer-events:auto}
 #afk .fc{width:min(380px,86vw);padding:22px 24px;border-radius:22px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);backdrop-filter:blur(10px);transition:opacity .6s,transform .6s}
@@ -116,7 +126,6 @@ button{font:inherit;color:inherit;cursor:pointer}
 #afk .fz{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:var(--dim);font-size:13px;font-weight:300}
 @media(max-width:700px){#afk{align-items:flex-end;justify-content:center;padding-bottom:90px}}
 
-/* меню RKCPlay и настройки */
 #brand{background:none;border:0;padding:6px 12px;margin-left:-12px;border-radius:999px;font-size:16px;font-weight:400;letter-spacing:.04em;color:var(--txt);transition:background .2s}
 #brand:hover,#brand:focus-visible{background:rgba(255,255,255,.14);outline:none}
 #hints{display:none!important}
@@ -131,12 +140,38 @@ body.tsS{--tile:clamp(88px,13vw,135px)}body.tsL{--tile:clamp(135px,23vw,225px)}
 body.tsS .tile,body.tsL .tile{--tile:inherit}
 body.rm *{transition:none!important;animation:none!important}
 .tos h4{color:var(--txt);margin:14px 0 2px}.tos p{margin:2px 0;font-size:14px;color:#c9d2ee}
-/* сезонные режимы */
 #season{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;transition:background 1s}
 #season span{position:absolute;top:0;opacity:.55;animation:sfall linear infinite;will-change:transform}
 @keyframes sfall{from{transform:translate(0,-12vh) rotate(0)}to{transform:translate(var(--dx),112vh) rotate(360deg)}}
 body.rm #season span{display:none}
 @media(prefers-reduced-motion:reduce){#season span{display:none}}
+
+/* ===== ДОСТИЖЕНИЯ PLAYSTATION-СТИЛЬ ===== */
+.tile .plat{position:absolute;right:8%;bottom:8%;font-size:15px;filter:drop-shadow(0 2px 4px #000);z-index:2}
+.ach-hero{display:flex;gap:16px;align-items:center;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(167,139,250,.28),rgba(50,60,110,.42));box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);margin-bottom:12px}
+.ach-hero .ah-big{font-size:44px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+.ach-hero b{font-size:17px}
+.ach-hero .ah-sub{font-size:12.5px;color:var(--dim);margin-top:2px}
+.ach-bar{height:6px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:8px}
+.ach-bar i{display:block;height:100%;background:linear-gradient(90deg,#a78bfa,#ffd84a);transition:width .4s}
+.ach-list{margin-top:4px}
+.ach-row{display:flex;gap:12px;align-items:flex-start;padding:11px 6px;border-top:1px solid rgba(255,255,255,.07)}
+.ach-row:first-child{border-top:0}
+.ach-row.locked{opacity:.45;filter:grayscale(.85)}
+.ach-row.plat{background:linear-gradient(90deg,rgba(167,139,250,.14),transparent);border-radius:10px}
+.ach-row .ar-ic{font-size:26px;width:34px;text-align:center;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.ach-row.plat .ar-ic{font-size:30px}
+.ach-row .ar-b{flex:1;min-width:0}
+.ach-row .ar-b b{display:block;font-size:14.5px;font-weight:600}
+.ach-row .ar-b span{display:block;font-size:12.5px;color:var(--dim);margin-top:1px}
+.ach-row .ar-meta{font-size:11.5px;color:var(--dim);margin-top:3px}
+#achtrophy{position:fixed;z-index:44;right:16px;bottom:calc(env(safe-area-inset-bottom) + 60px);display:flex;gap:14px;align-items:center;padding:13px 18px;border-radius:16px;background:linear-gradient(135deg,#1e2444,#0a0e20);box-shadow:0 0 0 1px rgba(255,255,255,.16),0 18px 46px rgba(0,0,0,.6);transform:translateX(calc(100% + 40px));transition:transform .55s cubic-bezier(.2,.8,.2,1);max-width:min(400px,92vw);pointer-events:none}
+#achtrophy.on{transform:translateX(0)}
+#achtrophy .at-ico{font-size:36px;filter:drop-shadow(0 0 12px rgba(255,255,255,.3))}
+#achtrophy .at-lbl{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600}
+#achtrophy .at-name{font-size:16px;font-weight:600;margin-top:1px}
+#achtrophy .at-desc{font-size:12.5px;color:var(--dim);margin-top:1px}
+@media(max-width:700px){#achtrophy{right:10px;left:10px;max-width:none;bottom:calc(env(safe-area-inset-bottom) + 66px)}}
 </style>
 </head>
 <body>
@@ -157,6 +192,8 @@ body.rm #season span{display:none}
 <div id="hints"><span>◀ ▶ игра</span><span>▲ ▼ раздел</span><span>Enter играть</span><span>I подробнее</span><span>F избранное</span><span>R рулетка</span><span>T трофеи</span></div>
 <div id="count"></div>
 
+<button id="panClose" aria-label="Закрыть">✕</button>
+
 <div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
 <div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
@@ -164,8 +201,10 @@ body.rm #season span{display:none}
 <div id="profP" class="pan"><div id="profBox" class="box"></div></div>
 <div id="shopP" class="pan"><div id="shopBox" class="box"></div></div>
 <div id="lbP" class="pan"><div id="lbBox" class="box"></div></div>
+<div id="achP" class="pan"><div id="achBox" class="box"></div></div>
 <input type="file" id="pfile" accept="application/json,.json" hidden>
 <div id="toast"><i></i><div><b></b><span></span></div></div>
+<div id="achtrophy"><i class="at-ico"></i><div><div class="at-lbl"></div><div class="at-name"></div><div class="at-desc"></div></div></div>
 <div id="afk" aria-hidden="true"><div class="fc" id="afkCard"><div class="fi"></div><div class="fl"></div><div class="ft"></div></div><div class="fz">Нажми любую кнопку</div></div>
 <div id="splash"><h1>RKCPlay</h1><p>Нажми любую кнопку</p></div>
 
@@ -173,49 +212,279 @@ body.rm #season span{display:none}
 <div id="player"><iframe id="frame" allow="fullscreen; autoplay; gamepad"></iframe></div>
 
 <script>
-// ====== СПИСОК ИГР — добавляй сюда новые строки ======
-// auth:true — игра только для вошедших (замок 🔒); dev: kb = ПК (клавиатура/мышь), touch = телефон/планшет; cat: horror | arcade | strat | logic | race | apps; new:true даёт значок NEW
+// ====== СПИСОК ИГР ======
 const GAMES=[
  {title:"Dead by Canvas",file:"games/dead-by-canvas.html",emoji:"🔦",desc:"Выживание от маньяка в тёмном лесу",cat:"horror",c:"#d0432f",c2:"#3a0d0d",new:true,dev:["kb","touch"],
   info:"Тёмный лес, маньяк и пять генераторов. Почини три из них и беги к воротам на востоке. Прячься в кустах, роняй палетки и не промахивайся мимо красной зоны.",
-  how:["WASD или стрелки — бег, Shift — красться","E — удерживай, чтобы чинить генератор, нажми, чтобы уронить палетку","Пробел или клик — попасть в красную зону проверки навыка","На телефоне: джойстик, кнопка действия и тап по экрану для проверки"]},
+  how:["WASD или стрелки — бег, Shift — красться","E — удерживай, чтобы чинить генератор, нажми, чтобы уронить палетку","Пробел или клик — попасть в красную зону проверки навыка","На телефоне: джойстик, кнопка действия и тап по экрану для проверки"],
+  ach:[
+    {id:'gen1',  n:'Первый ток',  d:'Почини первый генератор',                    t:'bronze'},
+    {id:'gen3',  n:'Электрик',    d:'Почини все три генератора',                   t:'silver'},
+    {id:'escape',n:'Побег',       d:'Сбеги через ворота',                          t:'gold'},
+    {id:'no_hit',n:'Неуязвимый',  d:'Сбеги, ни разу не попавшись маньяку',          t:'gold'}
+  ]},
+
  {title:"Обломов: Беги, Илья Ильич!",file:"games/oblomov-run.html",dev:["kb","touch"],emoji:"🛋️",desc:"Забег по мотивам романа",cat:"arcade",c:"#9bbf4c",c2:"#3b4a2a",new:true,
   info:"Забег по мотивам романа Гончарова.",
-  how:["Свайп влево или вправо — сменить дорожку, на ПК: A/D или стрелки","Свайп вверх — прыжок (W, ↑ или пробел), вниз — подкат или кувырок в воздухе (S или ↓)","Пауза — Esc или P, на телефоне — тап по верху экрана по центру"]},
+  how:["Свайп влево/вправо — сменить дорожку, на ПК: A/D или стрелки","Свайп вверх — прыжок, вниз — подкат","Esc или P — пауза"],
+  ach:[
+    {id:'a1', n:'Встал с дивана',        d:'Начни игру',                            t:'bronze'},
+    {id:'a2', n:'Прогулка',              d:'500 м за раз',                          t:'bronze'},
+    {id:'a3', n:'Марафон лентяя',        d:'1000 м за раз',                         t:'silver'},
+    {id:'a4', n:'Неугомонный',           d:'2000 м за раз',                         t:'silver'},
+    {id:'a5', n:'Пирожковый магнат',     d:'100 🥟 всего',                          t:'bronze'},
+    {id:'a6', n:'Сон Обломова',          d:'Пройди сон',                            t:'silver'},
+    {id:'a7', n:'Догнал велосипед',      d:'Пройди погоню',                         t:'silver'},
+    {id:'a8', n:'Ловкач',                d:'15 🥟 за один бонус',                   t:'silver'},
+    {id:'a9', n:'Модник',                d:'Купи халат',                            t:'bronze'},
+    {id:'a10',n:'Без царапин',           d:'1000 м без ударов',                     t:'silver'},
+    {id:'a11',n:'На волосок',            d:'10 «ловко» за забег',                   t:'silver'},
+    {id:'a12',n:'Штольц ушёл',           d:'Пройди босса',                          t:'silver'},
+    {id:'a13',n:'Комбо ×5',              d:'40 пирожков подряд',                    t:'silver'},
+    {id:'a14',n:'Победил автора',        d:'Победи Гончарова',                      t:'gold'},
+    {id:'a15',n:'Идеальный читатель',    d:'Гончаров без урона',                    t:'gold'},
+    {id:'a16',n:'Розовая мечта',         d:'20 розовых объектов',                   t:'silver'},
+    {id:'a17',n:'Книжный бог',           d:'Встреть Гончарова',                     t:'bronze'},
+    {id:'a18',n:'Чернильное пятно',      d:'Войди в Мир 2',                         t:'silver'},
+    {id:'a19',n:'Сенная площадь',        d:'500 м в Мире 2',                        t:'silver'},
+    {id:'a20',n:'Кошмар Обломовки',      d:'Пройди Сон 2',                          t:'silver'},
+    {id:'a21',n:'Штольц вернулся',       d:'Победи Штольца в Сне 2',                t:'silver'},
+    {id:'a22',n:'Тварь дрожащая',        d:'1500 м в Мире 2',                       t:'silver'},
+    {id:'a23',n:'Спокойная совесть',     d:'Сон 2 без ударов',                      t:'gold'},
+    {id:'a24',n:'Фёдор Михайлович',      d:'3000 м в Мире 2',                       t:'gold'},
+    {id:'a25',n:'Листы 1',               d:'Перейди из Мира 1 в Мир 2',             t:'silver'},
+    {id:'a26',n:'Возрождение к истокам', d:'Проиграй 1 раз',                        t:'bronze'},
+    {id:'a27',n:'Тотальная лень',        d:'Проиграй 10 раз',                       t:'silver'},
+    {id:'a28',n:'Один из многих',        d:'Проиграй 100 раз',                      t:'silver'},
+    {id:'a29',n:'Топор',                 d:'Впервые получи топор',                  t:'silver'},
+    {id:'a30',n:'Как?!',                 d:'Ударь Штольца топором',                 t:'silver'},
+    {id:'a31',n:'Плохое время',          d:'Встреть Раскольникова',                 t:'silver'},
+    {id:'a32',n:'Раскололся',            d:'Победи Раскольникова',                  t:'gold'},
+    {id:'a33',n:'Побег с оружием',       d:'Выйди в меню во время схватки с боссом, держа топор', t:'silver'},
+    {id:'a34',n:'ALT + F4',              d:'Выйди в меню во время финального босса мира', t:'gold'},
+    {id:'a35',n:'Первый кувырок',        d:'Выполни первый кувырок',                t:'bronze'},
+    {id:'a36',n:'Подхватил темп',        d:'Проедь 100 м в кувырке',                t:'silver'},
+    {id:'a37',n:'Кувырок за кувырком',   d:'Сделай 3 кувырка подряд',               t:'silver'},
+    {id:'a38',n:'Мастер акробатики',     d:'Сделай 5 кувырков подряд',              t:'gold'},
+    {id:'a39',n:'В последний момент',    d:'Кувырком избеги 3 препятствий за забег',t:'silver'},
+    {id:'a40',n:'Король дороги',         d:'Соверши 25 кувырков за один забег',     t:'gold'},
+    {id:'a41',n:'Не отставай!',          d:'Пройди 250 м в погоне за велосипедом',  t:'silver'},
+    {id:'a42',n:'Велосипедный слалом',   d:'Избеги 12 препятствий в погоне',        t:'silver'},
+    {id:'a43',n:'Он разозлился',         d:'Доживи до третьей фазы боя со Штольцем',t:'gold'},
+    {id:'a44',n:'Бета-тестер босса',     d:'Переживи 3 атаки финальной фазы Штольца',t:'gold'},
+    {id:'a45',n:'Рука судьбы',           d:'Отбей рывок Достоевского',              t:'silver'},
+    {id:'a46',n:'Каторга окончена',      d:'Победи Достоевского',                   t:'gold'},
+    {id:'a47',n:'Чистая совесть',        d:'Достоевский без урона',                 t:'gold'},
+    {id:'a48',n:'Свет сквозь жёлтое',    d:'5 розовых за бой с Достоевским',        t:'gold'},
+    {id:'a49',n:'Нырнул',                d:'Попади на Неву',                        t:'silver'},
+    {id:'a50',n:'Невский проспект',      d:'Пройди Неву до конца',                  t:'gold'},
+    {id:'a51',n:'Не промок',             d:'Нева без ударов',                       t:'gold'},
+    {id:'a52',n:'Боссраш',               d:'Начни боссраш',                         t:'bronze'},
+    {id:'a53',n:'Первый гигапирог',      d:'Получи гигапирог за победу над боссом', t:'bronze'},
+    {id:'a54',n:'Ва-банк',               d:'Продолжи боссраш, имея награду',        t:'silver'},
+    {id:'a55',n:'Вовремя ушёл',          d:'Забери награду и выйди из боссраша',    t:'silver'},
+    {id:'a56',n:'Всё или ничего',        d:'Проиграй в боссраше с накоплением',     t:'silver'},
+    {id:'a57',n:'Автор повержен (дважды)',d:'Победи Гончарова в боссраше',           t:'silver'},
+    {id:'a58',n:'Гигакопилка',           d:'Накопи 7 гигапирогов за один заход',    t:'silver'},
+    {id:'a59',n:'Неоновый король',       d:'Пройди боссраш полностью (12 гигапирогов)', t:'gold'},
+    {id:'a60',n:'Чистый боссраш',        d:'Пройди боссраш без потери жизней',      t:'gold'},
+    {id:'a61',n:'Гигамагнат',            d:'Забери 25 гигапирогов за всё время',    t:'gold'},
+    {id:'a62',n:'Король неона',          d:'Пройди боссраш 3 раза',                 t:'gold'}
+  ]},
+
  {title:"Спагетти-Спидран",file:"games/spaghetti-speedrun.html",emoji:"🍝",desc:"Платформер-спидран",cat:"arcade",c:"#ff8a3d",c2:"#c2331f",dev:["kb","touch"],
-  info:"Платформер на скорость. Таймер стартует с первого движения, так что успевай осмотреться.",
-  how:["A и D — бег, Shift — ускорение","Пробел — прыжок, удерживай, чтобы прыгнуть выше"]},
+  info:"Платформер на скорость. Таймер стартует с первого движения.",
+  how:["A и D — бег, Shift — ускорение","Пробел — прыжок, удерживай, чтобы прыгнуть выше"],
+  ach:[
+    {id:'first_move',    n:'Первые шаги',      d:'Начни движение',                                  t:'bronze'},
+    {id:'first_death',   n:'Ой',               d:'Умри в первый раз',                               t:'bronze'},
+    {id:'dash',          n:'Рывок',            d:'Используй рывок (Q)',                             t:'bronze'},
+    {id:'finisher',      n:'Финишер',          d:'Пройди основной уровень',                         t:'silver'},
+    {id:'student',       n:'Ученик',           d:'Пройди обучение',                                 t:'silver'},
+    {id:'immortal',      n:'Бессмертный',      d:'Пройди основной уровень без единой смерти',       t:'silver'},
+    {id:'acrobat',       n:'Акробат',          d:'Сделай флип или пикирование в воздухе',           t:'silver'},
+    {id:'master_actions',n:'Мастер действий',  d:'Используй все 6 специальных действий',            t:'silver'},
+    {id:'endless',       n:'Бесконечный бегун',d:'Пройди сгенерированный уровень',                  t:'silver'},
+    {id:'speedrunner',   n:'Спидраннер',       d:'Пройди основной уровень меньше чем за 2 минуты',  t:'gold'},
+    {id:'marathon',      n:'Марафонец',        d:'Пройди основной уровень меньше чем за минуту',    t:'gold'},
+    {id:'record',        n:'Рекордсмен',       d:'Установи новый рекорд',                           t:'gold'},
+    {id:'veteran',       n:'Ветеран',          d:'Пройди сгенерированный уровень номер 10 или выше',t:'gold'}
+  ]},
+
  {title:"Отель «Закат»",file:"games/hotel-maze.html",emoji:"🏨",desc:"Хоррор, ночная смена",cat:"horror",c:"#8a3dff",c2:"#2a0f5e",dev:["kb"],
   info:"Ночная смена в отеле. Свети фонариком, вставляй предохранители в щиток, закрывай и открывай железную дверь и отгоняй врагов крестом.",
-  how:["WASD — идти, мышь — направить фонарик","Левая кнопка мыши — взять предмет, вставить предохранитель или нажать кнопку","E — применить крест на видимого врага"]},
+  how:["WASD — идти, мышь — направить фонарик","Левая кнопка мыши — взять предмет, вставить предохранитель или нажать кнопку","E — применить крест на видимого врага"],
+  ach:[
+    {id:'p_first',   n:'Свет включён',         d:'Выберитесь из отеля',                        t:'bronze'},
+    {id:'i_fuse',    n:'Первый предохранитель',d:'Подберите предохранитель',                   t:'bronze'},
+    {id:'i_bat',     n:'Свежая батарейка',     d:'Подберите батарейку',                        t:'bronze'},
+    {id:'i_cross',   n:'Крест у вас',          d:'Подберите крест',                            t:'bronze'},
+    {id:'i_btn',     n:'Дверной мастер',       d:'Нажмите кнопку и переключите дверь',         t:'bronze'},
+    {id:'b_paint',   n:'Первый кирпич',        d:'Поставьте любую клетку в редакторе',         t:'bronze'},
+    {id:'b_cam',     n:'Видеонаблюдение',      d:'Поставьте камеру в редакторе',               t:'bronze'},
+    {id:'b_wire',    n:'Проводка',             d:'Проложите провод от кнопки к двери',         t:'bronze'},
+    {id:'b_size',    n:'Больше места',         d:'Расширьте или сузьте карту',                 t:'bronze'},
+    {id:'b_base',    n:'Из каталога',          d:'Загрузите базовую карту',                    t:'bronze'},
+    {id:'c_first',   n:'Включить планшет',     d:'Откройте планшет с камерами',                t:'bronze'},
+    {id:'c_lure',    n:'Приманка',             d:'Примените приманку',                         t:'bronze'},
+    {id:'f_book',    n:'Любитель чтения',      d:'Откройте блокнот',                           t:'bronze'},
+    {id:'f_watch',   n:'Мне показалось?',      d:'Увидьте Зрителя',                            t:'bronze'},
+    {id:'lose_time', n:'Время',                d:'Время вышло, и за вами пришёл Снейк',        t:'bronze'},
+    {id:'lose_W',    n:'Бродяга',              d:'Вас поймал Бродяга',                         t:'bronze'},
+    {id:'lose_S',    n:'Статуя',               d:'Вас поймала Статуя',                         t:'bronze'},
+    {id:'lose_N',    n:'Шум',                  d:'Вас поймал Шум',                             t:'bronze'},
+    {id:'lose_H',    n:'Тень',                 d:'Вас поймала Тень',                           t:'bronze'},
+    {id:'p_5',       n:'Постоялец',            d:'Выиграйте 5 раз',                            t:'silver'},
+    {id:'i_insert',  n:'Щиток ожил',           d:'Вставьте предохранитель в щиток',            t:'silver'},
+    {id:'i_bat3',    n:'Запасливый',           d:'Подберите 3 батарейки за раунд',             t:'silver'},
+    {id:'c_all',     n:'Все камеры',           d:'Посмотрите в каждую камеру за раунд',        t:'silver'},
+    {id:'c_lure2',   n:'Звонок на всех',       d:'Приманка привлекла двух врагов и больше',    t:'silver'},
+    {id:'f_angry',   n:'Рассерженный дедушка', d:'Доведите Старика до ярости',                 t:'silver'},
+    {id:'f_statue',  n:'Нос к носу',           d:'Подойдите вплотную к замершей Статуе',       t:'silver'},
+    {id:'f_hope',    n:'Ложная надежда',       d:'Примените крест на Снейка',                  t:'silver'},
+    {id:'w_W',       n:'Бродяга пройден',      d:'Выберитесь с Бродягой в раунде',             t:'silver'},
+    {id:'w_S',       n:'Статуя пройдена',      d:'Выберитесь со Статуей в раунде',             t:'silver'},
+    {id:'w_N',       n:'Шум пройден',          d:'Выберитесь с Шумом в раунде',                t:'silver'},
+    {id:'w_H',       n:'Тень пройдена',        d:'Выберитесь с Тенью в раунде',                t:'silver'},
+    {id:'w_Z',       n:'Зритель пройден',      d:'Выберитесь со Зрителем в раунде',            t:'silver'},
+    {id:'w_R',       n:'Доходяга пройден',     d:'Выберитесь с Доходягой в раунде',            t:'silver'},
+    {id:'w_A',       n:'Художник пройден',     d:'Выберитесь с Художником в раунде',           t:'silver'},
+    {id:'cross_W',   n:'Распятие: Бродяга',    d:'Заставьте Бродягу исчезнуть крестом',        t:'silver'},
+    {id:'cross_S',   n:'Распятие: Статуя',     d:'Заставьте Статую исчезнуть крестом',         t:'silver'},
+    {id:'cross_N',   n:'Распятие: Шум',        d:'Заставьте Шум исчезнуть крестом',            t:'silver'},
+    {id:'cross_H',   n:'Распятие: Тень',       d:'Заставьте Тень исчезнуть крестом',           t:'silver'},
+    {id:'def_W',     n:'Щит: Бродяга',         d:'Долф принял удар от Бродяги',                t:'silver'},
+    {id:'def_S',     n:'Щит: Статуя',          d:'Долф принял удар от Статуи',                 t:'silver'},
+    {id:'def_N',     n:'Щит: Шум',             d:'Долф принял удар от Шума',                   t:'silver'},
+    {id:'def_H',     n:'Щит: Тень',            d:'Долф принял удар от Тени',                   t:'silver'},
+    {id:'def_L',     n:'Щит: Флод',            d:'Долф принял удар от Флода',                  t:'silver'},
+    {id:'lose_E',    n:'Старик',               d:'Вас поймал Старик',                          t:'silver'},
+    {id:'lose_L',    n:'Флод',                 d:'Вас поймал Флод',                            t:'silver'},
+    {id:'lose_R',    n:'Доходяга',             d:'Вас поймал Доходяга',                        t:'silver'},
+    {id:'lose_A',    n:'Художник',             d:'Вас поймал Художник',                        t:'silver'},
+    {id:'p_fast',    n:'Спринтер',             d:'Выберитесь, когда осталось 90 с и больше',   t:'gold'},
+    {id:'p_last',    n:'На волоске',           d:'Выберитесь, когда осталось меньше 10 с',     t:'gold'},
+    {id:'b_test',    n:'Испытатель',           d:'Выиграйте на своей карте из редактора',      t:'gold'},
+    {id:'w_E',       n:'Старик пройден',       d:'Выберитесь со Стариком в раунде',            t:'gold'},
+    {id:'w_L',       n:'Флод пройден',         d:'Выберитесь с Флодом в раунде',               t:'gold'},
+    {id:'cross_E',   n:'Распятие: Старик',     d:'Заставьте Старика исчезнуть крестом',        t:'gold'},
+    {id:'cross_L',   n:'Распятие: Флод',       d:'Заставьте Флода исчезнуть крестом',          t:'gold'},
+    {id:'cross_R',   n:'Распятие: Доходяга',   d:'Заставьте Доходягу исчезнуть крестом',       t:'gold'},
+    {id:'cross_A',   n:'Распятие: Художник',   d:'Заставьте Художника исчезнуть крестом',      t:'gold'},
+    {id:'def_E',     n:'Щит: Старик',          d:'Долф принял удар от Старика',                t:'gold'},
+    {id:'def_R',     n:'Щит: Доходяга',        d:'Долф принял удар от Доходяги',               t:'gold'},
+    {id:'def_A',     n:'Щит: Художник',        d:'Долф принял удар от Художника',              t:'gold'},
+    {id:'ch_all',    n:'Полный отель',         d:'Выиграйте, включив всех врагов',             t:'gold'},
+    {id:'ch_notab',  n:'Без планшета',         d:'Выиграйте, ни разу не открыв планшет',       t:'gold'},
+    {id:'ch_nobat',  n:'Без батареек',         d:'Выиграйте, не подобрав ни одной батарейки',  t:'gold'},
+    {id:'ch_speed',  n:'Быстрый и смелый',     d:'Выиграйте с 3+ врагами и остатком 60 с',     t:'gold'},
+    {id:'ch_150',    n:'Легенда',              d:'Наберите крутость 150',                      t:'gold'},
+    {id:'ch_200',    n:'Король отеля',         d:'Наберите крутость 200',                      t:'gold'}
+  ]},
+
  {title:"Казик «Блябуду Рояль»",file:"games/kazik-neo.html",dev:["kb","touch"],emoji:"🎰",desc:"Слоты, шахматы, мины",cat:"logic",c:"#ffcf33",c2:"#b3260f",
-  info:"Слоты, шахматы и мины в одном казино.",how:["Поставь ставку и нажми «Играть»"]},
+  info:"Слоты, шахматы и мины в одном казино.",how:["Поставь ставку и нажми «Играть»"],
+  ach:[
+    {id:'first_bet',   n:'Первая ставка',    d:'Сделай первую ставку в любом режиме',        t:'bronze'},
+    {id:'first_win',   n:'Первая победа',    d:'Выиграй хотя бы одну игру',                  t:'bronze'},
+    {id:'diversify',   n:'Всё по-немногу',   d:'Сыграй в 5 разных режимов',                  t:'bronze', max:5},
+    {id:'streak3',     n:'Горячая рука',     d:'Собери стрик из 3 побед подряд',             t:'silver'},
+    {id:'rich10k',     n:'Десять тысяч',     d:'Достигни баланса 10 000',                    t:'silver'},
+    {id:'blackjack',   n:'Блэкджек!',        d:'Набери 21 с двух карт',                      t:'silver'},
+    {id:'checkmate',   n:'Мат!',             d:'Победи в шахматах',                          t:'silver'},
+    {id:'jackpot',     n:'Джекпот',          d:'Поймай три семёрки в слотах 3×3',            t:'gold'},
+    {id:'all_games',   n:'Полная коллекция', d:'Сыграй во все 11 режимов',                   t:'gold', max:11},
+    {id:'million',     n:'Миллионер',        d:'Накопи 1 000 000 на балансе',                t:'gold'},
+    {id:'bottom',      n:'Дно',              d:'Проиграй всё до нуля',                       t:'gold'}
+  ]},
+
  {title:"Battle Simulator",file:"games/battle-simulator.html",dev:["kb","touch"],emoji:"⚔️",desc:"Красные против Синих",cat:"strat",c:"#3d7bff",c2:"#d62f3f",
   info:"Эпичная битва двух армий: красные против синих. Ты за синих: нанимай бойцов за монеты и улучшай базу.",
-  how:["Нажимай на карточки юнитов (мечник, лучник, гигант, маг), чтобы нанять за монеты","«Улучшить базу» усиливает твою базу","Кнопки 1x, 2x и 5x меняют скорость, есть пауза и перезапуск"]},
+  how:["Нажимай на карточки юнитов, чтобы нанять за монеты","«Улучшить базу» усиливает твою базу","1x, 2x, 5x меняют скорость, есть пауза и перезапуск"]},
+
  {title:"Мозаика",file:"games/mozaika-match3.html",emoji:"💎",desc:"Три в ряд",cat:"logic",c:"#2fd6c4",c2:"#2a56c9",dev:["kb","touch"],
-  info:"Классическое «три в ряд» с рекордом в меню.",how:["Меняй местами соседние камни, чтобы собрать три в ряд","Подробные правила — кнопка «Как играть» в меню игры"]},
+  info:"Классическое «три в ряд» с рекордом в меню.",how:["Меняй местами соседние камни, чтобы собрать три в ряд","Подробные правила — кнопка «Как играть» в меню игры"],
+  ach:[
+    {id:'first_match', n:'Первая тройка', d:'Собери первое совпадение',                t:'bronze'},
+    {id:'moves25',     n:'Разминка',      d:'Сделай 25 ходов в одной игре',            t:'bronze'},
+    {id:'cross',       n:'Крест',         d:'Создай фишку-крест (4 в ряд)',            t:'silver'},
+    {id:'score1k',     n:'Тысяча',        d:'Набери 1000 очков',                       t:'silver'},
+    {id:'all_modes',   n:'Все режимы',    d:'Сыграй в каждый из 3 режимов',            t:'silver', max:3},
+    {id:'rainbow',     n:'Радуга',        d:'Создай радужную фишку (5 в ряд)',         t:'gold'},
+    {id:'score5k',     n:'Мастер мозаики',d:'Набери 5000 очков',                       t:'gold'},
+    {id:'record',      n:'Рекордсмен',    d:'Установи новый рекорд в любом режиме',    t:'gold'}
+  ]},
+
  {title:"Мафия · ИИ за столом",file:"games/mafia-gm.html",dev:["kb","touch"],emoji:"🕵️",desc:"Ведущий для игры с ИИ",cat:"logic",c:"#c23a5a",c2:"#25122a",
   info:"Ведущий для настольной мафии, где за столом сидят ИИ-игроки.",
-  how:["Роли: мирный житель, мафия и по желанию шериф","До 8 игроков, мафии не больше двух","Все правила и команды — в разделе внутри игры"]},
+  how:["Роли: мирный житель, мафия и по желанию шериф","До 8 игроков, мафии не больше двух","Все правила и команды — в разделе внутри игры"],
+  ach:[
+    {id:'first_game',   n:'Первая партия', d:'Начни первую игру',                     t:'bronze'},
+    {id:'interviewer',  n:'Интервьюер',    d:'Проведи интервью с игроком',            t:'bronze'},
+    {id:'chronicler',   n:'Хроникёр',      d:'Скачай протокол игры в .txt',            t:'silver'},
+    {id:'game_master',  n:'Мастер игры',   d:'Доведи партию до победы любой стороны',  t:'gold'}
+  ]},
+
  {title:"Симулятор электрощитка",file:"games/electric-panel.html",dev:["kb","touch"],emoji:"⚡",desc:"Щёлкай автоматы",cat:"arcade",c:"#ffe033",c2:"#4a5a6e",
   info:"Щёлкай рычажки щитка. Если захочется хаоса — есть кнопка «Авария!».",how:["Кликай по рычажкам и по кнопке T"]},
+
  {title:"XIZUS: The Final Cut",file:"games/xizus.html",dev:["kb","touch"],emoji:"🗄️",desc:"Проверка документов",cat:"logic",c:"#6b8cae",c2:"#1d2733",
   info:"Проверка документов в терминале: проверяй бумаги и решай, пропустить или отказать.",
-  how:["Кнопки Approve и Reject — одобрить или отклонить документ","Командная строка внизу принимает команды, на телефоне нужна экранная клавиатура"]},
+  how:["Кнопки Approve и Reject — одобрить или отклонить документ","Командная строка внизу принимает команды"],
+  ach:[
+    {id:'doc1',     n:'Первый документ',  d:'Обработай первый документ без ошибки',    t:'bronze'},
+    {id:'secret1',  n:'Любопытный',       d:'Открой первый секретный код',             t:'bronze'},
+    {id:'doc15',    n:'Смена идёт',       d:'Обработай 15 документов',                 t:'silver', max:15},
+    {id:'secret5',  n:'Архивариус',       d:'Найди 5 секретных кодов за смену',        t:'silver', max:5},
+    {id:'omega',    n:'Режим ОМЕГА',      d:'Достигни множителя потока 5.0',           t:'silver'},
+    {id:'doc45',    n:'Смена окончена',   d:'Обработай все 45 документов',             t:'gold'},
+    {id:'awake',    n:'Пробуждение',      d:'Введи финальный код пробуждения',         t:'gold'},
+    {id:'rankomega',n:'Создатель',        d:'Получи ранг ОМЕГА (600%+) в финале',      t:'gold'},
+    {id:'allsecret',n:'Хранитель тайн',   d:'Найди все 19 секретных кодов за смену',   t:'gold', max:19}
+  ]},
+
  {title:"Xizus vs Faerg",file:"games/xizus-vs-faerg-td.html",dev:["kb","touch"],emoji:"🛡️",desc:"Tower defense (v5)",cat:"strat",c:"#43c466",c2:"#14502e",
-  info:"Tower defense. Перед боем башни нужно выбрать заранее.",how:["Перед миссией нажми «Инвентарь» вверху экрана и выбери 4 активные башни"]},
+  info:"Tower defense. Перед боем башни нужно выбрать заранее.",how:["Перед миссией нажми «Инвентарь» и выбери 4 активные башни"],
+  ach:[
+    {id:'first_tower', n:'Инженер',        d:'Построй первую башню',                  t:'bronze'},
+    {id:'first_wave',  n:'Первая волна',   d:'Отбей первую волну',                    t:'bronze'},
+    {id:'sold',        n:'Вторсырьё',      d:'Продай башню',                          t:'bronze'},
+    {id:'veteran',     n:'Ветеран',        d:'Дойди до 20 волны',                     t:'silver'},
+    {id:'arsenal',     n:'Арсенал',        d:'Построй каждый тип башни хотя бы раз',  t:'silver'},
+    {id:'victory',     n:'Сектор защищён', d:'Заверши любую сложность победой',       t:'gold'},
+    {id:'hard_win',    n:'На грани',       d:'Победи на сложности «Сложно»',          t:'gold'},
+    {id:'infinite30',  n:'Бездна-30',      d:'Дойди до 30 волны в режиме «Бездна»',   t:'gold'}
+  ]},
+
  {title:"Drift Wheel",file:"games/drift-wheel.html",emoji:"🏎️",desc:"Дрифт-гонка с соперниками и нитро",cat:"race",c:"#e63946",c2:"#2a0d12",new:true,dev:["kb","touch"],
-  info:"Гонка на дрифте: 3 трассы, до 7 соперников с ИИ, 3 уровня сложности и выбор числа кругов. Копи нитро дрифтом и приезжай первым. Рекорд круга сохраняется.",
-  how:["A/D или ←/→ — руль, S/↓ — тормоз","W, ↑, Shift или Space — нитро","Esc — меню, Enter — старт и рестарт","На телефоне: веди пальцем по экрану, справа тормоз и нитро"]},
+  info:"Гонка на дрифте: 3 трассы, до 7 соперников с ИИ, 3 уровня сложности и выбор числа кругов. Копи нитро дрифтом и приезжай первым.",
+  how:["A/D или ←/→ — руль, S/↓ — тормоз","W, ↑, Shift или Space — нитро","Esc — меню, Enter — старт и рестарт","На телефоне: веди пальцем по экрану, справа тормоз и нитро"],
+  ach:[
+    {id:'first_race', n:'Первая гонка',  d:'Финишируй в любой гонке',              t:'bronze'},
+    {id:'drifter',    n:'Дрифтер',       d:'Удержи дрифт до комбо x2',              t:'bronze'},
+    {id:'winner',     n:'Победитель',    d:'Приди первым',                         t:'silver'},
+    {id:'hard_win',   n:'По-серьёзному', d:'Победи на сложности «Сложно»',          t:'silver'},
+    {id:'record',     n:'Рекордсмен',    d:'Установи новый рекорд круга',          t:'silver'},
+    {id:'traveler',   n:'Путешественник',d:'Победи на 4 разных трассах',           t:'gold', max:4},
+    {id:'marathon',   n:'Марафонец',     d:'Победи в гонке на 7 кругов',            t:'gold'},
+    {id:'impossible', n:'Безумный',      d:'Победи на «НЕВОЗМОЖНОЙ»',              t:'gold'}
+  ]},
+
  {title:"Aiblok Engine",file:"games/aiblok-engine.html",emoji:"🧱",desc:"Конструктор игр из блоков",cat:"apps",c:"#ffc533",c2:"#5a3a05",new:true,dev:["kb","touch"],
   info:"Визуальный редактор: собирай игру из блоков (события, объекты, переменные, физика), жми «Пуск» и сразу играй в то, что собрал.",
-  how:["Перетащи блоки из библиотеки в зону скрипта или кликни по блоку","Кликни по блоку в скрипте, чтобы изменить параметры","Ctrl+Enter — пуск","В игре: WASD или стрелки — движение, Esc — выход"]},
+  how:["Перетащи блоки из библиотеки в зону скрипта или кликни по блоку","Кликни по блоку в скрипте, чтобы изменить параметры","Ctrl+Enter — пуск","В игре: WASD или стрелки — движение, Esc — выход"],
+  ach:[
+    {id:'firstblock', n:'Первый блок',   d:'Добавь блок в скрипт',                              t:'bronze'},
+    {id:'firstrun',   n:'ПУСК!',         d:'Запусти игру первый раз',                           t:'bronze'},
+    {id:'scene',      n:'Своя сцена',    d:'Создай хотя бы один объект и запусти игру',         t:'silver'},
+    {id:'realgame',   n:'Геймдизайнер',  d:'Управляемый объект + переменная в запущенной игре', t:'gold'}
+  ]},
 ];
 const CATS=[['all','Все'],['recent','Недавние'],['fav','Избранное'],['horror','Хоррор'],['arcade','Аркады'],['strat','Стратегии'],['logic','Логика'],['race','Гонки'],['apps','Приложения']];
 const EMPTY={recent:'Ты ещё ни во что не играл',fav:'Нажми ☆ или F, чтобы добавить игру сюда'};
 const TRO=[['first','🥉','Первый шаг','Запусти любую игру'],['fav','🥉','Любимчик','Добавь игру в избранное'],['dice','🥉','Рисковый','Выбери игру рулеткой'],
  ['three','🥈','Любопытный','Запусти три разные игры'],['long','🥈','Не оторваться','Играй 10 минут подряд'],['all','🥇','Коллекционер','Запусти все игры'],['plat','🏆','Платина','Получи все остальные трофеи']];
+const TTYPE={bronze:{ico:'🥉',label:'Бронза'},silver:{ico:'🥈',label:'Серебро'},gold:{ico:'🥇',label:'Золото'},plat:{ico:'🏆',label:'Платина'}};
 // =====================================================
 
 const $=id=>document.getElementById(id);
@@ -223,6 +492,7 @@ const track=$('track'),player=$('player'),frame=$('frame'),back=$('back');
 let ST={fav:{},stats:{},tro:{},mute:false,bk:null};
 try{Object.assign(ST,JSON.parse(localStorage.getItem('rkc')||'{}'))}catch(e){}
 ST.prof=Object.assign({name:'Игрок'+(1000+Math.random()*9000|0),avatar:'😀',frame:'none',title:''},ST.prof||{});ST.coins=ST.coins||0;ST.xp=ST.xp||0;ST.owned=ST.owned||[];
+ST.ach=ST.ach||{};ST.achp=ST.achp||{};
 const save=()=>{ST.ts=Date.now();try{localStorage.setItem('rkc',JSON.stringify(ST))}catch(e){}schedPush();refreshTop()};
 const S={cat:'all',cur:0,list:[]};let inGame=false,lastOpen=null,curFile=null,t0=0,rolling=false,tiles=[];
 
@@ -234,8 +504,14 @@ function snd(f,d=.08,type='sine',at=0,v=.06){if(ST.mute)return;
 const sMove=()=>snd(520,.05,'triangle'),sOk=()=>{snd(660,.1);snd(880,.16,'sine',.08)},sBack=()=>{snd(440,.08);snd(330,.12,'sine',.07)};
 const chime=()=>[784,988,1319].forEach((f,i)=>snd(f,.35,'sine',i*.11,.07));
 const boot=()=>[262,330,392,523].forEach((f,i)=>snd(f,.9,'sine',i*.13,.05));
+function sndTrophy(t){
+ const seq=t==='plat'?[[523,.14],[659,.14],[784,.14],[1047,.42]]
+          :t==='gold'?[[659,.13],[880,.28]]
+          :[[587,.12],[784,.22]];
+ seq.forEach(([f,d],i)=>snd(f,d,'triangle',i*.1,.09));
+}
 
-// ---------- трофеи и уведомления ----------
+// ---------- трофеи сайта и уведомления ----------
 const q=[];let showing=false;
 function toast(i,b,s){q.push([i,b,s]);if(!showing)pump()}
 function pump(){const n=q.shift();if(!n){showing=false;return}showing=true;const t=$('toast');
@@ -245,21 +521,125 @@ function award(id){if(ST.tro[id])return;ST.tro[id]=Date.now();earn(25);const t=T
  if(id!=='plat'&&TRO.every(x=>x[0]==='plat'||ST.tro[x[0]]))setTimeout(()=>award('plat'),1500)}
 function check(){const n=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].n).length;if(n>=1)award('first');if(n>=3)award('three');if(n>=GAMES.length)award('all')}
 const pans=()=>[...document.querySelectorAll('.pan.on')];
-function closePans(){pans().forEach(p=>p.classList.remove('on'));snd(420,.1)}
+function closePans(){pans().forEach(p=>p.classList.remove('on'));$('panClose').classList.remove('on');snd(420,.1)}
 const dateRu=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+
+// ---------- ДОСТИЖЕНИЯ ПО ИГРАМ ----------
+function gameAch(file){
+ const g=GAMES.find(x=>x.file===file);
+ if(!g||!Array.isArray(g.ach)||!g.ach.length)return [];
+ return [{id:'__plat',n:'Платина',d:'Получи все остальные достижения в игре',t:'plat',plat:true},...g.ach];
+}
+const achUnlocked=(file,id)=>!!(ST.ach&&ST.ach[file]&&ST.ach[file][id]);
+const platDone=file=>achUnlocked(file,'__plat');
+function achDone(file){return gameAch(file).filter(a=>achUnlocked(file,a.id)).length}
+function achTotalGlobal(){
+ let total=0,done=0,plats=0;
+ GAMES.forEach(g=>{
+  const a=gameAch(g.file);if(!a.length)return;
+  total+=a.length;
+  done+=a.filter(x=>achUnlocked(g.file,x.id)).length;
+  if(platDone(g.file))plats++;
+ });
+ return {total,done,plats};
+}
+function achToast(a,file){
+ const g=GAMES.find(x=>x.file===file);
+ const el=$('achtrophy');
+ el.querySelector('.at-ico').textContent=TTYPE[a.t]?.ico||'🏆';
+ el.querySelector('.at-lbl').textContent='Достижение · '+(TTYPE[a.t]?.label||'');
+ el.querySelector('.at-name').textContent=a.n;
+ el.querySelector('.at-desc').textContent=(g?g.title+' · ':'')+a.d;
+ el.classList.add('on');
+ clearTimeout(achToast.t);
+ achToast.t=setTimeout(()=>el.classList.remove('on'),4200);
+ sndTrophy(a.t);
+}
+function unlockAch(id){
+ if(!inGame||!curFile)return false;
+ const a=gameAch(curFile).find(x=>x.id===id);
+ if(!a||a.plat||achUnlocked(curFile,id))return false;
+ ST.ach[curFile]=ST.ach[curFile]||{};
+ ST.ach[curFile][id]=Date.now();
+ const reward=a.t==='bronze'?5:a.t==='silver'?10:25;
+ earn(reward);save();achToast(a,curFile);
+ const others=gameAch(curFile).filter(x=>!x.plat);
+ if(others.every(x=>achUnlocked(curFile,x.id))&&!platDone(curFile)){
+  ST.ach[curFile]['__plat']=Date.now();
+  save();
+  setTimeout(()=>{achToast(gameAch(curFile)[0],curFile);earn(100)},1600);
+ }
+ return true;
+}
+function progressAch(id,cur){
+ if(!inGame||!curFile)return;
+ const a=gameAch(curFile).find(x=>x.id===id);
+ if(!a||!a.max||achUnlocked(curFile,id))return;
+ ST.achp[curFile]=ST.achp[curFile]||{};
+ ST.achp[curFile][id]=Math.max(ST.achp[curFile][id]||0,Math.min(a.max,+cur||0));
+ save();
+ if(ST.achp[curFile][id]>=a.max)unlockAch(id);
+}
+function achPanel(file){
+ if(!file)file=S.list[S.cur]?.file;
+ if(!file)return;
+ const g=GAMES.find(x=>x.file===file);
+ if(!g)return;
+ const a=gameAch(file);
+ if(!a.length){
+  $('achBox').innerHTML=`<h3>🏆 Достижения</h3><small>${esc(g.title)}</small><p style="margin-top:16px;color:var(--dim)">У этой игры пока нет достижений. Как только автор их добавит, они появятся здесь.</p><div class="row"><button class="pill" id="acClose">Закрыть</button></div>`;
+ }else{
+  const done=achDone(file),total=a.length,pct=Math.round(done/total*100),plats=platDone(file);
+  const rows=a.map(x=>{
+   const un=achUnlocked(file,x.id);
+   const ts=un?new Date(ST.ach[file][x.id]).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}):'';
+   const prog=!un&&x.max&&ST.achp?.[file]?.[x.id]?` · ${ST.achp[file][x.id]}/${x.max}`:'';
+   return `<div class="ach-row ${x.plat?'plat':''} ${un?'':'locked'}">
+     <div class="ar-ic">${TTYPE[x.t].ico}</div>
+     <div class="ar-b"><b>${esc(x.n)}</b><span>${esc(x.d)}${prog}</span>
+     <div class="ar-meta">${un?'🏆 Получено '+ts:'🔒 Не получено'}</div></div>
+   </div>`;
+  }).join('');
+  $('achBox').innerHTML=`
+   <h3>🏆 Достижения</h3><small>${esc(g.title)}</small>
+   <div class="ach-hero" style="margin-top:12px">
+     <div class="ah-big">${plats?'🏆':'🎯'}</div>
+     <div style="flex:1;min-width:0">
+       <b>${done} из ${total}</b>
+       <div class="ah-sub">${plats?'🏆 Платина получена':pct+'% · до платины '+(total-done)+' шт.'}</div>
+       <div class="ach-bar"><i style="width:${pct}%"></i></div>
+     </div>
+   </div>
+   <div class="ach-list">${rows}</div>
+   <div class="row"><button class="pill" id="acPlay">Играть</button><button class="pill" id="acClose">Закрыть</button></div>`;
+  $('acPlay').onclick=()=>{closePans();openGame(file,true)};
+ }
+ $('acClose').onclick=closePans;
+ $('achP').classList.add('on');$('panClose').classList.add('on');snd(600,.1);
+}
+
 function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[g.file],cat=CATS.find(c=>c[0]===g.cat);
  const DV={kb:'💻 ПК',touch:'📱 Телефон и планшет'};
+ const A=gameAch(g.file),aDone=achDone(g.file),aTotal=A.length;
+ const achBlock=aTotal
+  ?`<h4>🏆 Достижения (${aDone}/${aTotal})</h4><div class="ach-bar" style="margin:4px 0 10px"><i style="width:${Math.round(aDone/aTotal*100)}%"></i></div>`
+  :`<h4>🏆 Достижения</h4><p style="font-size:13px;color:var(--dim);margin:2px 0 10px">У этой игры пока нет достижений</p>`;
  $('detBox').innerHTML=`<div class="dh" style="background:linear-gradient(150deg,${g.c},${g.c2})">${g.emoji}</div><h3>${g.title}</h3>
  <div class="chips" style="margin-top:6px"><span class="chip">${cat?cat[1]:''}</span>${g.new?'<span class="chip">NEW</span>':''}${g.auth?'<span class="chip">🔒 Только для вошедших</span>':''}</div>
  <p>${g.info||g.desc}</p>
  ${g.how?'<h4>Как играть</h4><ul>'+g.how.map(h=>'<li>'+h+'</li>').join('')+'</ul>':''}
  ${g.dev?'<h4>Подходит для</h4><div class="chips">'+g.dev.map(d=>'<span class="chip">'+DV[d]+'</span>').join('')+'</div>':''}
+ ${achBlock}
  <h4>Твоя статистика</h4><div class="st2">${st&&st.n?`<span>Запусков: <b>${st.n}</b></span><span>Время: <b>${fmt(st.t)}</b></span><span>Последний раз: <b>${dateRu(st.last)}</b></span>`:'<span>Ещё не запускалась</span>'}</div>
- <div class="row"><button class="pill" id="dPlay">Играть</button><button class="pill" id="dClose">Закрыть</button></div>`;
- $('dPlay').onclick=()=>{closePans();launch()};$('dClose').onclick=closePans;$('detP').classList.add('on');snd(600,.1)}
+ <div class="row"><button class="pill" id="dPlay">Играть</button>${aTotal?`<button class="pill" id="dAch">🏆 Достижения (${aDone}/${aTotal})</button>`:''}<button class="pill" id="dClose">Закрыть</button></div>`;
+ $('dPlay').onclick=()=>{closePans();launch()};if(aTotal)$('dAch').onclick=()=>{closePans();achPanel(g.file)};
+ $('dClose').onclick=closePans;$('detP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
+
 function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),tm=v.reduce((a,x)=>a+(x.t||0),0),P=ST.prof,L=lvl(ST.xp),c0=15*(L-1)**2,c1=15*L*L;
+ const A=achTotalGlobal();
  $('profBox').innerHTML=`<div style="display:flex;gap:14px;align-items:center">${avh(P.avatar,P.frame)}<div style="flex:1;min-width:0"><b style="font-size:20px">${esc(P.name)}</b><div style="color:var(--dim);font-size:13px">${esc(P.title)||'Без титула'} · Ур. ${L}</div><div class="bar" style="margin-top:6px"><i style="width:${(ST.xp-c0)/(c1-c0)*100}%"></i></div></div></div>
- <div class="st2" style="margin-top:12px"><span>🪙 <b>${ST.coins}</b></span><span>Запусков: <b>${n}</b></span><span>В играх: <b>${fmt(tm)}</b></span><span>Трофеев: <b>${TRO.filter(x=>ST.tro[x[0]]).length}/${TRO.length}</b></span></div>
+ <div class="st2" style="margin-top:12px"><span>🪙 <b>${ST.coins}</b></span><span>Запусков: <b>${n}</b></span><span>В играх: <b>${fmt(tm)}</b></span></div>
+ <div class="st2" style="margin-top:6px"><span>🏅 Трофеи сайта: <b>${TRO.filter(x=>ST.tro[x[0]]).length}/${TRO.length}</b></span><span>🏆 Достижения игр: <b>${A.done}/${A.total}</b>${A.plats?' · 🏆 '+A.plats:''}</span></div>
  <h4>Ник</h4><input id="pName" maxlength="20" value="${esc(P.name)}">
  <h4>Облако</h4>${user?`<small>Вход: ${esc(user.email)}</small><div class="row"><button class="pill" id="pSync">Синхронизировать</button><button class="pill" id="pOut">Выйти</button></div>`:sb?`<small>Войди, чтобы профиль жил на всех устройствах</small><input id="pMail" type="email" placeholder="Почта"><input id="pPass" type="password" placeholder="Пароль (от 8 символов)"><div class="row" style="margin-top:8px"><button class="pill" id="pIn">Войти</button><button class="pill" id="pUp">Регистрация</button></div>`:'<small>Облако недоступно</small>'}
  <div class="row"><button class="pill" id="pShop">🛒 Магазин</button><button class="pill" id="pLb" ${sb?'':'hidden'}>🏅 Рейтинг</button></div>
@@ -270,8 +650,8 @@ function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),
  else if(sb){const cr=()=>({email:$('pMail').value.trim(),password:$('pPass').value});
   $('pIn').onclick=async()=>{const{error}=await sb.auth.signInWithPassword(cr());toast(error?'⚠️':'✅',error?'Не вошли':'Вы вошли',error?error.message:'')};
   $('pUp').onclick=async()=>{const{data,error}=await sb.auth.signUp(cr());if(error)toast('⚠️','Не получилось',error.message);else if(!data.session)toast('📧','Подтверди почту','Потом нажми «Войти»')}}
- $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');snd(600,.1)}
-function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro,coins:ST.coins,xp:ST.xp,owned:ST.owned}},a=document.createElement('a');
+ $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
+function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro,ach:ST.ach,achp:ST.achp,coins:ST.coins,xp:ST.xp,owned:ST.owned}},a=document.createElement('a');
  a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='rkc-profile.json';document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('💾','Профиль сохранён','Файл rkc-profile.json лежит в загрузках')}
 function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||!o.data)throw 0;d=o.data}catch(e){toast('⚠️','Не получилось','Это не файл профиля RKC');return}
@@ -279,13 +659,18 @@ function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||
  for(const f in d.fav||{})if(files.has(f))ST.fav[f]=1;
  for(const f in d.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=d.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
  for(const id in d.tro||{})if(ids.has(id)){const v=num(d.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
+ for(const f in d.ach||{})if(files.has(f)){ST.ach[f]=ST.ach[f]||{};for(const id in d.ach[f])if(!ST.ach[f][id])ST.ach[f][id]=d.ach[f][id]}
+ for(const f in d.achp||{})if(files.has(f)){ST.achp[f]=ST.achp[f]||{};for(const id in d.achp[f])ST.achp[f][id]=Math.max(ST.achp[f][id]||0,num(d.achp[f][id]))}
  ST.xp=Math.max(ST.xp,num(d.xp));ST.coins=Math.max(ST.coins,num(d.coins));if(Array.isArray(d.owned))ST.owned=[...new Set([...ST.owned,...d.owned.filter(x=>typeof x==='string')])];
  save();closePans();setCat(S.cat);toast('✅','Профиль загружен','Данные объединены с текущими')}
 $('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfile);e.target.value=''};
 function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contains('on');
  if(on){const got=TRO.filter(t=>ST.tro[t[0]]).length;
-  $('troBox').innerHTML=`<h3>Трофеи</h3><small>Получено ${got} из ${TRO.length}</small>`+TRO.map(t=>`<div class="tr ${ST.tro[t[0]]?'':'lock'}"><i>${t[1]}</i><div><b>${t[2]}</b><span>${t[3]}</span></div></div>`).join('')}
- p.classList.toggle('on',on);snd(on?600:420,.1)}
+  $('troBox').innerHTML=`<h3>Трофеи сайта</h3><small>Получено ${got} из ${TRO.length} · достижения по играм — в «Подробнее»</small>`+TRO.map(t=>`<div class="tr ${ST.tro[t[0]]?'':'lock'}"><i>${t[1]}</i><div><b>${t[2]}</b><span>${t[3]}</span></div></div>`).join('')}
+ p.classList.toggle('on',on);
+ if(on)$('panClose').classList.add('on');
+ else closePans();
+ snd(on?600:420,.1)}
 
 // ---------- каталог ----------
 const getList=()=>{const L=baseList();return ST.devOnly?L.filter(g=>!g.dev||g.dev.includes(DEV)):L};
@@ -299,7 +684,7 @@ function setCat(c,s){S.cat=c;[...$('tabs').children].forEach(b=>{const on=b.data
  S.list=getList();S.cur=0;build();select(0);if(s)snd(400,.06,'triangle')}
 function build(){track.innerHTML='';tiles=S.list.map((g,i)=>{const t=document.createElement('div');t.className='tile'+(ST.fav[g.file]?' isfav':'')+(g.dev&&!g.dev.includes(DEV)?' nodev':'');t.setAttribute('role','option');
  t.style.background=`linear-gradient(150deg,${g.c},${g.c2})`;
- t.innerHTML=`<span class="ico">${g.emoji}</span>${g.new?'<span class="nw">NEW</span>':''}${g.auth?'<span class="lk">🔒</span>':''}<span class="st">★</span>`;
+ t.innerHTML=`<span class="ico">${g.emoji}</span>${g.new?'<span class="nw">NEW</span>':''}${g.auth?'<span class="lk">🔒</span>':''}${platDone(g.file)?'<span class="plat">🏆</span>':''}<span class="st">★</span>`;
  t.onclick=()=>i===S.cur?launch():select(i,true);track.appendChild(t);return t})}
 function select(i,s){const L=S.list,has=L.length>0;$('acts').style.display=has?'flex':'none';
  if(!has){tiles=[];$('title').textContent='Здесь пока пусто';$('desc').textContent=EMPTY[S.cat]||'';$('meta').innerHTML='';$('count').textContent='';return}
@@ -308,7 +693,8 @@ function select(i,s){const L=S.list,has=L.length>0;$('acts').style.display=has?'
  const t=tiles[S.cur];track.style.transform=`translateX(${innerWidth/2-(t.offsetLeft+t.offsetWidth/2)}px)`;
  document.body.style.setProperty('--c',g.c);
  $('title').textContent=g.title;$('desc').textContent=g.desc;
- $('meta').innerHTML=st&&st.n?`<span>Запусков: ${st.n}</span><span>Время в игре: ${fmt(st.t)}</span>`:'<span>Ещё не запускалась</span>';
+ const A=gameAch(g.file),aD=achDone(g.file),aT=A.length;
+ $('meta').innerHTML=`<span>${st&&st.n?'Запусков: '+st.n:'Ещё не запускалась'}</span>${st&&st.n?`<span>Время: ${fmt(st.t)}</span>`:''}${aT?`<span>🏆 ${aD}/${aT}</span>`:''}`;
  $('favb').textContent=ST.fav[g.file]?'★':'☆';$('count').textContent=`${S.cur+1} из ${L.length}`;
  if(s)sMove()}
 function toggleFav(){const g=S.list[S.cur];if(!g||inGame)return;
@@ -336,7 +722,23 @@ function launch(){if(!S.list.length||inGame)return;sOk();{const g=S.list[S.cur];
 function fromHash(){const f=location.hash.length>1?decodeURIComponent(location.hash.slice(1)):'';
  const g=GAMES.find(x=>x.file===f);if(g){setCat('all');select(Math.max(0,S.list.indexOf(g)));openGame(f,false)}else if(inGame)closeGame()}
 
-// ---------- кнопка меню: перетаскивается, чтобы не мешать играм ----------
+// ---------- API для игр ----------
+window.RKC={
+ unlock: id => unlockAch(id),
+ progress: (id,cur) => progressAch(id,cur),
+ has: id => !!(curFile&&ST.ach[curFile]&&ST.ach[curFile][id]),
+ list: () => curFile ? gameAch(curFile).map(a=>({...a,done:achUnlocked(curFile,a.id),p:ST.achp?.[curFile]?.[a.id]||0})) : [],
+ game: () => curFile
+};
+addEventListener('message', e => {
+ if(!inGame || e.source !== frame.contentWindow) return;
+ const d = e.data;
+ if(!d || typeof d !== 'object') return;
+ if(d.type === 'rkc:ach:unlock' && typeof d.id === 'string') unlockAch(d.id);
+ else if(d.type === 'rkc:ach:progress' && typeof d.id === 'string') progressAch(d.id, +d.cur || 0);
+});
+
+// ---------- кнопка меню в игре (та, что перетаскивается) ----------
 function placeBack(){const p=ST.bk||{r:1,y:.5};back.style.top=Math.min(innerHeight-56,Math.max(8,p.y*innerHeight))+'px';back.style.left=(p.r?innerWidth-52:8)+'px'}
 let pid=null,mv=false,sx=0,sy=0;
 back.addEventListener('pointerdown',e=>{pid=e.pointerId;back.setPointerCapture(pid);sx=e.clientX;sy=e.clientY;mv=false;back.classList.add('drag')});
@@ -373,7 +775,10 @@ if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?do
 back.onclick=null;addEventListener('popstate',fromHash);addEventListener('pagehide',endSession);
 addEventListener('resize',()=>{select(S.cur);if(inGame)placeBack()});
 
-// геймпад: крестовина/стик, A играть, Y избранное, X рулетка, B/Select/PS — назад
+// Глобальная кнопка закрытия drawer
+$('panClose').onclick=closePans;
+
+// геймпад
 let gl=0;(function pad(){const p=(navigator.getGamepads?[...navigator.getGamepads()]:[]).find(Boolean),now=performance.now();
  if(p&&now>gl){const b=i=>p.buttons[i]&&p.buttons[i].pressed,ax=p.axes[0]||0,ay=p.axes[1]||0;let used=true;
   if(!$('splash').classList.contains('off')){if(p.buttons.some(x=>x.pressed))dismissSplash();else used=false}
@@ -402,7 +807,9 @@ const avh=(a,f,sz)=>`<span class="av" style="${sz?`width:${sz}px;height:${sz}px;
 function refreshTop(){$('bProf').innerHTML=avh(ST.prof.avatar,'none');$('coinb').textContent='🪙 '+ST.coins}
 function devBtn(){const b=$('bDev');b.textContent=DEV==='touch'?'📱':'💻';b.classList.toggle('off',!ST.devOnly);b.title=ST.devOnly?'Только игры для этого устройства (нажми — показать все)':'Показаны все игры (нажми — только для этого устройства)'}
 let shopTab='av';
-function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains('on');p.classList.toggle('on',on);if(!on){snd(420,.1);return}
+function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains('on');
+ if(!on){closePans();return}
+ p.classList.add('on');$('panClose').classList.add('on');
  const P=ST.prof,own=(k,pr)=>pr===0||ST.owned.includes(shopTab+':'+k),tabs=[['av','Аватары'],['fr','Рамки'],['ti','Титулы']];
  $('shopBox').innerHTML=`<h3>Магазин</h3><small>🪙 ${ST.coins} · монеты дают запуски, минуты в играх и трофеи</small>
  <div class="row" style="margin-top:10px">${tabs.map(x=>`<button class="pill${shopTab===x[0]?' sel':''}" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>
@@ -415,7 +822,7 @@ function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains(
   if(!own(k,pr)){if(ST.coins<pr){toast('🪙','Не хватает монет','Нужно '+pr);return}ST.coins-=pr;ST.owned.push(shopTab+':'+k);sOk()}
   ST.prof[FLD[shopTab]]=k;save();shop(true)});
  $('sClose').onclick=()=>shop(false);snd(600,.1)}
-// облако (Supabase): таблица rkc_profiles, доступ только к своей строке
+// облако (Supabase)
 const SB_URL='https://ljljtvywrmkmamhzyqha.supabase.co',SB_KEY='sb_publishable_1Sl3av1ub0piHKAM54BFDg_8wJ8hAF6';
 let sb=null,user=null,pt=0;
 try{if(window.supabase)sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
@@ -431,8 +838,10 @@ async function pull(){const{data}=await sb.from('rkc_profiles').select('*').eq('
  for(const f in data.fav||{})if(files.has(f))ST.fav[f]=1;
  for(const f in data.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=data.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
  for(const id in data.tro||{}){const v=num(data.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
+ if(data.ach)for(const f in data.ach){if(!files.has(f))continue;ST.ach[f]=ST.ach[f]||{};for(const id in data.ach[f])if(!ST.ach[f][id])ST.ach[f][id]=data.ach[f][id]}
+ if(data.achp)for(const f in data.achp){if(!files.has(f))continue;ST.achp[f]=ST.achp[f]||{};for(const id in data.achp[f])ST.achp[f][id]=Math.max(ST.achp[f][id]||0,num(data.achp[f][id]))}
  save();await push();setCat(S.cat)}
-async function lb(){$('lbBox').innerHTML='<h3>Рейтинг</h3><small>Загрузка…</small>';$('lbP').classList.add('on');
+async function lb(){$('lbBox').innerHTML='<h3>Рейтинг</h3><small>Загрузка…</small>';$('lbP').classList.add('on');$('panClose').classList.add('on');
  const{data,error}=await sb.rpc('rkc_leaderboard');
  $('lbBox').innerHTML='<h3>Рейтинг</h3><small>Топ-20 по опыту</small>'+(error?'<p>Не удалось загрузить</p>':(data||[]).map((r,i)=>`<div class="tr">${avh(r.avatar,r.frame,40)}<div><b>${i+1}. ${esc(r.nickname)}</b><span>${esc(r.title||'без титула')} · Ур. ${lvl(r.xp)}</span></div></div>`).join('')||'<p>Пока никого</p>')+'<div class="row"><button class="pill" id="lClose">Закрыть</button></div>';
  $('lClose').onclick=closePans}
@@ -454,8 +863,9 @@ function afkFacts(){const f=[],st=ST.stats,top=GAMES.filter(g=>st[g.file]&&st[g.
  if(top)f.push(['⏱️','Твоя статистика',fmt(st[top.file].t)+' в «'+top.title+'»']);
  const n=Object.values(st).reduce((a,x)=>a+(x.n||0),0);if(n)f.push(['🚀','Твоя статистика','Запусков за всё время: '+n]);
  f.push(['🪙','Профиль','Уровень '+lvl(ST.xp)+', монет: '+ST.coins]);
- const tg=TRO.filter(t=>ST.tro[t[0]]).length;f.push(['🏆','Трофеи','Получено '+tg+' из '+TRO.length]);
- [['◀ ▶ или колесо мыши — выбрать игру','🎮'],['Enter — играть, I — подробнее','⌨️'],['F — в избранное, R — случайная игра','🎲'],['▲ ▼ — переключить раздел','↕️'],['Кнопку ⌂ в игре можно перетащить в удобное место','⌂']].forEach(h=>f.push([h[1],'Подсказка',h[0]]));
+ const A=achTotalGlobal();if(A.total)f.push(['🏆','Достижения','Получено '+A.done+' из '+A.total+(A.plats?' · платин: '+A.plats:'')]);
+ const tg=TRO.filter(t=>ST.tro[t[0]]).length;f.push(['🏅','Трофеи сайта','Получено '+tg+' из '+TRO.length]);
+ [['◀ ▶ или колесо мыши — выбрать игру','🎮'],['Enter — играть, I — подробнее','⌨️'],['F — в избранное, R — случайная игра','🎲'],['▲ ▼ — переключить раздел','↕️'],['Кнопку ⌂ в игре можно перетащить','⌂']].forEach(h=>f.push([h[1],'Подсказка',h[0]]));
  GAMES.filter(g=>!(st[g.file]&&st[g.file].n)).sort(()=>Math.random()-.5).slice(0,3).forEach(g=>f.push([g.emoji,'Ты ещё не запускал','«'+g.title+'» — '+g.desc]));
  return f.sort(()=>Math.random()-.5)}
 function afkShow(){const x=afkF[afkI++%afkF.length];afkCard.classList.add('out');
@@ -467,18 +877,18 @@ function afkStop(){if(!afkOn)return false;afkOn=false;clearInterval(afkRot);afkE
 addEventListener('pointermove',()=>{if(!afkOn)poke()},{passive:true});
 (function afkPad(){const p=(navigator.getGamepads?[...navigator.getGamepads()]:[]).find(Boolean);
  if(p&&(p.buttons.some(b=>b.pressed)||Math.abs(p.axes[0]||0)>.6||Math.abs(p.axes[1]||0)>.6)){afkStop();poke()}requestAnimationFrame(afkPad)})();
-// заходим в игру — таймер не нужен, выходим из игры — заново
 new MutationObserver(poke).observe(player,{attributes:true,attributeFilter:['class']});poke();
 
-// ---------- меню RKCPlay ----------
+// ---------- меню ----------
 function applyPrefs(){document.body.classList.remove('tsS','tsL');if(ST.tileSz==='s')document.body.classList.add('tsS');if(ST.tileSz==='l')document.body.classList.add('tsL');
  document.body.classList.toggle('rm',!!ST.rm);applySeason();if(!inGame)select(S.cur)}
-const MENU_KEYS=['◀ ▶ — выбрать игру','▲ ▼ — раздел','Enter — играть','I — подробнее','F — избранное','R — случайная игра','T — трофеи','S — магазин','P — профиль','M — звук','Q — это меню'];
-function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');if(!on){p.classList.remove('on');snd(420,.1);return}
+const MENU_KEYS=['◀ ▶ — выбрать игру','▲ ▼ — раздел','Enter — играть','I — подробнее','F — избранное','R — случайная игра','T — трофеи сайта','S — магазин','P — профиль','M — звук','Q — это меню'];
+function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');
+ if(!on){closePans();return}
  const opt=(k,items,cur)=>items.map(x=>`<button class="pill${String(cur)===String(x[0])?' sel':''}" data-set="${k}:${x[0]}">${x[1]}</button>`).join('');
  const afk=ST.afkSec===undefined?60:ST.afkSec;
  $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры, профиль и настройки</small>
- <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
+ <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи сайта</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
  <h4>Настройки</h4>
  <div class="mset"><span>Звук</span><div class="row">${opt('snd',[[1,'Вкл'],[0,'Выкл']],ST.mute?0:1)}</div></div>
  <div class="mset"><span>Размер плиток</span><div class="row">${opt('tile',[['s','Мелкие'],['m','Средние'],['l','Крупные']],ST.tileSz||'m')}</div></div>
@@ -489,22 +899,26 @@ function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains(
  <div class="row"><button class="pill" id="mClose">Закрыть</button></div>
  <div class="mft"><b>RKC Studio</b>Студия-разработчик RKCPlay<br><button id="mTos">Пользовательское соглашение</button></div>`;
  const B=$('menuBox');
- B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])()});
+ B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();setTimeout(()=>({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])(),60)});
  B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
   if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
   save();applyPrefs();menu(true);if(k==='snd'&&!ST.mute)sOk()});
- $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;p.classList.add('on');snd(600,.1)}
-function tos(){closePans();$('tosBox').innerHTML=`<div class="tos"><h3>Пользовательское соглашение RKC</h3><small>Редакция от 29 октября 2026</small>
+ $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;
+ p.classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
+function tos(){closePans();setTimeout(()=>{
+ $('tosBox').innerHTML=`<div class="tos"><h3>Пользовательское соглашение RKC</h3><small>Редакция от 29 октября 2026</small>
  <h4>1. Что это</h4><p>RKCPlay — закрытая коллекция игр студии RKC. Её делает автор для себя и друзей.</p>
- <h4>2. Доступ</h4><p>Доступ только по ссылке от RKC. Не отправляй ссылку посторонним без разрешения автора.</p>
- <h4>3. Профиль и данные</h4><p>Ник, аватар, прогресс, монеты и статистика хранятся на твоём устройстве. Если войдёшь в аккаунт, они копируются в облако (Supabase). Почта нужна только для входа, мы её никому не передаём.</p>
- <h4>4. Правила поведения</h4><p>Без оскорбительных ников и аватаров. Без накрутки монет, опыта и рейтингов, без взлома сайта и чужих профилей. За нарушение RKC может обнулить профиль.</p>
- <h4>5. Монеты и предметы</h4><p>Монеты, рамки, титулы и темы — виртуальные. Они не стоят денег и не обмениваются на деньги. RKC может менять цены и баланс.</p>
- <h4>6. Игры</h4><p>Игры работают «как есть» и могут содержать ошибки. В хоррор-играх бывают пугающие сцены, резкие звуки и вспышки света. Играй, если тебе комфортно.</p>
- <h4>7. Удаление данных</h4><p>Очисти данные сайта в браузере, чтобы стереть локальный профиль. Чтобы удалить облачный, напиши в RKC.</p>
- <h4>8. Изменения</h4><p>Соглашение может обновляться. Продолжая пользоваться RKCPlay, ты соглашаешься с актуальной редакцией.</p>
+ <h4>2. Доступ</h4><p>Доступ только по ссылке от RKC.</p>
+ <h4>3. Профиль и данные</h4><p>Ник, аватар, прогресс, монеты, достижения и статистика хранятся на твоём устройстве. При входе в аккаунт они копируются в облако (Supabase).</p>
+ <h4>4. Правила поведения</h4><p>Без оскорбительных ников и накрутки. За нарушение RKC может обнулить профиль.</p>
+ <h4>5. Монеты и предметы</h4><p>Все предметы виртуальные и не стоят денег.</p>
+ <h4>6. Игры</h4><p>Игры работают «как есть». В хоррор-играх бывают пугающие сцены.</p>
+ <h4>7. Удаление данных</h4><p>Очисти данные сайта в браузере, чтобы стереть локальный профиль.</p>
+ <h4>8. Изменения</h4><p>Соглашение может обновляться.</p>
  <div class="row"><button class="pill" id="tBack">← В меню</button><button class="pill" id="tClose">Закрыть</button></div></div>`;
- $('tBack').onclick=()=>{closePans();menu(true)};$('tClose').onclick=closePans;$('tosP').classList.add('on');snd(600,.1)}
+ $('tBack').onclick=()=>{closePans();setTimeout(()=>menu(true),60)};$('tClose').onclick=closePans;
+ $('tosP').classList.add('on');$('panClose').classList.add('on');snd(600,.1);
+},60)}
 // ---------- сезонные режимы ----------
 const SEASONS={
  halloween:{name:'Хэллоуин',ico:'🎃',p:['🎃','🦇','👻','🕸️'],a:'rgba(255,110,20,.30)',b:'rgba(130,50,210,.24)',r:[1020,1102],hi:'Жуткий месяц в RKCPlay'},

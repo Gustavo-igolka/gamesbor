@@ -1,9 +1,17 @@
 <!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Обломов: Беги, Илья Ильич!</title>
 <style>html,body{margin:0;height:100%;background:#3b4a2a;overflow:hidden;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;font-family:Georgia,serif}canvas{display:block;width:100%;height:100%}</style></head><body><canvas id="c"></canvas><script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+    try{
+        if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+        else if(window.parent && window.parent !== window)
+            window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+    }catch(e){}
+}
+
 /* ================================================================
    ВЕРСИЯ ИГРЫ
    При ЛЮБОМ изменении кода увеличивай GAME_VERSION на +1.
-   Пример: 1 -> 2 -> 3 -> 4...
    ================================================================ */
 const GAME_VERSION=3;
 const c=document.getElementById('c'),g=c.getContext('2d');let W,H,D=devicePixelRatio||1;
@@ -17,6 +25,8 @@ const score=()=>Math.floor(dist)+pts;
 function reset(){rollGap=0;nvD=0;nvSeen=0;dkDone=0;dkP=0;ax=0;ht=0;hcd=0;wb=0;rk={h:5,m:0,t:0,z:18,l:0,tl:0,up:0,f:0,x:0,s:0,a:0,fl:0};d2b=0;w2s=0;sh=0;mg=0;ds=0;cb=0;pts=0;nm=0;pa=[];bm=null;bn=0;nextB=1000;hurt=0;bk=0;lane=0;px=0;jy=0;jv=0;slide=0;roll=0;rollT=0;rollCount=0;rollBest=0;rollTotal=0;rollTotalDist=0;rollDist=0;rollAvoid=0;bossPhase=0;bossAtk=0;bossAtkT=0;bossPattern=0;bossRush=0;bossHp=5;bossPinkT=0;bikeDist=0;bikeDodges=0;bikeNearMiss=0;objs=[];spd=14;dist=0;pies=0;lives=3;inv=0;spawnT=0;shake=0;msgT=0}
 reset();let V={best:0,w:0,tp:0,sk:0,own:[0],a:{}};try{Object.assign(V,JSON.parse(localStorage.getItem('ob_v2')||'{}'))}catch(e){}
 const sv=()=>{try{localStorage.setItem('ob_v2',JSON.stringify(V))}catch(e){}};best=V.best;
+// Синхронизация уже полученных достижений с каталогом при первом запуске
+try{Object.keys(V.a||{}).forEach(id=>{if(/^a\d+$/.test(id)) rkcUnlock(id);});}catch(e){}
 function spawn(){
  const r=Math.random(),l=Math.floor(Math.random()*3)-1,o=(t,L,z,x)=>objs.push(Object.assign({t,l:L,z},w2&&t=='big'&&Math.random()<.25?{yl:1}:null,x));
  const other=l<=0?l+1:l-1,far=-l||1;
@@ -198,7 +208,6 @@ function shopUI(cx){
  const shp=st=='shop',L2=SK.map((k,i)=>i).filter(i=>V.own.includes(i)!=shp),hh=hdr('Лавка Захаровича','🥟 '+V.w);
  const rw=Math.min(W-24-SI.l-SI.r,460),x=cx-rw/2,h=62,gp=9,y0=hh+10;
  scr(hh,H,220+Math.max(1,L2.length)*(h+gp)+SI.b+10,()=>{
-   // Старомодная лавка
    g.fillStyle='rgba(95,63,32,.28)';g.fillRect(x-8,y0-8,rw+16,188);
    g.strokeStyle='#d9a441';g.lineWidth=2;g.strokeRect(x-8,y0-8,rw+16,188);
    txt('🧓',cx,y0+52,58);
@@ -341,7 +350,7 @@ const AC=[
 ];
 const RARITY={Обыватель:'#aaa',Любитель:'#78b7ff',Читатель:'#c58bff',Классик:'#ffd34a'};
 function achR(id){const a=AC.find(x=>x[0]==id);return a?a[3]:'Обыватель'}
-function ach(id){if(V.a[id])return;V.a[id]=1;sv();tq.push('🏆 '+AC.find(a=>a[0]==id)[1]);STORY.filter(c=>c.a==id).forEach(c=>tq.push('📖 Новая глава: '+c.t))}
+function ach(id){if(V.a[id])return;V.a[id]=1;sv();rkcUnlock(id);tq.push('🏆 '+AC.find(a=>a[0]==id)[1]);STORY.filter(c=>c.a==id).forEach(c=>tq.push('📖 Новая глава: '+c.t))}
 const mult=()=>1+Math.min(4,Math.floor(cb/10));
 function addPie(n){pies+=n;if(!brm){V.w+=n;V.tp+=n}if(bm)bp+=n;cb++;const m=mult();pts+=10*n*m;if(m>=5)ach('a13');if(cb%10==0){msg='Комбо ×'+m+'!';msgT=1.2}fx(W/2+px*lw(),gy()-lw()*.4,'#ffd34a',5);if(V.tp>=100)ach('a5');sv()}
 function sb(fb){
@@ -381,10 +390,8 @@ function bon(dt,v){
     if(q<.12){objs.push({t:'pie',l:Math.floor(Math.random()*3)-1,z:40,g:1})}
    }
   }else if(bm=='boss'){
-   // Бета финального босса: Штольц имеет фазы и заранее показывает атаку.
-   const newPhase=bmT>10?0:bmT>5?1:2;if(newPhase!==bossPhase){bossPhase=newPhase;bossAtkT=.15;msg=['Штольц ускоряется!','Штольц начинает комбинировать атаки!','ПОСЛЕДНИЙ РЫВОК ШТЕЛЬЦА!'][bossPhase];msgT=1.4}
+   const newPhase=bmT>10?0:bmT>5?1:2;if(newPhase!==bossPhase){bossPhase=newPhase;bossAtkT=.15;msg=['Штольц ускоряется!','Штольц начинает комбинировать атаки!','ПОСЛЕДНИЙ РЫВОК ШТОЛЬЦА!'][bossPhase];msgT=1.4}
    bxT-=dt;if(bxT<=0){bxT=[1.25,.85,.55][bossPhase];const target=Math.round(px);bx=Math.max(-1,Math.min(1,target+(Math.random()<.45?(Math.random()<.5?-1:1):0)))}bk+=(bx-bk)*Math.min(1,dt*(2.5+bossPhase*1.2));
-   // Розовые препятствия — главная механика босса: в них нужно врезаться.
    bossPinkT-=dt;if(bossPinkT<=0){bossPinkT=[1.45,1.15,.9][bossPhase];const center=Math.round(bk);const side=center+(Math.random()<.35?(Math.random()<.5?-1:1):0);objs.push({t:['low','high','big'][bossPhase===2?Math.floor(Math.random()*3):Math.floor(Math.random()*2)],l:Math.max(-1,Math.min(1,side)),z:28,pk:true});}
    bossAtkT-=dt;if(bossAtkT<=0){bossAtkT=[1.45,1.05,.72][bossPhase];bossPattern=(bossPattern+1)%4;const center=Math.round(bk),other=center<=0?center+1:center-1,far=Math.floor(Math.random()*3)-1;
     if(bossPattern===0){objs.push({t:'high',l:center,z:25,sw:bossPhase>0})}
@@ -416,7 +423,6 @@ function dgn(x,y,u,pk){g.fillStyle=pk?'rgba(255,90,190,.35)':'rgba(255,215,90,.3
  g.font=u*.5+'px serif';g.textAlign='center';g.fillText('✒️',x+u*.5,y-u*.9);txt('ГОНЧАРОВ',x,y-u*2.35,Math.max(10,u*.2),pk?'#ff9ad6':'#ffe9b0')}
 function dbk(){const p=P(18,bk),u=lw()*.7*p.t,x=p.x,y=p.y;g.textAlign='center';g.font=u*1.3+'px serif';g.fillText('🚲',x,y-u*.1);g.font=u*.55+'px serif';g.fillText('🎩',x-u*.22,y-u);g.fillText('👒',x+u*.22,y-u*.95);txt('Андрей и Ольга',x,y-u*1.6,Math.max(10,u*.28))}
 
-/* ===== НЕВА (подэтаж) И ДОСТОЕВСКИЙ (финал Мира 2) ===== */
 function nvWin(){const q=dist%4000;return !w2&&!bm&&q>=3500&&q<3900}
 function nvStart(){bsp=spd;spd=17;bm='neva';nvD=0;nvS=-1;nvT=1;nvP=3;nvW=0;nvH=hurt;objs=[];bk=0;ax=0;bmD=bmT=1e9;msg='НЕВА! Подэтаж: держись на воде';msgT=3;shake=.4;ach('a49')}
 function nvu(dt,v){nvD+=v*dt;const S=nvD<350?0:nvD<750?1:nvD<1150?2:3;
@@ -454,7 +460,6 @@ function ddk(x,y,u,m,up,f){const s=u*1.3,Y=y-up*s*(.7+.15*Math.sin(off*.35));g.s
  g.fillStyle='#c9ccd2';g.beginPath();g.moveTo(s*.6,-s*(m==1?2.1:1.5));g.lineTo(s*.95,-s*(m==1?2.2:1.6));g.lineTo(s*.92,-s*(m==1?1.75:1.15));g.lineTo(s*.6,-s*(m==1?1.85:1.25));g.closePath();g.fill();g.strokeStyle='#fff';g.lineWidth=2;g.stroke();
  g.fillStyle='#f1c9a0';g.beginPath();g.arc(0,-s*1.55,s*.27,0,7);g.fill();g.fillStyle='#8a6a3a';g.beginPath();g.moveTo(-s*.25,-s*1.45);g.lineTo(s*.25,-s*1.45);g.lineTo(0,-s*.95);g.fill();g.fillStyle='#4a3a1a';g.beginPath();g.arc(0,-s*1.62,s*.27,Math.PI,0);g.fill();
  g.restore();txt('ДОСТОЕВСКИЙ',x,Y-s*2.1,Math.max(10,u*.2),'#ffe9a0')}
-/* ===== ФИОЛЕТОВЫЙ ТОПОР И РАСКОЛЬНИКОВ (НАСТОЯЩИЙ) ===== */
 function getAx(){ax=bm=='rask'?999:Math.max(ax,12);ach('a29');msg=bm=='rask'?'Топор! Присед = удар. Бей, когда он летит!':'Фиолетовый топор! Присед теперь — удар';msgT=2.2;fx(W/2+px*lw(),gy()-lw()*.5,'#c58bff',12)}
 function strike(){if(ht>0||hcd>0)return;ht=.3;hcd=.55}
 function lost(){if(st=='over')return;st='over';overT=.7;best=V.best=Math.max(V.best,score());V.lo=(V.lo||0)+1;sv();ach('a26');if(V.lo>=10)ach('a27');if(V.lo>=100)ach('a28')}
@@ -515,13 +520,6 @@ const MU=(()=>{
  return{tick,toggle,on:()=>on}})();
 function drawMute(){const s=44,x=(st=='menu'&&W>H*1.2)?SI.l+8:W-s-8-SI.r,y=8+SI.t;g.fillStyle='rgba(0,0,0,.35)';g.fillRect(x,y,s,s);txt(MU.on()?'🔊':'🔇',x+s/2,y+s*.7,s*.5);btn.unshift({x,y,w:s,h:s,fn:MU.toggle})}
 
-/* ================================================================
-   БОССРАШ
-   Штольц -> Раскольников -> Гончаров -> Достоевский.
-   Награда выдаётся гигапирогами (1 гигапирог = 100 пирожков).
-   После каждого босса: забрать и выйти или рискнуть дальше.
-   Проигрыш или сдача на боссе = вся копилка сгорает.
-   ================================================================ */
 let brm=0,brI=0,brGP=0,brH=0,brT=0,brGo=0,brRes=null;
 const BR=[{k:'boss',n:'Штольц',gp:1,w:0},{k:'rask',n:'Раскольников',gp:2,w:1},{k:'gon',n:'Гончаров',gp:4,w:0},{k:'dost',n:'Достоевский',gp:5,w:1}];
 const BRP={t:'#06000a',b:'#3a0014',gr:['#14000b','#1b000f'],rd:['#4a0014','#2c000c'],hl:'#2a0010',h2:'#1c000b',su:'#ff2a4a'};
@@ -564,14 +562,12 @@ function brLose(why){if(!brm||st=='brx'||st=='brc')return;const lostGP=brGP;
  brRes={t:'lose',gp:0,lost:lostGP,why:why,boss:BR[brI].n,done:brI};brGP=0;sv();bm=null;st='brx';brT=1.2}
 function brForfeit(){if(!brRes&&brGP>0)tq.push('Боссраш прерван: '+brGP+' '+gpw(brGP)+' сгорело');brm=0;brGP=0}
 
-/* перехват побед и поражений */
 var _eb=eb;eb=function(){if(brm){if(st!='play'||bm!='boss')return;if(bossHp>0){brLose('Штольц устоял: время вышло');return}_eb();brWin();return}_eb()};
 var _gw=gw;gw=function(){if(brm&&st!='play')return;_gw();if(brm)brWin()};
 var _rkWin=rkWin;rkWin=function(){if(brm&&st!='play')return;_rkWin();if(brm)brWin()};
 var _dkWin=dkWin;dkWin=function(){if(brm&&st!='play')return;_dkWin();if(brm)brWin()};
 var _lost=lost;lost=function(){if(brm){brLose('Жизни кончились');return}_lost()};
 
-/* экраны боссраша */
 function ntx(s,x,y,sz,col,al){g.save();g.textAlign=al||'center';g.font='bold '+sz+'px Georgia';g.shadowColor=col;g.shadowBlur=sz*.55;g.fillStyle=col;g.fillText(s,x,y);g.fillText(s,x,y);g.restore()}
 function brTrack(x0,y,mw,k,done){const gap=6*k,w=(mw-gap*3)/4,h=44*k;
  BR.forEach((q,i)=>{const x=x0+i*(w+gap),d=i<done;g.save();g.shadowColor='#ff2a4a';g.shadowBlur=d?12:0;g.fillStyle=d?'rgba(255,42,74,.32)':'rgba(255,255,255,.05)';g.fillRect(x,y,w,h);g.strokeStyle=d?'#ff2a4a':'#6a2a38';g.lineWidth=2;g.strokeRect(x,y,w,h);g.restore();
@@ -612,7 +608,6 @@ function brxUI(cx){
   Bx('↻ Новый боссраш',x0,by,mw,58*k,brStart,'#5a0a1e','#ff2a4a',Math.min(22,19*k),dis);
   Bx('☰ Меню',x0,by+70*k,mw,52*k,()=>{if(brT>0)return;brm=0;brRes=null;st='menu'},'#2a1a22',null,Math.min(20,18*k),dis)})}
 
-/* неоновый скин (персонаж в боссраше остаётся обычным; этот скин — отдельная награда) */
 var dpl0=dpl;dpl=function(){const k=SK[V.sk];if(k&&k.neon){g.save();g.shadowColor='#ff2a4a';g.shadowBlur=lw()*.25;dpl0();g.restore()}else dpl0()};
 SK.push({n:'Неоновый халат',c:'#12030a',d:'#ff2a4a',h:'#ff2a4a',cap:'#ff2a4a',neon:1,p:1200,ac:'a59',tr:'✨'});
 AC.push(

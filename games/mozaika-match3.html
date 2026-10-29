@@ -22,7 +22,6 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
 .screen.active{display:flex}
 
-/* ---------- Menu ---------- */
 #menu{align-items:center;justify-content:center;overflow:auto}
 .menu-inner{width:min(92vw,400px);padding:24px 0;display:flex;flex-direction:column;gap:18px}
 h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);line-height:1;margin:0;text-align:center;letter-spacing:.5px}
@@ -48,7 +47,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
 .links{display:flex;justify-content:center}
 .best{margin:0;text-align:center;color:var(--mute);font-size:15px;min-height:1.3em}
 
-/* ---------- Game ---------- */
 #game{padding-left:12px;padding-right:12px}
 #game header{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;gap:8px}
 .modeName{color:var(--mute);font-size:15px;text-align:center;flex:1}
@@ -63,7 +61,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
   box-shadow:0 0 0 4px var(--panel),0 12px 30px rgba(0,0,0,.35)}
 .tile{position:absolute;left:0;top:0;transition-property:transform;transition-timing-function:cubic-bezier(.3,.75,.35,1);will-change:transform}
 
-/* Фишки: у каждого цвета своя форма */
 .g{position:absolute;inset:7%;transition:transform .12s;
   background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.55),rgba(255,255,255,0) 42%),linear-gradient(150deg,var(--l),var(--b) 65%)}
 .c0{--b:#e4572e;--l:#ff9d78;clip-path:circle(50%)}
@@ -90,7 +87,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
   font-size:15px;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;z-index:5}
 #toast.on{opacity:1}
 
-/* ---------- Overlays ---------- */
 .overlay{position:absolute;inset:0;background:rgba(8,14,20,.78);display:none;align-items:center;justify-content:center;z-index:10;padding:20px}
 .overlay.on{display:flex}
 .card{background:var(--panel);border-radius:20px;padding:24px;width:min(100%,360px);display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
@@ -110,7 +106,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
 <body>
 <div id="app">
 
-  <!-- МЕНЮ -->
   <section id="menu" class="screen active">
     <div class="menu-inner">
       <h1>Мозаика</h1>
@@ -143,7 +138,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
     </div>
   </section>
 
-  <!-- ИГРА -->
   <section id="game" class="screen">
     <header>
       <button class="ghost" id="menuBtn">Меню</button>
@@ -159,7 +153,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
     <div id="toast"></div>
   </section>
 
-  <!-- Пауза -->
   <div class="overlay" id="pauseOv">
     <div class="card">
       <h2>Пауза</h2>
@@ -169,7 +162,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
     </div>
   </div>
 
-  <!-- Конец игры -->
   <div class="overlay" id="overOv">
     <div class="card">
       <h2 id="overTitle">Игра окончена</h2>
@@ -180,7 +172,6 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
     </div>
   </div>
 
-  <!-- Правила -->
   <div class="overlay" id="helpOv">
     <div class="card help">
       <h2>Как играть</h2>
@@ -198,6 +189,15 @@ h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);l
 </div>
 
 <script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+  try{
+    if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+    else if(window.parent && window.parent !== window)
+      window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+  }catch(e){}
+}
+
 (() => {
 'use strict';
 const N = 8;
@@ -206,7 +206,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rnd = n => Math.floor(Math.random() * n);
 const board = $('#board');
 
-/* ---------- Настройки и рекорды ---------- */
+const playedModes = new Set();
+
 const cfg = { mode: 'moves', colors: 5, sound: true };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('mosaic-cfg') || '{}')); } catch (e) {}
 const saveCfg = () => { try { localStorage.setItem('mosaic-cfg', JSON.stringify(cfg)); } catch (e) {} };
@@ -214,7 +215,6 @@ const bestKey = () => 'mosaic-best-' + cfg.mode + cfg.colors;
 const getBest = () => { try { return +localStorage.getItem(bestKey()) || 0; } catch (e) { return 0; } };
 const setBest = v => { try { localStorage.setItem(bestKey(), v); } catch (e) {} };
 
-/* ---------- Звук ---------- */
 let ac = null;
 function initAudio() {
   if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -236,7 +236,6 @@ const sfx = {
   tap() { tone(520, .05, 'sine', .04); }
 };
 
-/* ---------- Меню ---------- */
 const screens = { menu: $('#menu'), game: $('#game') };
 function show(name) { for (const k in screens) screens[k].classList.toggle('active', k === name); }
 
@@ -267,7 +266,6 @@ $('#helpBtn').addEventListener('click', () => $('#helpOv').classList.add('on'));
 $('#helpClose').addEventListener('click', () => $('#helpOv').classList.remove('on'));
 $('#play').addEventListener('click', () => { initAudio(); startGame(); });
 
-/* ---------- Состояние игры ---------- */
 let S = 48, K = 5, grid = [], uid = 0;
 let score = 0, movesLeft = 0, movesMade = 0, time = 60, best = 0;
 let running = false, paused = false, busy = false, lastSwap = null;
@@ -311,7 +309,6 @@ function layout() {
 }
 window.addEventListener('resize', () => { if (screens.game.classList.contains('active')) layout(); });
 
-/* ---------- Логика поля ---------- */
 const tm = () => grid.map(row => row.map(t => t ? t.color : -2));
 
 function anyRun(m) {
@@ -383,7 +380,6 @@ function showHint() {
   p.forEach(t => t.el.firstChild.classList.add('hint'));
 }
 
-/* ---------- Ввод ---------- */
 function select(t) { deselect(); selected = t; t.el.firstChild.classList.add('sel'); sfx.tap(); }
 function deselect() { if (selected) selected.el.firstChild.classList.remove('sel'); selected = null; }
 const adjacent = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
@@ -419,7 +415,6 @@ board.addEventListener('pointerup', () => {
 });
 board.addEventListener('pointercancel', () => { drag = null; });
 
-/* ---------- Ход ---------- */
 function swapTiles(a, b) {
   const ar = a.r, ac2 = a.c;
   grid[a.r][a.c] = b; grid[b.r][b.c] = a;
@@ -447,6 +442,10 @@ async function attempt(a, b) {
   }
   if (cfg.mode === 'moves') movesLeft--;
   movesMade++; hud();
+
+  // --- достижения: 25 ходов в одной игре ---
+  if (movesMade >= 25) rkcUnlock('moves25');
+
   await resolve(pre, targets);
   await afterResolve();
 }
@@ -495,6 +494,9 @@ async function resolve(pre = new Set(), targets = new Map()) {
     pre = new Set();
     if (!clear.size) break;
 
+    // --- достижения: первое совпадение ---
+    if (clear.size > 0 && combo === 0) rkcUnlock('first_match');
+
     expand(clear, targets); targets = new Map();
     make.forEach((_, t) => clear.delete(t));
     combo++;
@@ -504,12 +506,20 @@ async function resolve(pre = new Set(), targets = new Map()) {
     const n = Math.max(1, clear.size);
     const gain = clear.size * 10 * combo + make.size * 40;
     score += gain; hud();
+
+    // --- достижения: очки ---
+    if (score >= 1000) rkcUnlock('score1k');
+    if (score >= 5000) rkcUnlock('score5k');
+
     floatText('+' + gain + (combo > 1 ? '  ×' + combo : ''), sr / n, sc / n);
 
     clear.forEach(t => t.el.firstChild.classList.add('pop'));
     make.forEach((type, t) => {
       t.special = type; if (type === 'color') t.color = -1;
       draw(t); t.el.firstChild.classList.add('born');
+      // --- достижения: спецфишки ---
+      if (type === 'cross') rkcUnlock('cross');
+      if (type === 'color') rkcUnlock('rainbow');
     });
     make.size ? sfx.special() : sfx.match(combo);
     await sleep(250);
@@ -557,7 +567,6 @@ async function shuffleBoard() {
   await sleep(450);
 }
 
-/* ---------- Интерфейс игры ---------- */
 let toastT;
 function toast(msg) {
   const el = $('#toast'); el.textContent = msg; el.classList.add('on');
@@ -582,6 +591,10 @@ function startGame() {
   show('game');
   board.innerHTML = ''; grid = [];
   layout();
+
+  // --- достижения: режимы ---
+  playedModes.add(cfg.mode);
+  if (playedModes.size >= 3) rkcUnlock('all_modes');
 
   let m;
   do {
@@ -609,7 +622,7 @@ function endGame() {
   if (!running) return;
   running = false; busy = true; clearHint(); deselect();
   const isRec = score > best && score > 0;
-  if (isRec) { setBest(score); best = score; }
+  if (isRec) { setBest(score); best = score; rkcUnlock('record'); }
   $('#overTitle').textContent = cfg.mode === 'time' ? 'Время вышло' : 'Ходы закончились';
   $('#overScore').textContent = score;
   $('#overRec').textContent = isRec ? 'Новый рекорд!' : (best ? 'Рекорд: ' + best : '');

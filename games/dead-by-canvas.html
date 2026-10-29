@@ -48,6 +48,15 @@ canvas{position:fixed;left:0;top:0;width:100%;height:100%;display:block}
 </div>
 
 <script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+  try{
+    if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+    else if(window.parent && window.parent !== window)
+      window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+  }catch(e){}
+}
+
 const W=3200, cv=document.getElementById('c'), ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id), rnd=(a,b)=>a+Math.random()*(b-a), dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 let VW,VH,DPR,G,running=false,last=0,shake=0;
@@ -55,7 +64,6 @@ let VW,VH,DPR,G,running=false,last=0,shake=0;
 function resize(){DPR=Math.min(2,devicePixelRatio||1);VW=innerWidth;VH=innerHeight;cv.width=VW*DPR;cv.height=VH*DPR}
 addEventListener('resize',resize);resize();
 
-// фон-текстура: трава и хвоя, рисуется один раз
 const tex=document.createElement('canvas');tex.width=tex.height=320;
 (()=>{const t=tex.getContext('2d');t.fillStyle='#0b110b';t.fillRect(0,0,320,320);
 for(let i=0;i<700;i++){t.fillStyle=`rgba(${20+Math.random()*25|0},${40+Math.random()*40|0},${18+Math.random()*20|0},${.25+Math.random()*.5})`;t.fillRect(Math.random()*320,Math.random()*320,1+Math.random()*2,3+Math.random()*5)}
@@ -74,13 +82,12 @@ function newGame(){
   for(let i=0;i<190;i++){const o=place(26,26,false);if(o)trees.push({x:o.x,y:o.y,r:26,k:rnd(34,50),t:Math.random()})}
   G={P:{x:start.x,y:start.y,r:15,hp:2,haste:0,hidden:false,vx:0,vy:1},
      K:{x:kst.x,y:kst.y,r:24,mode:'patrol',t:0,lost:0,target:null,pal:null,vx:0,vy:1},
-     gens,pallets,trees,bushes,marks:[],done:0,sc:null,scCool:2,time:0,over:false,markT:0,
+     gens,pallets,trees,bushes,marks:[],done:0,hitCount:0,sc:null,scCool:2,time:0,over:false,markT:0,
      solids:[...gens,...trees],act:false,gate:{x:W-40,y:W/2,r:200}};
   $('gens').textContent='Генераторы: 0 / 3';
   [...$('hp').children].forEach(i=>i.classList.remove('off'));
 }
 
-// ---------- ввод ----------
 const keys={},joy={on:false,x:0,y:0};
 function inputVec(){
   if(joy.on)return{x:joy.x,y:joy.y,run:Math.hypot(joy.x,joy.y)>.7};
@@ -122,7 +129,6 @@ function press(){
   else G.act=true;
 }
 
-// ---------- логика ----------
 function push(e,list,skip){for(const s of list){if(s===skip)continue;const dx=e.x-s.x,dy=e.y-s.y,d=Math.hypot(dx,dy),m=e.r+s.r;
   if(d<m&&d>0.01){e.x+=dx/d*(m-d);e.y+=dy/d*(m-d)}}}
 function skillEnd(){const s=G.sc,ok=s.a>=s.z&&s.a<=s.z+s.w;G.sc=null;G.scCool=2;
@@ -145,14 +151,16 @@ function update(dt){
   if(moving&&G.markT<=0&&!P.hidden&&(inp.run||P.hp<2)){G.markT=.09;G.marks.push({x:P.x,y:P.y,l:3,blood:P.hp<2})}
   G.marks=G.marks.filter(m=>(m.l-=dt)>0);
 
-  // ремонт и проверки навыка
   if(repair){const g=target().g;g.p+=11*dt;
     G.scCool-=dt;if(!G.sc&&G.scCool<=0&&Math.random()<.5*dt)G.sc={a:0,z:rnd(60,270),w:52};
     if(g.p>=100){g.done=true;g.p=100;G.done++;G.act=false;$('gens').textContent=`Генераторы: ${Math.min(G.done,3)} / 3`+(G.done>=3?' — ворота открыты':'');shake=6;
-      if(K.mode==='patrol')K.target={x:g.x,y:g.y}}}
+      if(K.mode==='patrol')K.target={x:g.x,y:g.y};
+      // --- достижения ---
+      if(G.done===1) rkcUnlock('gen1');
+      if(G.done>=3)  rkcUnlock('gen3');
+    }}
   if(G.sc){G.sc.a+=400*dt;if(G.sc.a>360)skillEnd()}
 
-  // маньяк
   const d=dist(K,P),sight=P.hidden?150:540;
   if(['stun','recover','break'].includes(K.mode)){K.t-=dt;
     if(K.t<=0){if(K.mode==='break'&&K.pal){K.pal.s=2;G.solids=G.solids.filter(s=>s!==K.pal);K.pal=null}K.mode=d<sight?'chase':'patrol';K.lost=0}}
@@ -171,23 +179,24 @@ function update(dt){
   }
   if(G.done>=3&&Math.abs(P.y-G.gate.y)<G.gate.r&&P.x>W-70)finish(true);
   shake=Math.max(0,shake-30*dt);
-  // подсказка
   const t=target();let txt='';
   if(t&&t.p)txt='E — уронить палетку';else if(t&&t.g)txt=G.sc?'ПРОБЕЛ — в красную зону!':'Удерживай E — чинить';
   const pr=$('prompt');pr.textContent=txt;pr.classList.toggle('on',!!txt&&!G.over);
 }
 
-function hit(){const {P,K}=G;P.hp--;[...$('hp').children].forEach((i,k)=>i.classList.toggle('off',k>=P.hp));
+function hit(){const {P,K}=G;
+  G.hitCount=(G.hitCount||0)+1;
+  P.hp--;[...$('hp').children].forEach((i,k)=>i.classList.toggle('off',k>=P.hp));
   flash(.9);shake=16;
   if(P.hp<=0){finish(false);return}
   P.haste=1.8;K.mode='recover';K.t=1.6;G.sc=null;G.act=false}
 
 function finish(win){G.over=true;running=false;
+  if(win){ rkcUnlock('escape'); if(!G.hitCount) rkcUnlock('no_hit'); }
   $('et').textContent=win?'СБЕЖАЛ':'ПОЙМАН';$('et').style.color=win?'#4ade80':'#d94a3a';
   $('es').textContent=`${win?'Ты выбрался из леса':'Маньяк добрался до тебя'}. Время: ${Math.floor(G.time/60)}:${String(Math.floor(G.time%60)).padStart(2,'0')}, починено генераторов: ${Math.min(G.done,5)}.`;
   $('prompt').classList.remove('on');setTimeout(()=>$('end').classList.remove('hide'),600)}
 
-// ---------- рисование ----------
 function draw(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const {P,K}=G,cx=VW/2+(Math.random()-.5)*shake,cy=VH/2+(Math.random()-.5)*shake,ox=cx-P.x,oy=cy-P.y;
@@ -198,25 +207,21 @@ function draw(){
   ctx.strokeStyle='#2a1a14';ctx.lineWidth=6;ctx.strokeRect(0,0,W,W);
 
   for(const m of G.marks){ctx.fillStyle=m.blood?`rgba(160,10,10,${m.l/3})`:`rgba(220,200,150,${m.l/6})`;ctx.beginPath();ctx.arc(m.x,m.y,m.blood?4:2.5,0,7);ctx.fill()}
-  // ворота
   const open=G.done>=3,gt=G.gate;
   ctx.save();ctx.shadowBlur=open?60:0;ctx.shadowColor='#fff';ctx.fillStyle=open?'rgba(255,255,255,.92)':'rgba(120,120,120,.25)';
   ctx.fillRect(W-24,gt.y-gt.r,24,gt.r*2);ctx.restore();
-  // палетки
   for(const p of G.pallets){if(p.s===2||!inView(p.x,p.y,80))continue;
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);
     if(p.s===0){ctx.fillStyle='#6b4a24';ctx.fillRect(-6,-34,12,68);ctx.fillStyle='#8a6232';ctx.fillRect(-4,-30,8,60);
       ctx.strokeStyle='rgba(255,255,255,.07)';ctx.beginPath();ctx.arc(0,0,75,0,7);ctx.stroke()}
     else{ctx.rotate(1.2);ctx.fillStyle='#3d2616';ctx.fillRect(-36,-14,72,28);ctx.strokeStyle='#1f130b';ctx.lineWidth=2;for(let i=-24;i<30;i+=16){ctx.beginPath();ctx.moveTo(i,-14);ctx.lineTo(i,14);ctx.stroke()}}
     ctx.restore()}
-  // генераторы
   for(const g of G.gens){if(!inView(g.x,g.y,100))continue;
     ctx.fillStyle='#161a22';ctx.fillRect(g.x-38,g.y-30,76,60);
     ctx.fillStyle=g.done?'#1f7a3a':'#2a3f7a';ctx.fillRect(g.x-32,g.y-24,64,48);
     ctx.fillStyle=g.done?'#7dffa4':'#0a0f1c';ctx.fillRect(g.x-20,g.y-12,40,10);
     ctx.fillStyle='#555';for(let i=0;i<4;i++)ctx.fillRect(g.x-28+i*15,g.y+8,9,12);
     if(!g.done){ctx.fillStyle='#1a1a1a';ctx.fillRect(g.x-36,g.y-50,72,8);ctx.fillStyle='#d94a3a';ctx.fillRect(g.x-36,g.y-50,72*g.p/100,8)}}
-  // маньяк и игрок под деревьями
   ctx.save();ctx.translate(K.x,K.y);ctx.rotate(Math.atan2(K.vy,K.vx));
   ctx.fillStyle=K.mode==='stun'?'#333':'#7d1410';ctx.shadowBlur=K.mode==='stun'?0:24;ctx.shadowColor='red';
   ctx.beginPath();ctx.arc(0,0,K.r,0,7);ctx.fill();ctx.shadowBlur=0;
@@ -225,7 +230,6 @@ function draw(){
   ctx.globalAlpha=P.hidden?.35:1;ctx.shadowBlur=P.hidden?0:12;ctx.shadowColor='#fff';
   ctx.fillStyle=P.hp<2?'#e8b5ac':'#f2f0e8';ctx.beginPath();ctx.arc(0,0,P.r,0,7);ctx.fill();
   ctx.fillStyle='#444';ctx.beginPath();ctx.arc(5,0,6,0,7);ctx.fill();ctx.restore();
-  // кусты и деревья поверх
   for(const b of G.bushes){if(!inView(b.x,b.y,200))continue;
     for(const l of b.l){ctx.fillStyle=`rgb(14,${40+l[2]},16)`;ctx.beginPath();ctx.arc(b.x+l[0]*b.w,b.y+l[1]*b.h,l[2],0,7);ctx.fill()}}
   for(const t of G.trees){if(!inView(t.x,t.y,80))continue;
@@ -234,25 +238,20 @@ function draw(){
     ctx.fillStyle='#0d2414';ctx.beginPath();ctx.arc(t.x-t.k*.2,t.y-t.k*.2,t.k*.6,0,7);ctx.fill()}
   ctx.restore();
 
-  // тьма: виден только свет вокруг игрока
   const dK=dist(K,P),lr=P.hidden?260:360;
   let g=ctx.createRadialGradient(cx,cy,60,cx,cy,Math.max(VW,VH)*.75);
   g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(lr/(Math.max(VW,VH)*.75),'rgba(0,0,0,.55)');g.addColorStop(1,'rgba(0,0,0,.97)');
   ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH);
-  // красное сияние маньяка видно издалека
   if(dK<1100){const kx=K.x+ox,ky=K.y+oy;g=ctx.createRadialGradient(kx,ky,0,kx,ky,240);
     const al=K.mode==='chase'?.55:.28;g.addColorStop(0,`rgba(255,20,20,${al})`);g.addColorStop(1,'rgba(255,0,0,0)');
     ctx.fillStyle=g;ctx.fillRect(kx-240,ky-240,480,480)}
-  // пульс сердца
   if(dK<700){const k=1-dK/700,beat=Math.pow(Math.max(0,Math.sin(G.time*(5+k*6))),8);
     g=ctx.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.3,VW/2,VH/2,Math.max(VW,VH)*.75);
     g.addColorStop(0,'rgba(120,0,0,0)');g.addColorStop(1,`rgba(120,0,0,${(.15+beat*.5)*k})`);ctx.fillStyle=g;ctx.fillRect(0,0,VW,VH)}
-  // компас к цели
   const tg=G.done>=3?{x:W-40,y:G.gate.y}:G.gens.filter(q=>!q.done).sort((a,b)=>dist(a,P)-dist(b,P))[0];
   if(tg&&dist(tg,P)>300){const a=Math.atan2(tg.y-P.y,tg.x-P.x),rx=Math.min(VW,VH)*.38;
     ctx.save();ctx.translate(VW/2+Math.cos(a)*rx,VH/2+Math.sin(a)*rx);ctx.rotate(a);ctx.fillStyle=G.done>=3?'rgba(255,255,255,.7)':'rgba(120,160,255,.6)';
     ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-8,-8);ctx.lineTo(-8,8);ctx.fill();ctx.restore()}
-  // проверка навыка
   if(G.sc){const s=G.sc,x=VW/2,y=VH*.36,R=64,r=a=>(a-90)*Math.PI/180;
     ctx.lineWidth=10;ctx.strokeStyle='rgba(255,255,255,.2)';ctx.beginPath();ctx.arc(x,y,R,0,7);ctx.stroke();
     ctx.strokeStyle='#ff3b3b';ctx.beginPath();ctx.arc(x,y,R,r(s.z),r(s.z+s.w));ctx.stroke();
