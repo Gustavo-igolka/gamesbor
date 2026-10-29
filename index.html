@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Сборник игр</title>
+<title>RKCPlay</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 @property --c{syntax:'<color>';inherits:true;initial-value:#1c3a8a}
@@ -100,10 +100,43 @@ button{font:inherit;color:inherit;cursor:pointer}
 .lk{position:absolute;left:8%;bottom:8%;font-size:16px}
 .tile.nodev{filter:saturate(.25) brightness(.8)}
 @media(pointer:coarse){#hints{display:none}.tile{--tile:clamp(120px,30vw,170px)}}
-@media(max-width:700px){#brand{display:none}#top{padding:calc(env(safe-area-inset-top) + 10px) 12px 0}#tools button{width:42px;height:42px}#tools{gap:4px}
+@media(max-width:700px){#bShop,#bTro,#bMute,#bFs{display:none}#top{padding:calc(env(safe-area-inset-top) + 10px) 12px 0}#tools button{width:42px;height:42px}#tools{gap:4px}
  #clock{display:none}#tabs{top:calc(env(safe-area-inset-top) + 62px)}#tabs button{padding:10px 16px;font-size:16px}
  .pill{padding:13px 26px}#info{min-height:170px}#count{right:14px}
  .pan{align-items:flex-end}.box{width:100vw;max-height:88vh;border-radius:22px 22px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}}
+
+/* АФК-экран */
+#afk{position:fixed;inset:0;z-index:35;background:rgba(2,4,10,.78);display:flex;align-items:center;justify-content:flex-end;padding:0 clamp(20px,6vw,90px);opacity:0;pointer-events:none;transition:opacity 1.2s}
+#afk.on{opacity:1;pointer-events:auto}
+#afk .fc{width:min(380px,86vw);padding:22px 24px;border-radius:22px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);backdrop-filter:blur(10px);transition:opacity .6s,transform .6s}
+#afk .fc.out{opacity:0;transform:translateY(10px)}
+#afk .fi{font-size:40px;margin-bottom:6px}
+#afk .fl{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+#afk .ft{margin-top:6px;font-size:clamp(20px,3vw,26px);font-weight:300;line-height:1.3}
+#afk .fz{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:var(--dim);font-size:13px;font-weight:300}
+@media(max-width:700px){#afk{align-items:flex-end;justify-content:center;padding-bottom:90px}}
+
+/* меню RKCPlay и настройки */
+#brand{background:none;border:0;padding:6px 12px;margin-left:-12px;border-radius:999px;font-size:16px;font-weight:400;letter-spacing:.04em;color:var(--txt);transition:background .2s}
+#brand:hover,#brand:focus-visible{background:rgba(255,255,255,.14);outline:none}
+#hints{display:none!important}
+.mi{display:flex;gap:14px;align-items:center;width:100%;padding:12px 4px;border:0;border-top:1px solid rgba(255,255,255,.08);background:none;text-align:left;font-size:16px}
+.mi:first-of-type{border-top:0}.mi:hover,.mi:focus-visible{background:rgba(255,255,255,.07);outline:none}.mi i{font-style:normal;font-size:24px;width:30px;text-align:center}
+.mset{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0}
+.mset .row{margin:0}.mset .pill{padding:7px 14px;font-size:14px}
+.mft{margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);text-align:center;color:var(--dim);font-size:13px;font-weight:300}
+.mft b{display:block;color:var(--txt);font-size:15px;font-weight:400;letter-spacing:.06em;margin-bottom:2px}
+.mft button{background:none;border:0;color:var(--dim);text-decoration:underline;font-size:13px;margin-top:6px}
+body.tsS{--tile:clamp(88px,13vw,135px)}body.tsL{--tile:clamp(135px,23vw,225px)}
+body.tsS .tile,body.tsL .tile{--tile:inherit}
+body.rm *{transition:none!important;animation:none!important}
+.tos h4{color:var(--txt);margin:14px 0 2px}.tos p{margin:2px 0;font-size:14px;color:#c9d2ee}
+/* сезонные режимы */
+#season{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;transition:background 1s}
+#season span{position:absolute;top:0;opacity:.55;animation:sfall linear infinite;will-change:transform}
+@keyframes sfall{from{transform:translate(0,-12vh) rotate(0)}to{transform:translate(var(--dx),112vh) rotate(360deg)}}
+body.rm #season span{display:none}
+@media(prefers-reduced-motion:reduce){#season span{display:none}}
 </style>
 </head>
 <body>
@@ -111,7 +144,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 <svg id="waves" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true"><g>
 <path d="M0 200C200 120 400 280 600 200S1000 120 1200 200"/><path d="M0 240C200 160 400 320 600 240S1000 160 1200 240"/><path d="M0 280C200 200 400 360 600 280S1000 200 1200 280"/><path d="M0 320C200 240 400 400 600 320S1000 240 1200 320"/></g></svg>
 
-<div id="top"><div id="brand">RKC Studio</div>
+<div id="season" aria-hidden="true"></div>
+<div id="top"><button id="brand" aria-label="Меню RKCPlay">RKCPlay ▾</button>
 <div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
 <nav id="tabs" aria-label="Разделы"></nav>
 
@@ -123,6 +157,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div id="hints"><span>◀ ▶ игра</span><span>▲ ▼ раздел</span><span>Enter играть</span><span>I подробнее</span><span>F избранное</span><span>R рулетка</span><span>T трофеи</span></div>
 <div id="count"></div>
 
+<div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
+<div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
 <div id="detP" class="pan"><div id="detBox" class="box"></div></div>
 <div id="profP" class="pan"><div id="profBox" class="box"></div></div>
@@ -130,7 +166,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div id="lbP" class="pan"><div id="lbBox" class="box"></div></div>
 <input type="file" id="pfile" accept="application/json,.json" hidden>
 <div id="toast"><i></i><div><b></b><span></span></div></div>
-<div id="splash"><h1>RKC Studio</h1><p>Нажми любую кнопку</p></div>
+<div id="afk" aria-hidden="true"><div class="fc" id="afkCard"><div class="fi"></div><div class="fl"></div><div class="ft"></div></div><div class="fz">Нажми любую кнопку</div></div>
+<div id="splash"><h1>RKCPlay</h1><p>Нажми любую кнопку</p></div>
 
 <button id="back" aria-label="В меню" title="В меню. Кнопку можно перетащить">⌂</button>
 <div id="player"><iframe id="frame" allow="fullscreen; autoplay; gamepad"></iframe></div>
@@ -320,7 +357,7 @@ addEventListener('keydown',e=>{
  if(e.key==='ArrowRight')select(S.cur+1,true);else if(e.key==='ArrowLeft')select(S.cur-1,true);
  else if(e.key==='ArrowDown')setCat(CATS[(ci+1)%CATS.length][0],true);else if(e.key==='ArrowUp')setCat(CATS[(ci+CATS.length-1)%CATS.length][0],true);
  else if(e.key==='Enter'&&!document.activeElement.matches('button'))launch();
- else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();else if(k==='s'||k==='ы')shop();
+ else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();else if(k==='s'||k==='ы')shop();else if(k==='q'||k==='й')menu();
  else return;e.preventDefault()});
 addEventListener('wheel',e=>{if(inGame||pans().length>0)return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
  if(Math.abs(d)>12&&!wheel.l){select(S.cur+(d>0?1:-1),true);wheel.l=1;setTimeout(()=>wheel.l=0,180)}},{passive:true});
@@ -345,7 +382,7 @@ let gl=0;(function pad(){const p=(navigator.getGamepads?[...navigator.getGamepad
   else if(b(15)||ax>.6)select(S.cur+1,true);else if(b(14)||ax<-.6)select(S.cur-1,true);
   else if(b(13)||ay>.6)setCat(CATS[(CATS.findIndex(c=>c[0]===S.cat)+1)%CATS.length][0],true);
   else if(b(12)||ay<-.6)setCat(CATS[(CATS.findIndex(c=>c[0]===S.cat)+CATS.length-1)%CATS.length][0],true);
-  else if(b(0))launch();else if(b(9))details();else if(b(3))toggleFav();else if(b(2))dice();else used=false;
+  else if(b(0))launch();else if(b(9))details();else if(b(8))menu();else if(b(3))toggleFav();else if(b(2))dice();else used=false;
   if(used)gl=now+230}
  requestAnimationFrame(pad)})();
 
@@ -409,6 +446,82 @@ buildTabs();setCat('all');
 const lastG=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].last).sort((a,b)=>ST.stats[b.file].last-ST.stats[a.file].last)[0];
 if(lastG)select(Math.max(0,S.list.indexOf(lastG)));
 if(location.hash.length>1&&GAMES.some(g=>g.file===decodeURIComponent(location.hash.slice(1)))){$('splash').classList.add('off');fromHash()}
+
+// ---------- АФК-экран ----------
+const afkEl=$('afk'),afkCard=$('afkCard');let afkOn=false,afkT=0,afkI=0,afkF=[],afkRot=0;
+const afkLimit=()=>(ST.afkSec===undefined?60:ST.afkSec)*1000;
+function afkFacts(){const f=[],st=ST.stats,top=GAMES.filter(g=>st[g.file]&&st[g.file].t>=6e4).sort((a,b)=>st[b.file].t-st[a.file].t)[0];
+ if(top)f.push(['⏱️','Твоя статистика',fmt(st[top.file].t)+' в «'+top.title+'»']);
+ const n=Object.values(st).reduce((a,x)=>a+(x.n||0),0);if(n)f.push(['🚀','Твоя статистика','Запусков за всё время: '+n]);
+ f.push(['🪙','Профиль','Уровень '+lvl(ST.xp)+', монет: '+ST.coins]);
+ const tg=TRO.filter(t=>ST.tro[t[0]]).length;f.push(['🏆','Трофеи','Получено '+tg+' из '+TRO.length]);
+ [['◀ ▶ или колесо мыши — выбрать игру','🎮'],['Enter — играть, I — подробнее','⌨️'],['F — в избранное, R — случайная игра','🎲'],['▲ ▼ — переключить раздел','↕️'],['Кнопку ⌂ в игре можно перетащить в удобное место','⌂']].forEach(h=>f.push([h[1],'Подсказка',h[0]]));
+ GAMES.filter(g=>!(st[g.file]&&st[g.file].n)).sort(()=>Math.random()-.5).slice(0,3).forEach(g=>f.push([g.emoji,'Ты ещё не запускал','«'+g.title+'» — '+g.desc]));
+ return f.sort(()=>Math.random()-.5)}
+function afkShow(){const x=afkF[afkI++%afkF.length];afkCard.classList.add('out');
+ setTimeout(()=>{afkCard.children[0].textContent=x[0];afkCard.children[1].textContent=x[1];afkCard.children[2].textContent=x[2];afkCard.classList.remove('out')},afkOn&&afkI>1?600:0)}
+function afkStart(){if(afkOn||inGame||!$('splash').classList.contains('off'))return;afkOn=true;afkF=afkFacts();afkI=0;afkEl.classList.add('on');afkEl.setAttribute('aria-hidden','false');afkShow();afkRot=setInterval(afkShow,6000)}
+function poke(){clearTimeout(afkT);if(!inGame&&afkLimit())afkT=setTimeout(afkStart,afkLimit())}
+function afkStop(){if(!afkOn)return false;afkOn=false;clearInterval(afkRot);afkEl.classList.remove('on');afkEl.setAttribute('aria-hidden','true');gl=performance.now()+400;return true}
+['keydown','pointerdown','touchstart','wheel'].forEach(t=>addEventListener(t,e=>{if(afkStop()){e.stopImmediatePropagation();if(e.cancelable)e.preventDefault()}poke()},{capture:true,passive:false}));
+addEventListener('pointermove',()=>{if(!afkOn)poke()},{passive:true});
+(function afkPad(){const p=(navigator.getGamepads?[...navigator.getGamepads()]:[]).find(Boolean);
+ if(p&&(p.buttons.some(b=>b.pressed)||Math.abs(p.axes[0]||0)>.6||Math.abs(p.axes[1]||0)>.6)){afkStop();poke()}requestAnimationFrame(afkPad)})();
+// заходим в игру — таймер не нужен, выходим из игры — заново
+new MutationObserver(poke).observe(player,{attributes:true,attributeFilter:['class']});poke();
+
+// ---------- меню RKCPlay ----------
+function applyPrefs(){document.body.classList.remove('tsS','tsL');if(ST.tileSz==='s')document.body.classList.add('tsS');if(ST.tileSz==='l')document.body.classList.add('tsL');
+ document.body.classList.toggle('rm',!!ST.rm);applySeason();if(!inGame)select(S.cur)}
+const MENU_KEYS=['◀ ▶ — выбрать игру','▲ ▼ — раздел','Enter — играть','I — подробнее','F — избранное','R — случайная игра','T — трофеи','S — магазин','P — профиль','M — звук','Q — это меню'];
+function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');if(!on){p.classList.remove('on');snd(420,.1);return}
+ const opt=(k,items,cur)=>items.map(x=>`<button class="pill${String(cur)===String(x[0])?' sel':''}" data-set="${k}:${x[0]}">${x[1]}</button>`).join('');
+ const afk=ST.afkSec===undefined?60:ST.afkSec;
+ $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры, профиль и настройки</small>
+ <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
+ <h4>Настройки</h4>
+ <div class="mset"><span>Звук</span><div class="row">${opt('snd',[[1,'Вкл'],[0,'Выкл']],ST.mute?0:1)}</div></div>
+ <div class="mset"><span>Размер плиток</span><div class="row">${opt('tile',[['s','Мелкие'],['m','Средние'],['l','Крупные']],ST.tileSz||'m')}</div></div>
+ <div class="mset"><span>Меньше анимаций</span><div class="row">${opt('rm',[[1,'Да'],[0,'Нет']],ST.rm?1:0)}</div></div>
+ <div class="mset"><span>АФК-экран через</span><div class="row">${opt('afk',[[30,'30 с'],[60,'1 мин'],[180,'3 мин'],[0,'Никогда']],afk)}</div></div>
+ <div class="mset"><span>Сезонный режим</span><div class="row">${opt('season',[['auto','Авто'],['off','Выкл'],['halloween','🎃'],['winter','❄️'],['love','💗'],['spring','🌸']],ST.season||'auto')}</div></div>
+ <h4>Управление</h4><ul>${MENU_KEYS.map(k=>'<li>'+k+'</li>').join('')}</ul>
+ <div class="row"><button class="pill" id="mClose">Закрыть</button></div>
+ <div class="mft"><b>RKC Studio</b>Студия-разработчик RKCPlay<br><button id="mTos">Пользовательское соглашение</button></div>`;
+ const B=$('menuBox');
+ B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])()});
+ B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
+  if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
+  save();applyPrefs();menu(true);if(k==='snd'&&!ST.mute)sOk()});
+ $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;p.classList.add('on');snd(600,.1)}
+function tos(){closePans();$('tosBox').innerHTML=`<div class="tos"><h3>Пользовательское соглашение RKC</h3><small>Редакция от 29 октября 2026</small>
+ <h4>1. Что это</h4><p>RKCPlay — закрытая коллекция игр студии RKC. Её делает автор для себя и друзей.</p>
+ <h4>2. Доступ</h4><p>Доступ только по ссылке от RKC. Не отправляй ссылку посторонним без разрешения автора.</p>
+ <h4>3. Профиль и данные</h4><p>Ник, аватар, прогресс, монеты и статистика хранятся на твоём устройстве. Если войдёшь в аккаунт, они копируются в облако (Supabase). Почта нужна только для входа, мы её никому не передаём.</p>
+ <h4>4. Правила поведения</h4><p>Без оскорбительных ников и аватаров. Без накрутки монет, опыта и рейтингов, без взлома сайта и чужих профилей. За нарушение RKC может обнулить профиль.</p>
+ <h4>5. Монеты и предметы</h4><p>Монеты, рамки, титулы и темы — виртуальные. Они не стоят денег и не обмениваются на деньги. RKC может менять цены и баланс.</p>
+ <h4>6. Игры</h4><p>Игры работают «как есть» и могут содержать ошибки. В хоррор-играх бывают пугающие сцены, резкие звуки и вспышки света. Играй, если тебе комфортно.</p>
+ <h4>7. Удаление данных</h4><p>Очисти данные сайта в браузере, чтобы стереть локальный профиль. Чтобы удалить облачный, напиши в RKC.</p>
+ <h4>8. Изменения</h4><p>Соглашение может обновляться. Продолжая пользоваться RKCPlay, ты соглашаешься с актуальной редакцией.</p>
+ <div class="row"><button class="pill" id="tBack">← В меню</button><button class="pill" id="tClose">Закрыть</button></div></div>`;
+ $('tBack').onclick=()=>{closePans();menu(true)};$('tClose').onclick=closePans;$('tosP').classList.add('on');snd(600,.1)}
+// ---------- сезонные режимы ----------
+const SEASONS={
+ halloween:{name:'Хэллоуин',ico:'🎃',p:['🎃','🦇','👻','🕸️'],a:'rgba(255,110,20,.30)',b:'rgba(130,50,210,.24)',r:[1020,1102],hi:'Жуткий месяц в RKCPlay'},
+ winter:{name:'Зима',ico:'❄️',p:['❄️','❄️','✨','⛄'],a:'rgba(120,190,255,.24)',b:'rgba(210,235,255,.10)',r:[1201,110],hi:'В RKCPlay пошёл снег'},
+ love:{name:'День святого Валентина',ico:'💗',p:['💗','💕','🌹'],a:'rgba(255,80,140,.26)',b:'rgba(255,170,190,.12)',r:[208,215],hi:'Сердечки в RKCPlay'},
+ spring:{name:'Весна',ico:'🌸',p:['🌸','🌷','🍃'],a:'rgba(255,150,190,.20)',b:'rgba(120,220,140,.14)',r:[301,515],hi:'В RKCPlay расцвела весна'}};
+function seasonId(){const m=ST.season||'auto';if(m==='off')return null;if(SEASONS[m])return m;
+ const d=new Date(),md=(d.getMonth()+1)*100+d.getDate();
+ return Object.keys(SEASONS).find(k=>{const r=SEASONS[k].r;return r[0]<=r[1]?md>=r[0]&&md<=r[1]:md>=r[0]||md<=r[1]})||null}
+function applySeason(){const el=$('season'),id=seasonId(),S0=SEASONS[id],h1=$('splash').querySelector('h1');
+ el.innerHTML='';el.style.background='none';$('brand').textContent=(S0?S0.ico+' ':'')+'RKCPlay ▾';h1.textContent=(S0?S0.ico+' ':'')+'RKCPlay';if(!S0)return;
+ el.style.background=`radial-gradient(90% 60% at 50% 0%,${S0.a},transparent 70%),radial-gradient(80% 50% at 100% 100%,${S0.b},transparent 70%)`;
+ for(let i=0;i<20;i++){const sp=document.createElement('span'),r=Math.random;sp.textContent=S0.p[i%S0.p.length];
+  sp.style.cssText=`left:${r()*100}%;font-size:${14+r()*18|0}px;animation-duration:${9+r()*9}s;animation-delay:-${r()*16}s;--dx:${(r()-.5)*160}px`;el.appendChild(sp)}}
+function seasonHello(){const id=seasonId();if(!id)return;const k=id+new Date().getFullYear();if(ST.seasonSeen===k)return;ST.seasonSeen=k;save();
+ setTimeout(()=>toast(SEASONS[id].ico,SEASONS[id].name,SEASONS[id].hi),2000)}
+$('brand').onclick=()=>menu();applyPrefs();seasonHello();
 </script>
 </body>
 </html>
