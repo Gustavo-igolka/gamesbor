@@ -5,9 +5,11 @@
 <title>БАР «ПОСЛЕДНИЙ БОЛТ»</title>
 <style>
   html,body{margin:0;height:100%;background:#05040a;display:flex;align-items:center;
-            justify-content:center;overflow:hidden;font-family:'Courier New',monospace;}
+            justify-content:center;overflow:hidden;font-family:'Courier New',monospace;
+            user-select:none;-webkit-user-select:none;}
   canvas{display:block;border-radius:6px;cursor:crosshair;
          box-shadow:0 0 70px rgba(255,90,20,.3),0 0 200px rgba(0,0,0,.9);}
+  canvas.flash{cursor:none;}
 </style>
 </head>
 <body>
@@ -31,15 +33,16 @@ function rkcProgress(id, cur){
 
 /* ===== Достижения: локальный прогресс (переживает перезапуск игры) ===== */
 const BAR_STATS_KEY = 'bar_last_bolt_stats_v1';
-let barStats = {ingr:{}, recipes:{}, customers:{}, firstSuccess:0, firstPerfect:0, poured:0};
+let barStats = {ingr:{}, recipes:{}, customers:{}, firstSuccess:0, firstPerfect:0, poured:0, pestsBanished:0};
 try{ Object.assign(barStats, JSON.parse(localStorage.getItem(BAR_STATS_KEY)||'{}')); }catch(e){}
 const saveBar = () => { try{localStorage.setItem(BAR_STATS_KEY, JSON.stringify(barStats));}catch(e){} };
 
-// Синк того, что уже было получено в прошлых сессиях
 (function syncAch(){
   if(barStats.poured) rkcUnlock('pour_first');
   if(barStats.firstSuccess) rkcUnlock('first_success');
   if(barStats.firstPerfect) rkcUnlock('first_perfect');
+  if(barStats.pestsBanished >= 1) rkcUnlock('pest_first');
+  if(barStats.pestsBanished >= 10) rkcUnlock('pest_10');
   const nr = Object.keys(barStats.recipes||{}).length;
   const nc = Object.keys(barStats.customers||{}).length;
   const ni = Object.keys(barStats.ingr||{}).length;
@@ -52,7 +55,7 @@ const saveBar = () => { try{localStorage.setItem(BAR_STATS_KEY, JSON.stringify(b
 })();
 
 /* ============================================================
-   БАР «ПОСЛЕДНИЙ БОЛТ» — v2 (физика стакана)
+   БАР «ПОСЛЕДНИЙ БОЛТ» — v3 (физика стакана + роботы-помехи + фонарик)
    ============================================================ */
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -77,6 +80,42 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
     this.lineTo(x,y+r[0]); this.quadraticCurveTo(x,y,x+r[0],y);
     return this;
   };
+}
+
+/* ============================================================
+   АУДИО
+   ============================================================ */
+let audioCtx = null;
+function initAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+  if(audioCtx && audioCtx.state === 'suspended'){ try{ audioCtx.resume(); }catch(e){} }
+}
+function beep(freq, dur, type, vol){
+  if(!audioCtx || audioCtx.state !== 'running') return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(vol || 0.04, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + dur + 0.02);
+}
+function sweepBeep(f1, f2, dur, type, vol){
+  if(!audioCtx || audioCtx.state !== 'running') return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'square';
+  osc.frequency.setValueAtTime(f1, now);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20,f2), now + dur);
+  gain.gain.setValueAtTime(vol || 0.04, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + dur + 0.02);
 }
 
 /* ============================================================
@@ -155,6 +194,256 @@ const game = {
 };
 
 /* ============================================================
+   РОБОТЫ-ПОМЕХИ + ФОНАРИК
+   ============================================================ */
+const pests = [];
+let pestSpawnTimer = 6;
+const pestHintShown = {v:false};
+
+const flashlight = {
+  active: false,
+  x: 500, y: 300,
+  radius: 120,
+  flicker: 0,
+};
+
+function spawnPest(){
+  const x = 320 + Math.random() * (W - 420);
+  const y = 120 + Math.random() * 320;
+  pests.push({
+    x, y,
+    vx: (Math.random()-0.5)*70,
+    vy: (Math.random()-0.5)*70,
+    wobble: Math.random()*Math.PI*2,
+    banishTimer: 0,
+    life: 10 + Math.random()*3,
+    beepTimer: 0.2 + Math.random()*0.6,
+    waveTimer: 0,
+    panic: 0,
+    inBeam: false,
+  });
+  beep(520, 0.06, 'square', 0.03);
+  setTimeout(()=>beep(680, 0.06, 'square', 0.03), 90);
+  if(!pestHintShown.v){
+    pestHintShown.v = true;
+    game.message = {text:'⚠ ПОМЕХА! ЗАЖМИ ПКМ И СВЕТИ 2 СЕК', color:'#ffaa33', t:3.2};
+  } else if(!game.message || game.message.t < 0.8){
+    game.message = {text:'⚠ ОБНАРУЖЕНА ПОМЕХА ⚠', color:'#ffaa33', t:1.6};
+  }
+}
+
+function updatePests(dt){
+  if(game.phase !== 'making'){
+    if(pests.length > 0) pests.length = 0;
+    pestSpawnTimer = 6 + Math.random()*3;
+    return;
+  }
+
+  pestSpawnTimer -= dt;
+  if(pestSpawnTimer <= 0){
+    if(pests.length < 3) spawnPest();
+    const interval = Math.max(3.2, 7 - game.points/400);
+    pestSpawnTimer = interval + Math.random()*2;
+  }
+
+  for(let i=pests.length-1; i>=0; i--){
+    const p = pests[i];
+    const panicSpeed = p.inBeam ? 2.4 : 1;
+    p.wobble += dt * (3 + p.panic*8) * panicSpeed;
+    p.x += Math.sin(p.wobble) * 22 * dt + p.vx * dt * panicSpeed;
+    p.y += Math.cos(p.wobble*1.3) * 22 * dt + p.vy * dt * panicSpeed;
+
+    if(p.x < 300){ p.x = 300; p.vx = Math.abs(p.vx); }
+    if(p.x > W-60){ p.x = W-60; p.vx = -Math.abs(p.vx); }
+    if(p.y < 100){ p.y = 100; p.vy = Math.abs(p.vy); }
+    if(p.y > 460){ p.y = 460; p.vy = -Math.abs(p.vy); }
+
+    p.beepTimer -= dt;
+    if(p.beepTimer <= 0){
+      p.beepTimer = (p.inBeam ? 0.28 : 0.75) + Math.random()*0.5;
+      beep(280 + Math.random()*220 + (p.inBeam?300:0), 0.07, 'square', 0.02);
+      p.waveTimer = 0.45;
+    }
+    if(p.waveTimer > 0) p.waveTimer -= dt;
+
+    // проверка попадания в луч фонарика
+    const dist = Math.hypot(flashlight.x - p.x, flashlight.y - p.y);
+    p.inBeam = flashlight.active && dist < flashlight.radius;
+    if(p.inBeam){
+      p.banishTimer += dt;
+      p.panic = Math.min(1, p.panic + dt*3);
+      p.waveTimer = Math.max(p.waveTimer, 0.15);
+      if(p.banishTimer >= 2){
+        pests.splice(i,1);
+        game.points += 30;
+        game.shake = Math.max(game.shake, 0.3);
+        sweepBeep(1400, 400, 0.18, 'sawtooth', 0.05);
+        setTimeout(()=>beep(1600, 0.06, 'square', 0.03), 60);
+        if(!game.message || game.message.t < 1){
+          game.message = {text:'ПОМЕХА УСТРАНЕНА +30', color:'#5ce8ff', t:1.5};
+        }
+        barStats.pestsBanished = (barStats.pestsBanished||0) + 1;
+        saveBar();
+        rkcUnlock('pest_first');
+        if(barStats.pestsBanished >= 10) rkcUnlock('pest_10');
+        if(game.points >= 500) rkcUnlock('score_500');
+        continue;
+      }
+    } else {
+      p.banishTimer = Math.max(0, p.banishTimer - dt*1.8);
+      p.panic = Math.max(0, p.panic - dt*2);
+    }
+
+    // таймер жизни: помеха портит заказ
+    p.life -= dt;
+    if(p.life <= 0){
+      let stole = false;
+      if(game.glass && game.glass.contents.length > 0){
+        const idx = Math.floor(Math.random()*game.glass.contents.length);
+        const c = game.glass.contents[idx];
+        c.amount -= 1;
+        if(c.amount <= 0) game.glass.contents.splice(idx,1);
+        stole = true;
+        game.message = {text:'ПОМЕХА УКРАЛА ИНГРЕДИЕНТ!', color:'#ff4d4d', t:2};
+      } else if(game.order){
+        game.order.time = Math.max(0, game.order.time - 5);
+        game.message = {text:'ПОМЕХА СЪЕЛА ВРЕМЯ −5с', color:'#ff4d4d', t:2};
+      }
+      sweepBeep(400, 100, 0.35, 'sawtooth', 0.06);
+      game.shake = Math.max(game.shake, 0.6);
+      pests.splice(i,1);
+    }
+  }
+}
+
+function drawPest(p){
+  const shake = p.inBeam ? Math.sin(game.time*40)*1.5 : Math.sin(game.time*6 + p.wobble)*0.6;
+  const x = p.x + shake;
+  const y = p.y + Math.sin(p.wobble*2)*2;
+
+  // тень
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(x, y+16, 13, 4, 0, 0, 7);
+  ctx.fill();
+
+  // звуковые волны
+  if(p.waveTimer > 0){
+    const a = p.waveTimer / 0.45;
+    ctx.strokeStyle = `rgba(255,200,60,${(a*0.6).toFixed(2)})`;
+    ctx.lineWidth = 2;
+    for(let k=0;k<2;k++){
+      const rr = 18 + k*11 + (1-a)*14;
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.stroke();
+    }
+  }
+
+  // ноги
+  ctx.strokeStyle = p.inBeam ? '#5a4850' : '#2a2028';
+  ctx.lineWidth = 2;
+  for(let i=-1;i<=1;i++){
+    ctx.beginPath();
+    ctx.moveTo(x + i*7, y+8);
+    ctx.lineTo(x + i*10, y+16);
+    ctx.stroke();
+  }
+
+  // тело
+  ctx.save();
+  if(p.inBeam){ ctx.shadowColor = '#ff3a18'; ctx.shadowBlur = 22; }
+  ctx.fillStyle = p.inBeam ? '#4a3840' : '#1e1418';
+  ctx.beginPath(); ctx.roundRect(x-13, y-9, 26, 20, 5); ctx.fill();
+  ctx.restore();
+
+  // глаза
+  const eyeA = p.inBeam ? 1 : 0.55 + 0.45*Math.sin(game.time*8 + p.wobble);
+  ctx.save();
+  if(p.inBeam){ ctx.shadowColor = '#ff2010'; ctx.shadowBlur = 14; }
+  ctx.fillStyle = `rgba(255,60,30,${eyeA.toFixed(2)})`;
+  ctx.beginPath(); ctx.arc(x-5, y-2, 2.6, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+5, y-2, 2.6, 0, 7); ctx.fill();
+  ctx.restore();
+
+  // антенна
+  ctx.strokeStyle = p.inBeam ? '#6a5860' : '#2a2028';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y-9); ctx.lineTo(x, y-17); ctx.stroke();
+  ctx.fillStyle = `rgba(255,200,50,${(0.5+0.5*Math.sin(game.time*6+p.wobble)).toFixed(2)})`;
+  ctx.beginPath(); ctx.arc(x, y-17, 2.2, 0, 7); ctx.fill();
+
+  // прогресс фокусировки
+  if(p.banishTimer > 0){
+    const prog = Math.min(1, p.banishTimer/2);
+    const bw = 46, bh = 6, bx = x - bw/2, by = y - 34;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#5ce8ff';
+    ctx.beginPath(); ctx.roundRect(bx+1, by+1, (bw-2)*prog, bh-2, 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold 8px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil((2 - p.banishTimer)*10)/10 + 'с', x, by-4);
+  }
+
+  // иконка опасности
+  if(!p.inBeam){
+    const blink = 0.4 + 0.6*Math.abs(Math.sin(game.time*4));
+    ctx.globalAlpha = blink;
+    ctx.fillStyle = '#ffaa33';
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠', x, y - 22);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawFlashlight(){
+  if(!flashlight.active) return;
+  const r = flashlight.radius;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const g = ctx.createRadialGradient(flashlight.x, flashlight.y, 10, flashlight.x, flashlight.y, r);
+  g.addColorStop(0, 'rgba(255,246,200,0.55)');
+  g.addColorStop(0.55, 'rgba(255,225,140,0.22)');
+  g.addColorStop(1, 'rgba(255,215,110,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(flashlight.x, flashlight.y, r, 0, 7); ctx.fill();
+
+  // световое кольцо
+  ctx.strokeStyle = 'rgba(255,235,170,0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(flashlight.x, flashlight.y, r, 0, 7); ctx.stroke();
+
+  // лучи
+  ctx.strokeStyle = 'rgba(255,230,150,0.12)';
+  ctx.lineWidth = 1;
+  for(let i=0;i<8;i++){
+    const a = i/8*Math.PI*2 + game.time*0.4;
+    ctx.beginPath();
+    ctx.moveTo(flashlight.x, flashlight.y);
+    ctx.lineTo(flashlight.x + Math.cos(a)*r, flashlight.y + Math.sin(a)*r);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // прицел
+  ctx.strokeStyle = 'rgba(255,240,180,0.85)';
+  ctx.lineWidth = 1.5;
+  const fx = flashlight.x, fy = flashlight.y;
+  ctx.beginPath();
+  ctx.moveTo(fx-9, fy); ctx.lineTo(fx-3, fy);
+  ctx.moveTo(fx+3, fy); ctx.lineTo(fx+9, fy);
+  ctx.moveTo(fx, fy-9); ctx.lineTo(fx, fy-3);
+  ctx.moveTo(fx, fy+3); ctx.lineTo(fx, fy+9);
+  ctx.stroke();
+}
+
+/* ============================================================
    УТИЛИТЫ
    ============================================================ */
 function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
@@ -231,7 +520,7 @@ function updateGlassPhysics(dt){
   if(g.y > H + 60 || g.x < -60 || g.x > W + 60){
     game.glass = null;
     game.message = {text:'СТАКАН РАЗБИЛСЯ', color:'#ff4d4d', t:2};
-    // --- достижение: разбить стакан ---
+    sweepBeep(600, 120, 0.3, 'square', 0.05);
     rkcUnlock('break_glass');
   }
 }
@@ -286,8 +575,11 @@ function startGame(){
   game.view = 'front';
   game.sessionSuccesses = 0;
   game.sessionPerfectChain = 0;
-  // --- достижение: первая смена ---
+  pests.length = 0;
+  pestSpawnTimer = 6;
   rkcUnlock('play');
+  beep(440, 0.08, 'square', 0.04);
+  setTimeout(()=>beep(660, 0.1, 'square', 0.04), 100);
   newCustomer();
 }
 
@@ -306,6 +598,7 @@ function newCustomer(){
   game.tapPull = [0,0,0,0];
   game.dragging = null;
   game.resultInfo = null;
+  pests.length = 0;
 }
 
 function advanceDialogue(){
@@ -318,6 +611,7 @@ function advanceDialogue(){
   } else {
     game.phase = 'making';
     game.order.time = game.order.total;
+    pestSpawnTimer = 6 + Math.random()*3;
     game.message = {text:'ЗАКАЗ ПРИНЯТ. К СТОЙКЕ (S)', color:'#5ce8ff', t:2};
   }
 }
@@ -335,7 +629,6 @@ function pourInto(id, amount){
   g.mixed = false;
   g.mixProgress = 0;
 
-  // --- достижения: налив ---
   if(!barStats.poured){
     barStats.poured = 1; saveBar(); rkcUnlock('pour_first');
   }
@@ -366,13 +659,13 @@ function serve(){
 
   const timeBonus = Math.round(game.order.time * 8);
   const pts = Math.round(q * 12) + timeBonus;
-  // Считаем затраченное время до того, как обнулим таймер
   const elapsed = game.order.total - game.order.time;
 
   if(q >= 30){
     game.points += pts;
+    beep(880, 0.08, 'square', 0.04);
+    setTimeout(()=>beep(1320, 0.12, 'square', 0.04), 90);
 
-    // ===== ДОСТИЖЕНИЯ =====
     barStats.successes = (barStats.successes||0) + 1;
 
     if(!barStats.recipes[r.name]){
@@ -406,7 +699,6 @@ function serve(){
     if(game.sessionSuccesses >= 10) rkcUnlock('long_game');
 
     if(game.points >= 500) rkcUnlock('score_500');
-    // ===== /ДОСТИЖЕНИЯ =====
 
     game.message = {text:'+'+pts+' ОЧКОВ', color:'#5ce8ff', t:2.2};
     game.shake = 0.4;
@@ -414,6 +706,7 @@ function serve(){
   } else {
     game.lives--;
     game.shake = 1;
+    sweepBeep(300, 90, 0.3, 'sawtooth', 0.05);
     game.message = {text:'БОТ НЕДОВОЛЕН. −1 ЖИЗНЬ', color:'#ff4d4d', t:2.2};
     game.resultInfo = {ok:false, q, pts:0};
     game.sessionPerfectChain = 0;
@@ -421,16 +714,19 @@ function serve(){
   game.phase = 'result';
   game.resultTimer = 2.4;
   game.order.time = 0;
+  pests.length = 0;
 }
 
 function failOrder(){
   game.lives--;
   game.shake = 1;
+  sweepBeep(300, 90, 0.4, 'sawtooth', 0.05);
   game.message = {text:'ВРЕМЯ ВЫШЛО. БОТ УШЁЛ.', color:'#ff4d4d', t:2.2};
   game.resultInfo = {ok:false, q:0, pts:0, timeout:true};
   game.phase = 'result';
   game.resultTimer = 2.4;
   game.sessionPerfectChain = 0;
+  pests.length = 0;
 }
 
 /* ============================================================
@@ -486,6 +782,7 @@ function update(dt){
   }
 
   updateGlassPhysics(dt);
+  updatePests(dt);
 }
 
 /* ============================================================
@@ -516,7 +813,6 @@ function handleClick(p){
     return;
   }
 
-  // вид назад: краны
   for(let i=0;i<4;i++){
     const hb = tapHitbox(i);
     if(p.x>hb.x && p.x<hb.x+hb.w && p.y>hb.y && p.y<hb.y+hb.h){
@@ -525,7 +821,6 @@ function handleClick(p){
     }
   }
 
-  // вид назад: полка со стаканами
   if(p.x > 45 && p.x < 260 && p.y > 470 && p.y < 580){
     if(!game.glass){
       const g = createGlass();
@@ -538,7 +833,7 @@ function handleClick(p){
       g.lastMoveY = p.y;
       game.glass = g;
       game.message = {text:'СТАКАН ВЗЯТ', color:'#9fe8ff', t:1.2};
-      // --- достижение: взять стакан ---
+      beep(600, 0.05, 'square', 0.03);
       rkcUnlock('take_glass');
     } else {
       game.message = {text:'СТАКАН УЖЕ В РУКЕ', color:'#ffaa33', t:1.2};
@@ -546,7 +841,6 @@ function handleClick(p){
     return;
   }
 
-  // вид назад: гарниры
   for(let i=0;i<GARNISHES.length;i++){
     const gx = 420 + i*80, gy = 500;
     if(Math.hypot(p.x-gx, p.y-gy) < 36){
@@ -560,7 +854,7 @@ function handleClick(p){
       }
       game.glass.garnish = GARNISHES[i].id;
       game.message = {text:'ДОБАВЛЕНО: '+GARNISHES[i].name, color:'#9fe8ff', t:1.2};
-      // --- достижение: первый гарнир ---
+      beep(700, 0.05, 'square', 0.03);
       rkcUnlock('add_garnish');
       return;
     }
@@ -568,14 +862,31 @@ function handleClick(p){
 }
 
 canvas.addEventListener('mousedown', e=>{
+  initAudio();
   const p = toCanvas(e);
   mouse.x = p.x; mouse.y = p.y;
+
+  if(e.button === 2){
+    flashlight.active = true;
+    flashlight.x = p.x;
+    flashlight.y = p.y;
+    canvas.classList.add('flash');
+    e.preventDefault();
+    beep(1200, 0.03, 'sine', 0.02);
+    return;
+  }
+
   mouse.down = true;
   if(tryGrabGlass(p)) return;
   handleClick(p);
 });
 
-canvas.addEventListener('mouseup', ()=>{
+canvas.addEventListener('mouseup', e=>{
+  if(e.button === 2){
+    flashlight.active = false;
+    canvas.classList.remove('flash');
+    return;
+  }
   mouse.down = false;
   releaseGlass();
   game.dragging = null;
@@ -585,6 +896,10 @@ canvas.addEventListener('mousemove', e=>{
   const p = toCanvas(e);
   mouse.x = p.x;
   mouse.y = p.y;
+  if(flashlight.active){
+    flashlight.x = p.x;
+    flashlight.y = p.y;
+  }
   if(game.dragging){
     game.dragging.pull = clamp((p.y - game.dragging.startY)/70, 0, 1);
   }
@@ -594,9 +909,14 @@ canvas.addEventListener('mouseleave', ()=>{
   mouse.down = false;
   releaseGlass();
   game.dragging = null;
+  flashlight.active = false;
+  canvas.classList.remove('flash');
 });
 
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
 window.addEventListener('keydown', e=>{
+  initAudio();
   if(e.code === 'Space'){
     e.preventDefault();
     if(game.phase === 'menu' || game.phase === 'gameover') startGame();
@@ -715,7 +1035,7 @@ function drawFront(){
   ctx.textAlign = 'center';
   ctx.font = '13px "Courier New"';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
-  ctx.fillText('[S] К СТОЙКЕ', 500, 585);
+  ctx.fillText('[S] К СТОЙКЕ   ·   ПКМ — ФОНАРИК', 500, 585);
 }
 
 function drawRobot(cx, baseY){
@@ -859,7 +1179,7 @@ function drawBack(){
   ctx.textAlign = 'center';
   ctx.font = '13px "Courier New"';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
-  ctx.fillText('[W] К БОТУ  ·  Перетащи стакан под кран, потом тяни кран вниз', 500, 588);
+  ctx.fillText('[W] К БОТУ  ·  Перетащи стакан под кран, потом тяни кран вниз  ·  ПКМ — ФОНАРИК', 500, 588);
 }
 
 function drawTap(i){
@@ -1211,6 +1531,17 @@ function drawHUD(){
     ctx.fillText(Math.ceil(game.order.time)+' сек', bx+bw/2, by+14);
   }
 
+  // индикатор помех
+  if(pests.length > 0){
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 14px "Courier New"';
+    const blink = 0.55 + 0.45*Math.sin(game.time*8);
+    ctx.globalAlpha = blink;
+    ctx.fillStyle = '#ffaa33';
+    ctx.fillText('⚠ ПОМЕХ: ' + pests.length + '  (ПКМ)', W-20, 34);
+    ctx.globalAlpha = 1;
+  }
+
   if(game.message){
     const a = Math.min(1, game.message.t * 2);
     ctx.globalAlpha = a;
@@ -1295,27 +1626,30 @@ function drawMenu(){
   ctx.shadowColor = '#ff5a1e'; ctx.shadowBlur = 40;
   ctx.fillStyle = '#ffb066';
   ctx.font = 'bold 62px "Courier New"';
-  ctx.fillText('ПОСЛЕДНИЙ БОЛТ', 500, 190);
+  ctx.fillText('ПОСЛЕДНИЙ БОЛТ', 500, 180);
   ctx.restore();
 
   ctx.fillStyle = 'rgba(255,180,120,0.75)';
   ctx.font = 'bold 18px "Courier New"';
-  ctx.fillText('Б А Р   Д Л Я   Р О Б О Т О В', 500, 226);
+  ctx.fillText('Б А Р   Д Л Я   Р О Б О Т О В', 500, 216);
 
   ctx.fillStyle = 'rgba(220,220,220,0.7)';
   ctx.font = '15px "Courier New"';
-  ctx.fillText('Мир пал. Роботы правят. Но выпить хотят все.', 500, 282);
-  ctx.fillText('Ты — последний бармен. Не подведи.', 500, 306);
+  ctx.fillText('Мир пал. Роботы правят. Но выпить хотят все.', 500, 268);
+  ctx.fillText('Ты — последний бармен. Не подведи.', 500, 292);
 
   ctx.fillStyle = 'rgba(150,220,255,0.85)';
   ctx.font = 'bold 13px "Courier New"';
-  ctx.fillText('W — к боту    ·    S — к стойке', 500, 360);
-  ctx.fillText('ПРОБЕЛ — пропустить диалог', 500, 384);
-  ctx.fillText('ЛКМ — взять стакан, таскать, тянуть кран, добавлять', 500, 408);
+  ctx.fillText('W — к боту    ·    S — к стойке', 500, 344);
+  ctx.fillText('ПРОБЕЛ — пропустить диалог', 500, 368);
+  ctx.fillText('ЛКМ — взять стакан, таскать, тянуть кран, добавлять', 500, 392);
+  ctx.fillStyle = 'rgba(255,220,120,0.9)';
+  ctx.fillText('ПКМ — ФОНАРИК (свети на помеху 2 сек)', 500, 416);
 
   ctx.fillStyle = 'rgba(255,180,120,0.7)';
   ctx.font = '13px "Courier New"';
-  ctx.fillText('Стакан можно бросить — он упадёт с гравитацией!', 500, 448);
+  ctx.fillText('Маленькие роботы-помехи крадут ингредиенты.', 500, 456);
+  ctx.fillText('Включай фонарик и жги их светом!', 500, 476);
 
   const blink = 0.5 + 0.5*Math.sin(game.time*4);
   ctx.save();
@@ -1323,13 +1657,13 @@ function drawMenu(){
   ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 20;
   ctx.fillStyle = '#5ce8ff';
   ctx.font = 'bold 22px "Courier New"';
-  ctx.fillText('НАЖМИ ПРОБЕЛ ИЛИ КЛИКНИ', 500, 510);
+  ctx.fillText('НАЖМИ ПРОБЕЛ ИЛИ КЛИКНИ', 500, 528);
   ctx.restore();
 
   if(game.best > 0){
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '14px "Courier New"';
-    ctx.fillText('РЕКОРД: ' + game.best, 500, 552);
+    ctx.fillText('РЕКОРД: ' + game.best, 500, 566);
   }
 }
 
@@ -1447,6 +1781,20 @@ function draw(){
   } else {
     if(game.view === 'front') drawFront();
     else drawBack();
+
+    // фонарик под помехами
+    drawFlashlight();
+
+    // красная виньетка при наличии помех
+    if(pests.length > 0){
+      const vg = ctx.createRadialGradient(W/2, H/2, 200, W/2, H/2, 620);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(255, 40, 20, ' + (0.06 + pests.length*0.05).toFixed(2) + ')');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0,0,W,H);
+    }
+
+    for(const p of pests) drawPest(p);
 
     drawHUD();
 
