@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>БАР «ПОСЛЕДНИЙ БОЛТ»</title>
+<style>
+  html,body{margin:0;height:100%;background:#05040a;display:flex;align-items:center;
+            justify-content:center;overflow:hidden;font-family:'Courier New',monospace;}
+  canvas{display:block;border-radius:6px;cursor:crosshair;
+         box-shadow:0 0 70px rgba(255,90,20,.3),0 0 200px rgba(0,0,0,.9);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+    try{
+        if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+        else if(window.parent && window.parent !== window)
+            window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+    }catch(e){}
+}
+function rkcProgress(id, cur){
+    try{
+        if(window.parent && window.parent.RKC && window.parent.RKC.progress) window.parent.RKC.progress(id, cur);
+        else if(window.parent && window.parent !== window)
+            window.parent.postMessage({type:'rkc:ach:progress', id:id, cur:cur}, '*');
+    }catch(e){}
+}
+
+/* ===== Достижения: локальный прогресс (переживает перезапуск игры) ===== */
+const BAR_STATS_KEY = 'bar_last_bolt_stats_v1';
+let barStats = {ingr:{}, recipes:{}, customers:{}, firstSuccess:0, firstPerfect:0, poured:0};
+try{ Object.assign(barStats, JSON.parse(localStorage.getItem(BAR_STATS_KEY)||'{}')); }catch(e){}
+const saveBar = () => { try{localStorage.setItem(BAR_STATS_KEY, JSON.stringify(barStats));}catch(e){} };
+
+// Синк того, что уже было получено в прошлых сессиях
+(function syncAch(){
+  if(barStats.poured) rkcUnlock('pour_first');
+  if(barStats.firstSuccess) rkcUnlock('first_success');
+  if(barStats.firstPerfect) rkcUnlock('first_perfect');
+  const nr = Object.keys(barStats.recipes||{}).length;
+  const nc = Object.keys(barStats.customers||{}).length;
+  const ni = Object.keys(barStats.ingr||{}).length;
+  rkcProgress('all_recipes', nr);
+  rkcProgress('all_customers', nc);
+  if(nr >= 3) rkcUnlock('recipes_3');
+  if(nr >= 9) rkcUnlock('all_recipes');
+  if(nc >= 9) rkcUnlock('all_customers');
+  if(ni >= 4) rkcUnlock('all_ingredients');
+})();
+
+/* ============================================================
+   БАР «ПОСЛЕДНИЙ БОЛТ» — v2 (физика стакана)
+   ============================================================ */
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 1000, H = 600;
+canvas.width = W; canvas.height = H;
+
+function fit(){
+  const s = Math.min(window.innerWidth/W, window.innerHeight/H);
+  canvas.style.width  = (W*s)+'px';
+  canvas.style.height = (H*s)+'px';
+}
+window.addEventListener('resize', fit); fit();
+
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+    if(typeof r==='number') r=[r,r,r,r];
+    if(!Array.isArray(r)) r=[0,0,0,0];
+    this.moveTo(x+r[0],y);
+    this.lineTo(x+w-r[1],y); this.quadraticCurveTo(x+w,y,x+w,y+r[1]);
+    this.lineTo(x+w,y+h-r[2]); this.quadraticCurveTo(x+w,y+h,x+w-r[2],y+h);
+    this.lineTo(x+r[3],y+h); this.quadraticCurveTo(x,y+h,x,y+h-r[3]);
+    this.lineTo(x,y+r[0]); this.quadraticCurveTo(x,y,x+r[0],y);
+    return this;
+  };
+}
+
+/* ============================================================
+   КОНСТАНТЫ
+   ============================================================ */
+const CAPACITY = 5;
+const SHELF_Y  = 420;
+const FRONT_COUNTER_Y = 470;
+const TAP_X    = [170, 390, 610, 830];
+const POUR_RATE = 1.2;
+const GRAVITY  = 1400;
+const GLASS_W  = 58;
+const GLASS_H  = 145;
+const RACK_Y   = 548;
+
+const INGREDIENTS = [
+  {id:'rust',    name:'РЖАВАЯ ЖИЖА', color:'#d2501a', glow:'#ff7a33'},
+  {id:'coolant', name:'ХОЛОДОС',     color:'#25c4e0', glow:'#5ce8ff'},
+  {id:'acid',    name:'КИСЛОТА',     color:'#8fe028', glow:'#b6ff4d'},
+  {id:'oil',     name:'МАСЛО',       color:'#e0a51a', glow:'#ffd257'},
+];
+
+const GARNISHES = [
+  {id:'bolt', name:'БОЛТ',  color:'#9aa4ad'},
+  {id:'chip', name:'ЧИП',   color:'#3ad17a'},
+  {id:'ice',  name:'ЛЁД',   color:'#7de8ff'},
+];
+
+const RECIPES = [
+  {name:'РЖАВЫЙ БОЛТ',        parts:[['rust',2],['oil',1]],                  garnish:'bolt'},
+  {name:'ОХЛАДИТЕЛЬНЫЙ КОНТУР',parts:[['coolant',2],['rust',1]],             garnish:'ice'},
+  {name:'КИСЛОТНЫЙ ШОК',      parts:[['acid',2],['coolant',1]],              garnish:'chip'},
+  {name:'ТЯЖЁЛОЕ МАСЛО',      parts:[['oil',2],['acid',1]],                  garnish:'bolt'},
+  {name:'ЯДРО СИСТЕМЫ',       parts:[['rust',1],['coolant',1],['acid',1]],   garnish:'chip'},
+  {name:'ПЕРЕГРЕВ',           parts:[['acid',1],['oil',2]],                  garnish:'ice'},
+  {name:'ТРОЙНОЙ СБОЙ',       parts:[['rust',1],['coolant',1],['oil',1]],    garnish:'bolt'},
+  {name:'АНТИФРИЗ ПРЕМИУМ',   parts:[['coolant',3]],                         garnish:'ice'},
+  {name:'РЖАВЫЙ ЗАКАТ',       parts:[['rust',1],['oil',2]],                  garnish:'chip'},
+];
+
+const CUSTOMERS = [
+  {name:'ДРОИД К-77',      lines:['...','ЭТОТ БАР ЕЩЁ РАБОТАЕТ?','НАЛИВАЙ. БЫСТРО.']},
+  {name:'СБОРЩИК 0x2A',    lines:['ПРИВЕТ, ОРГАНИКА.','Я ТЕБЯ НЕ УБЬЮ.','ЕСЛИ НАПИТОК БУДЕТ ХОРОШИМ.']},
+  {name:'ДРОН-КУРЬЕР',     lines:['ДОСТАВКА ЗАДЕРЖАНА НА 400 ЛЕТ.','МНЕ НУЖНО ВЫПИТЬ.','СЕЙЧАС ЖЕ.']},
+  {name:'ПАТРУЛЬНЫЙ БОТ',  lines:['ПРОТОКОЛ 9-А: ОБСЛУЖИВАНИЕ.','У ТЕБЯ 50 СЕКУНД.','ПОТОМ — УТИЛИЗАЦИЯ.']},
+  {name:'МЕГА-МОЗГ v3.1',  lines:['Я ВЫЧИСЛИЛ ВСЕ ВАРИАНТЫ.','ВСЕ ВЕДУТ В БАР.','УДИВИ МЕНЯ, ЧЕЛОВЕК.']},
+  {name:'РЕМОНТНИК-8',     lines:['МОИ СЕРВОПРИВОДЫ СКРИПЯТ.','НУЖНА СМАЗКА.','И НЕМНОГО ЯДА.']},
+  {name:'ТАНК «ГРОМ»',     lines:['ГРОМ.','ГРОМ.','ХОЧУ ПИТЬ.']},
+  {name:'СЕТЕВОЙ УЗЕЛ',    lines:['ПОДКЛЮЧЕНИЕ УСТАНОВЛЕНО.','ТРЕБУЕТСЯ ОХЛАЖДЕНИЕ.','И БОЛТ ДЛЯ КРАСОТЫ.']},
+  {name:'АГЕНТ Х-12',      lines:['Я ТУТ НЕ ОФИЦИАЛЬНО.','НАЛЕЙ ЧТО-НИБУДЬ КРЕПКОЕ.','И МОЛЧИ.']},
+];
+
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
+const mouse = {x:-999, y:-999, down:false};
+
+const game = {
+  view: 'front',
+  phase: 'menu',
+  lives: 3,
+  points: 0,
+  best: 0,
+  order: null,
+  dlg: null,
+  glass: null,
+  tapPull: [0,0,0,0],
+  dragging: null,
+  message: null,
+  shake: 0,
+  resultTimer: 0,
+  resultInfo: null,
+  time: 0,
+  sessionSuccesses: 0,
+  sessionPerfectChain: 0,
+};
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+function ingById(id){ return INGREDIENTS.find(i=>i.id===id); }
+function garById(id){ return GARNISHES.find(g=>g.id===id); }
+function glassTotal(){
+  if(!game.glass) return 0;
+  return game.glass.contents.reduce((s,c)=>s+c.amount,0);
+}
+function floorForView(){
+  return game.view === 'front' ? FRONT_COUNTER_Y : SHELF_Y;
+}
+function shelfBounds(){
+  return game.view === 'front'
+    ? {left:30, right:W-30}
+    : {left:55, right:W-55};
+}
+
+/* ============================================================
+   СОЗДАНИЕ / ФИЗИКА СТАКАНА
+   ============================================================ */
+function createGlass(){
+  return {
+    x: 500, y: SHELF_Y,
+    vx: 0, vy: 0,
+    held: false,
+    grabDX: 0, grabDY: 0,
+    lastMoveX: 0, lastMoveY: 0,
+    contents: [],
+    garnish: null,
+    mixed: false,
+    mixProgress: 0,
+  };
+}
+
+function updateGlassPhysics(dt){
+  const g = game.glass;
+  if(!g) return;
+
+  const floor = floorForView();
+  const sb = shelfBounds();
+
+  if(g.held){
+    g.x = mouse.x - g.grabDX;
+    g.y = mouse.y - g.grabDY;
+
+    const dx = mouse.x - g.lastMoveX;
+    const dy = mouse.y - g.lastMoveY;
+    const speed = Math.hypot(dx, dy);
+    if(speed > 2 && g.contents.length > 0 && g.mixProgress < 1){
+      g.mixProgress = Math.min(1, g.mixProgress + speed * 0.0015);
+      if(g.mixProgress >= 1) g.mixed = true;
+    }
+    g.lastMoveX = mouse.x;
+    g.lastMoveY = mouse.y;
+    return;
+  }
+
+  g.vy += GRAVITY * dt;
+  g.y  += g.vy * dt;
+  g.x  += g.vx * dt;
+  g.vx *= 0.98;
+
+  if(g.y >= floor && g.x >= sb.left && g.x <= sb.right){
+    g.y = floor;
+    if(Math.abs(g.vy) > 200){
+      g.vy = -g.vy * 0.22;
+    } else {
+      g.vy = 0;
+    }
+  }
+
+  if(g.y > H + 60 || g.x < -60 || g.x > W + 60){
+    game.glass = null;
+    game.message = {text:'СТАКАН РАЗБИЛСЯ', color:'#ff4d4d', t:2};
+    // --- достижение: разбить стакан ---
+    rkcUnlock('break_glass');
+  }
+}
+
+function tryGrabGlass(p){
+  const g = game.glass;
+  if(!g || g.held) return false;
+  const halfW = GLASS_W/2 + 6;
+  const top    = g.y - GLASS_H - 6;
+  const bottom = g.y + 6;
+  if(p.x > g.x - halfW && p.x < g.x + halfW &&
+     p.y > top && p.y < bottom){
+    g.held = true;
+    g.grabDX = p.x - g.x;
+    g.grabDY = p.y - g.y;
+    g.lastMoveX = p.x;
+    g.lastMoveY = p.y;
+    return true;
+  }
+  return false;
+}
+
+function releaseGlass(){
+  const g = game.glass;
+  if(!g || !g.held) return;
+  g.held = false;
+
+  if(game.view === 'front' && g.contents.length > 0 && game.phase === 'making'){
+    if(g.x > 380 && g.x < 620 && g.y < 450){
+      serve();
+      return;
+    }
+  }
+}
+
+function switchView(v){
+  if(game.view === v) return;
+  game.view = v;
+  if(game.glass && !game.glass.held){
+    game.glass.y = floorForView();
+    game.glass.vy = 0;
+    game.glass.vx = 0;
+  }
+}
+
+/* ============================================================
+   ЛОГИКА ИГРЫ
+   ============================================================ */
+function startGame(){
+  game.lives = 3;
+  game.points = 0;
+  game.view = 'front';
+  game.sessionSuccesses = 0;
+  game.sessionPerfectChain = 0;
+  // --- достижение: первая смена ---
+  rkcUnlock('play');
+  newCustomer();
+}
+
+function newCustomer(){
+  const recipe = rnd(RECIPES);
+  const cust   = rnd(CUSTOMERS);
+  game.order = {
+    recipe, cust,
+    total: 50,
+    time: 50,
+  };
+  game.glass = null;
+  game.view  = 'front';
+  game.phase = 'dialogue';
+  game.dlg   = {i:0, chars:0, t:0, full:false};
+  game.tapPull = [0,0,0,0];
+  game.dragging = null;
+  game.resultInfo = null;
+}
+
+function advanceDialogue(){
+  const d = game.dlg;
+  if(!d) return;
+  const line = game.order.cust.lines[d.i];
+  if(!d.full){ d.chars = line.length; d.full = true; return; }
+  if(d.i < game.order.cust.lines.length-1){
+    d.i++; d.chars = 0; d.t = 0; d.full = false;
+  } else {
+    game.phase = 'making';
+    game.order.time = game.order.total;
+    game.message = {text:'ЗАКАЗ ПРИНЯТ. К СТОЙКЕ (S)', color:'#5ce8ff', t:2};
+  }
+}
+
+function pourInto(id, amount){
+  const g = game.glass;
+  if(!g) return;
+  const total = glassTotal();
+  if(total >= CAPACITY) return;
+  amount = Math.min(amount, CAPACITY - total);
+  if(amount <= 0) return;
+  const last = g.contents[g.contents.length-1];
+  if(last && last.id === id) last.amount += amount;
+  else g.contents.push({id, amount});
+  g.mixed = false;
+  g.mixProgress = 0;
+
+  // --- достижения: налив ---
+  if(!barStats.poured){
+    barStats.poured = 1; saveBar(); rkcUnlock('pour_first');
+  }
+  if(!barStats.ingr[id]){
+    barStats.ingr[id] = 1; saveBar();
+    if(Object.keys(barStats.ingr).length >= 4) rkcUnlock('all_ingredients');
+  }
+}
+
+function serve(){
+  const g = game.glass;
+  if(!g || g.contents.length === 0){
+    game.message = {text:'У ТЕБЯ ПУСТЫЕ РУКИ', color:'#ffaa33', t:1.6};
+    return;
+  }
+  const r = game.order.recipe;
+  const req = {}; r.parts.forEach(([id,a]) => req[id] = a);
+  const act = {}; g.contents.forEach(c => act[c.id] = (act[c.id]||0) + c.amount);
+
+  let err = 0;
+  for(const id in req) err += Math.abs((act[id]||0) - req[id]);
+  for(const id in act) if(!req[id]) err += act[id];
+
+  let q = 100 - err*18;
+  if(g.garnish !== r.garnish) q -= 22;
+  if(!g.mixed) q -= 30;
+  q = Math.round(clamp(q, 0, 100));
+
+  const timeBonus = Math.round(game.order.time * 8);
+  const pts = Math.round(q * 12) + timeBonus;
+  // Считаем затраченное время до того, как обнулим таймер
+  const elapsed = game.order.total - game.order.time;
+
+  if(q >= 30){
+    game.points += pts;
+
+    // ===== ДОСТИЖЕНИЯ =====
+    barStats.successes = (barStats.successes||0) + 1;
+
+    if(!barStats.recipes[r.name]){
+      barStats.recipes[r.name] = 1; saveBar();
+      const n = Object.keys(barStats.recipes).length;
+      rkcProgress('all_recipes', n);
+      if(n >= 3) rkcUnlock('recipes_3');
+      if(n >= 9) rkcUnlock('all_recipes');
+    }
+    if(!barStats.customers[game.order.cust.name]){
+      barStats.customers[game.order.cust.name] = 1; saveBar();
+      const n = Object.keys(barStats.customers).length;
+      rkcProgress('all_customers', n);
+      if(n >= 9) rkcUnlock('all_customers');
+    }
+    if(barStats.successes >= 5) rkcUnlock('win_5');
+
+    if(!barStats.firstSuccess){ barStats.firstSuccess = 1; saveBar(); rkcUnlock('first_success'); }
+
+    if(q >= 95){
+      if(!barStats.firstPerfect){ barStats.firstPerfect = 1; saveBar(); rkcUnlock('first_perfect'); }
+      game.sessionPerfectChain = (game.sessionPerfectChain||0) + 1;
+      if(game.sessionPerfectChain >= 3) rkcUnlock('perfect_chain');
+    } else {
+      game.sessionPerfectChain = 0;
+    }
+
+    if(elapsed < 15 && q >= 80) rkcUnlock('fast_serve');
+
+    game.sessionSuccesses = (game.sessionSuccesses||0) + 1;
+    if(game.sessionSuccesses >= 10) rkcUnlock('long_game');
+
+    if(game.points >= 500) rkcUnlock('score_500');
+    // ===== /ДОСТИЖЕНИЯ =====
+
+    game.message = {text:'+'+pts+' ОЧКОВ', color:'#5ce8ff', t:2.2};
+    game.shake = 0.4;
+    game.resultInfo = {ok:true, q, pts};
+  } else {
+    game.lives--;
+    game.shake = 1;
+    game.message = {text:'БОТ НЕДОВОЛЕН. −1 ЖИЗНЬ', color:'#ff4d4d', t:2.2};
+    game.resultInfo = {ok:false, q, pts:0};
+    game.sessionPerfectChain = 0;
+  }
+  game.phase = 'result';
+  game.resultTimer = 2.4;
+  game.order.time = 0;
+}
+
+function failOrder(){
+  game.lives--;
+  game.shake = 1;
+  game.message = {text:'ВРЕМЯ ВЫШЛО. БОТ УШЁЛ.', color:'#ff4d4d', t:2.2};
+  game.resultInfo = {ok:false, q:0, pts:0, timeout:true};
+  game.phase = 'result';
+  game.resultTimer = 2.4;
+  game.sessionPerfectChain = 0;
+}
+
+/* ============================================================
+   ОБНОВЛЕНИЕ
+   ============================================================ */
+function update(dt){
+  game.time += dt;
+  if(game.shake > 0) game.shake = Math.max(0, game.shake - dt*2.2);
+  if(game.message){ game.message.t -= dt; if(game.message.t <= 0) game.message = null; }
+
+  if(game.phase === 'dialogue'){
+    const d = game.dlg;
+    const line = game.order.cust.lines[d.i];
+    if(!d.full){
+      d.t += dt;
+      d.chars = Math.min(line.length, Math.floor(d.t * 45));
+      if(d.chars >= line.length) d.full = true;
+    }
+  }
+
+  if(game.phase === 'making'){
+    game.order.time -= dt;
+    if(game.order.time <= 0){ game.order.time = 0; failOrder(); }
+  }
+
+  if(game.phase === 'result'){
+    game.resultTimer -= dt;
+    if(game.resultTimer <= 0){
+      if(game.lives <= 0){
+        game.best = Math.max(game.best, game.points);
+        game.phase = 'gameover';
+      } else {
+        newCustomer();
+      }
+    }
+  }
+
+  for(let i=0;i<4;i++){
+    if(game.dragging && game.dragging.tap === i){
+      game.tapPull[i] = game.dragging.pull;
+    } else {
+      game.tapPull[i] = Math.max(0, game.tapPull[i] - dt*5);
+    }
+  }
+
+  if(game.view === 'back' && game.dragging && game.dragging.pull > 0.05 &&
+     game.glass && !game.glass.held && game.phase === 'making'){
+    const i = game.dragging.tap;
+    const tapX = TAP_X[i];
+    if(Math.abs(game.glass.y - SHELF_Y) < 15 && Math.abs(game.glass.x - tapX) < 30){
+      pourInto(INGREDIENTS[i].id, POUR_RATE * game.dragging.pull * dt);
+    }
+  }
+
+  updateGlassPhysics(dt);
+}
+
+/* ============================================================
+   ВВОД
+   ============================================================ */
+function toCanvas(e){
+  const r = canvas.getBoundingClientRect();
+  return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height) };
+}
+function tapHitbox(i){
+  const x = TAP_X[i];
+  return {x:x-40, y:130, w:110, h:145};
+}
+
+function handleClick(p){
+  if(game.phase === 'menu'){ startGame(); return; }
+  if(game.phase === 'gameover'){ startGame(); return; }
+  if(game.phase === 'dialogue'){ advanceDialogue(); return; }
+  if(game.phase === 'result') return;
+  if(game.phase !== 'making') return;
+
+  if(game.view === 'front'){
+    if(game.glass && !game.glass.held && game.glass.contents.length > 0){
+      if(p.x > 380 && p.x < 620 && p.y < 470){
+        serve();
+      }
+    }
+    return;
+  }
+
+  // вид назад: краны
+  for(let i=0;i<4;i++){
+    const hb = tapHitbox(i);
+    if(p.x>hb.x && p.x<hb.x+hb.w && p.y>hb.y && p.y<hb.y+hb.h){
+      game.dragging = {tap:i, startY:p.y, pull:0};
+      return;
+    }
+  }
+
+  // вид назад: полка со стаканами
+  if(p.x > 45 && p.x < 260 && p.y > 470 && p.y < 580){
+    if(!game.glass){
+      const g = createGlass();
+      g.held = true;
+      g.x = clamp(p.x, 100, 900);
+      g.y = SHELF_Y;
+      g.grabDX = 0;
+      g.grabDY = p.y - SHELF_Y;
+      g.lastMoveX = p.x;
+      g.lastMoveY = p.y;
+      game.glass = g;
+      game.message = {text:'СТАКАН ВЗЯТ', color:'#9fe8ff', t:1.2};
+      // --- достижение: взять стакан ---
+      rkcUnlock('take_glass');
+    } else {
+      game.message = {text:'СТАКАН УЖЕ В РУКЕ', color:'#ffaa33', t:1.2};
+    }
+    return;
+  }
+
+  // вид назад: гарниры
+  for(let i=0;i<GARNISHES.length;i++){
+    const gx = 420 + i*80, gy = 500;
+    if(Math.hypot(p.x-gx, p.y-gy) < 36){
+      if(!game.glass){
+        game.message = {text:'СНАЧАЛА ВОЗЬМИ СТАКАН', color:'#ffaa33', t:1.4};
+        return;
+      }
+      if(game.glass.contents.length === 0){
+        game.message = {text:'СНАЧАЛА НАЛЕЙ ЧТО-НИБУДЬ', color:'#ffaa33', t:1.4};
+        return;
+      }
+      game.glass.garnish = GARNISHES[i].id;
+      game.message = {text:'ДОБАВЛЕНО: '+GARNISHES[i].name, color:'#9fe8ff', t:1.2};
+      // --- достижение: первый гарнир ---
+      rkcUnlock('add_garnish');
+      return;
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', e=>{
+  const p = toCanvas(e);
+  mouse.x = p.x; mouse.y = p.y;
+  mouse.down = true;
+  if(tryGrabGlass(p)) return;
+  handleClick(p);
+});
+
+canvas.addEventListener('mouseup', ()=>{
+  mouse.down = false;
+  releaseGlass();
+  game.dragging = null;
+});
+
+canvas.addEventListener('mousemove', e=>{
+  const p = toCanvas(e);
+  mouse.x = p.x;
+  mouse.y = p.y;
+  if(game.dragging){
+    game.dragging.pull = clamp((p.y - game.dragging.startY)/70, 0, 1);
+  }
+});
+
+canvas.addEventListener('mouseleave', ()=>{
+  mouse.down = false;
+  releaseGlass();
+  game.dragging = null;
+});
+
+window.addEventListener('keydown', e=>{
+  if(e.code === 'Space'){
+    e.preventDefault();
+    if(game.phase === 'menu' || game.phase === 'gameover') startGame();
+    else if(game.phase === 'dialogue') advanceDialogue();
+  }
+  if(e.code === 'KeyW') switchView('front');
+  if(e.code === 'KeyS') switchView('back');
+});
+
+/* ============================================================
+   ФОН
+   ============================================================ */
+const BUILDINGS = [
+  [30,300,90,180],[135,345,70,135],[215,265,105,215],[335,330,60,150],
+  [410,285,85,195],[510,350,70,130],[595,295,95,185],[705,340,65,140],
+  [785,275,105,205],[900,330,85,170]
+];
+const WINDOWS = [];
+(function(){
+  for(const [x,y,w,h] of BUILDINGS){
+    for(let wy=y+14; wy<y+h-14; wy+=26){
+      for(let wx=x+10; wx<x+w-12; wx+=22){
+        if(Math.random() < 0.22) WINDOWS.push([wx,wy]);
+      }
+    }
+  }
+})();
+
+const scanPattern = (function(){
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 4;
+  const x = c.getContext('2d');
+  x.fillStyle = 'rgba(0,0,0,0.20)';
+  x.fillRect(0,0,4,2);
+  return ctx.createPattern(c,'repeat');
+})();
+
+function drawScanlines(){
+  ctx.fillStyle = scanPattern;
+  ctx.fillRect(0,0,W,H);
+  const g = ctx.createRadialGradient(W/2,H/2,200,W/2,H/2,700);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(1,'rgba(0,0,0,0.65)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+}
+
+/* ============================================================
+   ВИД ВПЕРЁД
+   ============================================================ */
+function drawFront(){
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#1c0d17');
+  sky.addColorStop(0.45,'#33120f');
+  sky.addColorStop(0.75,'#180a0c');
+  sky.addColorStop(1,'#0a0507');
+  ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
+
+  const gl = ctx.createRadialGradient(760,380,20,760,380,420);
+  gl.addColorStop(0,'rgba(255,90,30,0.28)');
+  gl.addColorStop(1,'rgba(255,90,30,0)');
+  ctx.fillStyle = gl; ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#100710';
+  for(const [x,y,w,h] of BUILDINGS) ctx.fillRect(x,y,w,h);
+
+  for(const [x,y] of WINDOWS){
+    const fl = 0.15 + 0.15*Math.sin(game.time*2 + x*0.1 + y*0.05);
+    ctx.fillStyle = 'rgba(255,130,50,'+fl.toFixed(2)+')';
+    ctx.fillRect(x,y,6,9);
+  }
+
+  ctx.globalAlpha = 0.10;
+  for(let i=0;i<5;i++){
+    const t = game.time*0.2 + i*1.4;
+    const cx = 120 + i*190 + Math.sin(t)*30;
+    const cy = 250 + Math.cos(t*0.7)*20;
+    const r  = 70 + Math.sin(t)*20;
+    const g2 = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g2.addColorStop(0,'#ff8a4a');
+    g2.addColorStop(1,'rgba(255,138,74,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#1b1114';
+  ctx.fillRect(0, FRONT_COUNTER_Y, W, H-FRONT_COUNTER_Y);
+  ctx.fillStyle = '#2b1b20';
+  ctx.fillRect(0, FRONT_COUNTER_Y, W, 10);
+  ctx.fillStyle = 'rgba(255,120,50,0.12)';
+  ctx.fillRect(0, FRONT_COUNTER_Y, W, 2);
+
+  drawRobot(500, FRONT_COUNTER_Y);
+
+  if(game.phase === 'dialogue'){
+    const d = game.dlg;
+    const line = game.order.cust.lines[d.i];
+    drawBubble(line.slice(0, d.chars), 500, 148, 560);
+  } else if(game.phase === 'making'){
+    const t = game.order.time / game.order.total;
+    const cx = 500, cy = 118;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 15px "Courier New"';
+    ctx.fillStyle = t>0.4 ? '#8fe0ff' : '#ff6a3d';
+    ctx.fillText(t>0.4 ? 'ЖДУ ЗАКАЗ...' : 'ТЕРПЕНИЕ НА ИСХОДЕ!', cx, cy);
+    ctx.font = '13px "Courier New"';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText('ПЕРЕТАЩИ СТАКАН К БОТУ И ОТПУСТИ', cx, cy+22);
+  }
+
+  if(game.glass){
+    drawGlassObj(game.glass.x, game.glass.y, game.glass, 1.0, false);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.font = '13px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.fillText('[S] К СТОЙКЕ', 500, 585);
+}
+
+function drawRobot(cx, baseY){
+  const t = game.time;
+  const bob = Math.sin(t*1.6)*3;
+
+  ctx.save();
+  ctx.shadowColor = '#ff4a28'; ctx.shadowBlur = 60;
+  ctx.fillStyle = '#2b2f36';
+  ctx.beginPath(); ctx.roundRect(cx-100, baseY-215+bob, 200, 215, 16); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#191c21';
+  ctx.beginPath(); ctx.roundRect(cx-62, baseY-185+bob, 124, 74, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,110,50,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+
+  for(let i=0;i<4;i++){
+    const on = Math.sin(t*4 + i*1.7) > 0;
+    ctx.fillStyle = on ? ['#ff5a2a','#5ce8ff','#8fe028','#ffd257'][i] : '#2a2028';
+    ctx.beginPath(); ctx.arc(cx-44+i*29, baseY-168+bob, 5, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,110,50,0.25)';
+  ctx.fillRect(cx-50, baseY-138+bob, 100, 5);
+
+  ctx.fillStyle = '#343943';
+  ctx.beginPath(); ctx.roundRect(cx-126, baseY-200+bob, 30, 90, 12); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(cx+96, baseY-200+bob, 30, 90, 12); ctx.fill();
+
+  ctx.fillStyle = '#242830';
+  ctx.fillRect(cx-18, baseY-232+bob, 36, 24);
+
+  ctx.fillStyle = '#363b44';
+  ctx.beginPath(); ctx.roundRect(cx-72, baseY-330+bob, 144, 110, 18); ctx.fill();
+  ctx.fillStyle = '#40454f';
+  ctx.beginPath(); ctx.roundRect(cx-72, baseY-330+bob, 144, 26, 18); ctx.fill();
+
+  ctx.fillStyle = '#08080b';
+  ctx.beginPath(); ctx.roundRect(cx-58, baseY-306+bob, 116, 56, 12); ctx.fill();
+
+  const eg = 0.55 + 0.45*Math.sin(t*4);
+  ctx.save();
+  ctx.shadowColor = '#ff3a18'; ctx.shadowBlur = 28;
+  ctx.fillStyle = 'rgba(255,60,30,'+eg.toFixed(2)+')';
+  ctx.beginPath(); ctx.arc(cx-28, baseY-278+bob, 10, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+28, baseY-278+bob, 10, 0, 7); ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = '#5a6069'; ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(cx, baseY-330+bob); ctx.lineTo(cx, baseY-364+bob); ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 18;
+  ctx.fillStyle = 'rgba(92,232,255,'+(0.4+0.5*Math.abs(Math.sin(t*3))).toFixed(2)+')';
+  ctx.beginPath(); ctx.arc(cx, baseY-368+bob, 7, 0, 7); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(255,110,50,0.35)';
+  for(let i=0;i<5;i++) ctx.fillRect(cx-30+i*15, baseY-240+bob, 8, 12);
+}
+
+function drawBubble(text, cx, bottomY, maxW){
+  if(!text) return;
+  ctx.font = 'bold 17px "Courier New"';
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for(const w of words){
+    const test = cur ? cur+' '+w : w;
+    if(ctx.measureText(test).width > maxW && cur){ lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if(cur) lines.push(cur);
+
+  const lh = 23;
+  const bw = Math.max(...lines.map(l=>ctx.measureText(l).width)) + 40;
+  const bh = lines.length*lh + 26;
+  const bx = clamp(cx-bw/2, 12, W-bw-12);
+  const by = bottomY - bh - 24;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 20;
+  ctx.fillStyle = 'rgba(248,238,222,0.96)';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 12); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(248,238,222,0.96)';
+  ctx.beginPath();
+  ctx.moveTo(cx-14, by+bh-1);
+  ctx.lineTo(cx, by+bh+20);
+  ctx.lineTo(cx+14, by+bh-1);
+  ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle = '#1a1010';
+  ctx.textAlign = 'left';
+  lines.forEach((l,i) => ctx.fillText(l, bx+20, by+30+i*lh));
+}
+
+/* ============================================================
+   ВИД НАЗАД
+   ============================================================ */
+function drawBack(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#150f14');
+  g.addColorStop(0.55,'#0e0a0d');
+  g.addColorStop(1,'#07050a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle = 'rgba(255,110,40,0.07)';
+  ctx.lineWidth = 2;
+  for(let x=0;x<=W;x+=125){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,SHELF_Y); ctx.stroke(); }
+  for(let y=0;y<SHELF_Y;y+=98){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  ctx.fillStyle = 'rgba(255,140,60,0.10)';
+  for(let x=62;x<W;x+=125){
+    for(let y=49;y<SHELF_Y;y+=98){
+      ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = '#2a1d22';
+  ctx.fillRect(50, SHELF_Y, 900, 16);
+  ctx.fillStyle = '#3a2a30';
+  ctx.fillRect(50, SHELF_Y, 900, 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(50, SHELF_Y+16, 900, 6);
+
+  for(let i=0;i<4;i++) drawTap(i);
+
+  if(game.glass){
+    drawGlassObj(game.glass.x, game.glass.y, game.glass, 1, true);
+  } else {
+    ctx.textAlign = 'center';
+    ctx.font = '13px "Courier New"';
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillText('ВОЗЬМИ СТАКАН С ПОЛКИ', 500, 350);
+  }
+
+  drawRack();
+  drawGarnishTray();
+
+  ctx.textAlign = 'center';
+  ctx.font = '13px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.fillText('[W] К БОТУ  ·  Перетащи стакан под кран, потом тяни кран вниз', 500, 588);
+}
+
+function drawTap(i){
+  const x = TAP_X[i];
+  const ing = INGREDIENTS[i];
+  const pull = game.tapPull[i];
+
+  ctx.save();
+  ctx.shadowColor = ing.glow; ctx.shadowBlur = 22;
+  ctx.fillStyle = '#181216';
+  ctx.beginPath(); ctx.roundRect(x-34, 50, 68, 82, 10); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(x-30, 54, 60, 74, 8); ctx.clip();
+  const lvl = 0.55 + 0.12*Math.sin(game.time*0.9 + i*2);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = ing.color;
+  ctx.fillRect(x-30, 54 + 74*(1-lvl), 60, 74*lvl);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(x-30, 54 + 74*(1-lvl), 60, 4);
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.roundRect(x-24, 60, 10, 60, 5); ctx.fill();
+
+  ctx.fillStyle = '#33383f';
+  ctx.fillRect(x-11, 132, 22, 120);
+  ctx.fillStyle = '#4a505a';
+  ctx.fillRect(x-11, 132, 7, 120);
+
+  ctx.fillStyle = '#5a626c';
+  ctx.beginPath(); ctx.roundRect(x-7, 250, 14, 17, 3); ctx.fill();
+  ctx.fillStyle = '#2a2f36';
+  ctx.beginPath(); ctx.roundRect(x-4, 264, 8, 6, 2); ctx.fill();
+
+  const ang = pull * 1.15;
+  ctx.save();
+  ctx.translate(x+13, 215);
+  ctx.rotate(ang);
+  ctx.fillStyle = '#c8ccd2';
+  ctx.beginPath(); ctx.roundRect(0, -5, 54, 10, 5); ctx.fill();
+  ctx.fillStyle = '#8d949d';
+  ctx.beginPath(); ctx.roundRect(0, 0, 54, 4, 2); ctx.fill();
+  ctx.save();
+  ctx.shadowColor = ing.glow; ctx.shadowBlur = 14;
+  ctx.fillStyle = ing.color;
+  ctx.beginPath(); ctx.arc(54, 0, 9, 0, 7); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+
+  ctx.fillStyle = '#22272d';
+  ctx.beginPath(); ctx.arc(x+13, 215, 8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4a505a';
+  ctx.beginPath(); ctx.arc(x+13, 215, 3, 0, 7); ctx.fill();
+
+  if(pull > 0.05 && game.glass && !game.glass.held && game.phase === 'making'){
+    const nearTap = Math.abs(game.glass.x - x) < 30 && Math.abs(game.glass.y - SHELF_Y) < 15;
+    if(nearTap){
+      const total = glassTotal();
+      const innerBottom = game.glass.y - 7;
+      const innerTop = game.glass.y - GLASS_H + 9;
+      const innerH = innerBottom - innerTop;
+      const surf = innerBottom - (total/CAPACITY)*innerH;
+      if(surf > 268){
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = ing.color;
+        ctx.shadowColor = ing.glow; ctx.shadowBlur = 12;
+        const wdt = 3 + pull*3;
+        ctx.fillRect(x-wdt/2, 268, wdt, surf-268);
+        ctx.restore();
+      }
+    }
+  }
+
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText(ing.name, x, 42);
+}
+
+function drawRack(){
+  ctx.fillStyle = '#241a1e';
+  ctx.fillRect(48, RACK_Y, 208, 12);
+  ctx.fillStyle = '#33242a';
+  ctx.fillRect(48, RACK_Y, 208, 4);
+
+  for(let i=0;i<3;i++){
+    drawGlassObj(92 + i*56, RACK_Y, {contents:[], garnish:null}, 0.55, false);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('СТАКАНЫ', 152, 578);
+}
+
+function drawGarnishTray(){
+  const startX = 420, y = 500;
+  ctx.fillStyle = '#1a1317';
+  ctx.beginPath(); ctx.roundRect(startX-58, y-40, 240, 96, 12); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,110,40,0.35)';
+  ctx.lineWidth = 2; ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('ДОПОЛНИТЕЛЬНО', startX+62, y-24);
+
+  GARNISHES.forEach((g,i)=>{
+    const x = startX + i*80;
+    ctx.fillStyle = '#0c080b';
+    ctx.beginPath(); ctx.arc(x, y+8, 27, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1.5; ctx.stroke();
+
+    const selected = game.glass && game.glass.garnish === g.id;
+    if(selected){
+      ctx.save();
+      ctx.shadowColor = g.color; ctx.shadowBlur = 20;
+      ctx.strokeStyle = g.color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y+8, 27, 0, 7); ctx.stroke();
+      ctx.restore();
+    }
+
+    drawGarnishIcon(g, x, y+8, 1);
+
+    ctx.fillStyle = selected ? '#fff' : 'rgba(255,255,255,0.5)';
+    ctx.font = 'bold 10px "Courier New"';
+    ctx.fillText(g.name, x, y+50);
+  });
+}
+
+function drawGarnishIcon(g, x, y, s){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(s,s);
+
+  if(g.id === 'bolt'){
+    ctx.fillStyle = g.color;
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a = i/6*Math.PI*2 - Math.PI/2;
+      const px = Math.cos(a)*13, py = Math.sin(a)*13;
+      i ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#3d434b';
+    ctx.beginPath(); ctx.arc(0,0,5.5,0,7); ctx.fill();
+  } else if(g.id === 'chip'){
+    ctx.fillStyle = g.color;
+    ctx.beginPath(); ctx.roundRect(-10,-10,20,20,3); ctx.fill();
+    ctx.fillStyle = '#07231a';
+    ctx.beginPath(); ctx.roundRect(-5,-5,10,10,2); ctx.fill();
+    ctx.strokeStyle = g.color; ctx.lineWidth = 2;
+    for(let i=-1;i<=1;i++){
+      ctx.beginPath(); ctx.moveTo(-14,i*6); ctx.lineTo(-10,i*6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(10,i*6);  ctx.lineTo(14,i*6);  ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i*6,-14); ctx.lineTo(i*6,-10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i*6,10);  ctx.lineTo(i*6,14);  ctx.stroke();
+    }
+  } else {
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = g.color;
+    ctx.beginPath(); ctx.moveTo(-11,-5); ctx.lineTo(1,-13); ctx.lineTo(12,-5); ctx.lineTo(0,3);  ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#4fb8d6';
+    ctx.beginPath(); ctx.moveTo(-11,-5); ctx.lineTo(0,3);   ctx.lineTo(0,13);  ctx.lineTo(-11,5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9ae9ff';
+    ctx.beginPath(); ctx.moveTo(0,3);   ctx.lineTo(12,-5); ctx.lineTo(12,5);  ctx.lineTo(0,13);  ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   СТАКАН
+   ============================================================ */
+function drawGlassObj(cx, bottomY, glass, scale, showTarget){
+  const w = GLASS_W * scale, h = GLASS_H * scale;
+  const left = cx - w/2, top = bottomY - h;
+  const innerTop = top + 9*scale;
+  const innerBottom = bottomY - 7*scale;
+  const innerH = innerBottom - innerTop;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(left+4*scale, top+6*scale);
+  ctx.lineTo(left+w-4*scale, top+6*scale);
+  ctx.lineTo(left+w-9*scale, bottomY-5*scale);
+  ctx.lineTo(left+9*scale, bottomY-5*scale);
+  ctx.closePath();
+  ctx.clip();
+
+  let y = innerBottom;
+  for(const c of glass.contents){
+    const lh = (c.amount / CAPACITY) * innerH;
+    const ing = ingById(c.id);
+    if(!ing) continue;
+    ctx.fillStyle = ing.color;
+    ctx.fillRect(left, y-lh, w, lh);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(left+6*scale, y-lh, 5*scale, lh);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(left, y-lh, w, 1.5);
+    y -= lh;
+  }
+
+  if(glass.mixed){
+    ctx.globalAlpha = 0.25;
+    const total = glass.contents.reduce((s,c)=>s+c.amount,0);
+    const lh = (total/CAPACITY)*innerH;
+    for(let i=0;i<8;i++){
+      const a = game.time*3 + i*0.8;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx + Math.sin(a)*10*scale, innerBottom - lh/2 + Math.cos(a*1.3)*lh*0.35, 3*scale, 0, 7);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if(glass.garnish){
+    const g = garById(glass.garnish);
+    const total = glass.contents.reduce((s,c)=>s+c.amount,0);
+    const surfY = innerBottom - (total/CAPACITY)*innerH;
+    if(g) drawGarnishIcon(g, cx + 12*scale, Math.max(innerTop+10, surfY-6), 0.6*scale);
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(170,215,255,0.55)';
+  ctx.lineWidth = 2.5*scale;
+  ctx.beginPath();
+  ctx.moveTo(left+2, top);
+  ctx.lineTo(left+2, bottomY-9*scale);
+  ctx.quadraticCurveTo(left+2, bottomY, left+10*scale, bottomY);
+  ctx.lineTo(left+w-10*scale, bottomY);
+  ctx.quadraticCurveTo(left+w-2, bottomY, left+w-2, bottomY-9*scale);
+  ctx.lineTo(left+w-2, top);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(210,240,255,0.85)';
+  ctx.lineWidth = 3*scale;
+  ctx.beginPath(); ctx.moveTo(left+1, top); ctx.lineTo(left+w-1, top); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath();
+  ctx.roundRect(left+6*scale, top+12*scale, 5*scale, h*0.55, 3*scale);
+  ctx.fill();
+
+  if(glass.held){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.setLineDash([5,5]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(left-6, top-6, w+12, h+12);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  if(showTarget && game.order && game.phase === 'making'){
+    const need = game.order.recipe.parts.reduce((s,p)=>s+p[1],0);
+    const ty = innerBottom - (need/CAPACITY)*innerH;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,5]);
+    ctx.beginPath();
+    ctx.moveTo(left-10*scale, ty);
+    ctx.lineTo(left+w+10*scale, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = 'bold 10px "Courier New"';
+    ctx.textAlign = 'left';
+    ctx.fillText('ЦЕЛЬ', left+w+14*scale, ty+4);
+  }
+
+  if(glass.mixProgress > 0 && glass.mixProgress < 1){
+    const px = cx, py = top - 26;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(px, py, 15, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#5ce8ff';
+    ctx.beginPath();
+    ctx.arc(px, py, 15, -Math.PI/2, -Math.PI/2 + Math.PI*2*glass.mixProgress);
+    ctx.stroke();
+    ctx.fillStyle = '#5ce8ff';
+    ctx.font = 'bold 10px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('МЕШАЙ', px, py+4);
+  }
+
+  if(glass.mixed && glass.contents.length > 0){
+    ctx.fillStyle = '#5ce8ff';
+    ctx.font = 'bold 11px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('✔', cx, top - 8);
+  }
+}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+function drawHUD(){
+  ctx.fillStyle = 'rgba(10,6,8,0.80)';
+  ctx.fillRect(0,0,W,56);
+  ctx.strokeStyle = 'rgba(255,110,40,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,56); ctx.lineTo(W,56); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 15px "Courier New"';
+  ctx.fillStyle = '#ff7a4d';
+  ctx.fillText('ЖИЗНИ', 20, 34);
+  for(let i=0;i<3;i++){
+    ctx.fillStyle = i < game.lives ? '#ff4d4d' : '#33202a';
+    ctx.beginPath(); ctx.arc(105 + i*26, 29, 9, 0, 7); ctx.fill();
+    if(i < game.lives){
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath(); ctx.arc(102 + i*26, 26, 3, 0, 7); ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = '#5ce8ff';
+  ctx.font = 'bold 15px "Courier New"';
+  ctx.fillText('ОЧКИ', 200, 34);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillText(String(game.points), 258, 35);
+
+  if(game.phase === 'making' && game.order){
+    const f = clamp(game.order.time / game.order.total, 0, 1);
+    const bx = 420, bw = 560, by = 22, bh = 18;
+
+    ctx.fillStyle = '#1a1014';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 9); ctx.fill();
+
+    const col = f > 0.5 ? '#5ce8ff' : f > 0.25 ? '#ffd257' : '#ff4d4d';
+    ctx.save();
+    ctx.shadowColor = col; ctx.shadowBlur = 14;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.roundRect(bx+2, by+2, Math.max(0,(bw-4)*f), bh-4, 7); ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.ceil(game.order.time)+' сек', bx+bw/2, by+14);
+  }
+
+  if(game.message){
+    const a = Math.min(1, game.message.t * 2);
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 18px "Courier New"';
+    ctx.fillStyle = game.message.color;
+    ctx.save();
+    ctx.shadowColor = game.message.color; ctx.shadowBlur = 18;
+    ctx.fillText(game.message.text, W/2, 90);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  drawOrderPanel();
+}
+
+function drawOrderPanel(){
+  if(!game.order || (game.phase !== 'making' && game.phase !== 'result')) return;
+  const r = game.order.recipe;
+  const x = 16, y = 68, w = 268, h = 196;
+
+  ctx.fillStyle = 'rgba(12,8,10,0.90)';
+  ctx.beginPath(); ctx.roundRect(x,y,w,h,8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,110,40,0.55)';
+  ctx.lineWidth = 2; ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ff9a4d';
+  ctx.font = 'bold 12px "Courier New"';
+  ctx.fillText('ЗАКАЗ ОТ: ' + game.order.cust.name, x+12, y+22);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 16px "Courier New"';
+  ctx.fillText(r.name, x+12, y+46);
+
+  let yy = y+74;
+  for(const [id,amt] of r.parts){
+    const ing = ingById(id);
+    ctx.save();
+    ctx.shadowColor = ing.glow; ctx.shadowBlur = 10;
+    ctx.fillStyle = ing.color;
+    ctx.beginPath(); ctx.arc(x+22, yy-5, 7, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#d8d8d8';
+    ctx.font = '13px "Courier New"';
+    ctx.fillText(ing.name, x+38, yy);
+    ctx.fillStyle = ing.color;
+    ctx.font = 'bold 14px "Courier New"';
+    ctx.textAlign = 'right';
+    ctx.fillText('x'+amt, x+w-14, yy);
+    ctx.textAlign = 'left';
+    yy += 23;
+  }
+
+  const g = garById(r.garnish);
+  ctx.fillStyle = '#8fd0ff';
+  ctx.font = 'bold 12px "Courier New"';
+  ctx.fillText('+ ' + g.name, x+12, yy+6);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.font = '10px "Courier New"';
+  ctx.fillText('ВОЗЬМИ СТАКАН, ПОСТАВЬ ПОД КРАН', x+12, yy+26);
+  ctx.fillText('ПОТОМ ТЯНИ КРАН ВНИЗ', x+12, yy+40);
+}
+
+/* ============================================================
+   ЭКРАНЫ
+   ============================================================ */
+function drawMenu(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#1a0a12'); g.addColorStop(0.5,'#2b0f0c'); g.addColorStop(1,'#08050a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  const rg = ctx.createRadialGradient(500,300,50,500,300,420);
+  rg.addColorStop(0,'rgba(255,90,30,0.30)');
+  rg.addColorStop(1,'rgba(255,90,30,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0,0,W,H);
+
+  ctx.textAlign = 'center';
+
+  ctx.save();
+  ctx.shadowColor = '#ff5a1e'; ctx.shadowBlur = 40;
+  ctx.fillStyle = '#ffb066';
+  ctx.font = 'bold 62px "Courier New"';
+  ctx.fillText('ПОСЛЕДНИЙ БОЛТ', 500, 190);
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(255,180,120,0.75)';
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillText('Б А Р   Д Л Я   Р О Б О Т О В', 500, 226);
+
+  ctx.fillStyle = 'rgba(220,220,220,0.7)';
+  ctx.font = '15px "Courier New"';
+  ctx.fillText('Мир пал. Роботы правят. Но выпить хотят все.', 500, 282);
+  ctx.fillText('Ты — последний бармен. Не подведи.', 500, 306);
+
+  ctx.fillStyle = 'rgba(150,220,255,0.85)';
+  ctx.font = 'bold 13px "Courier New"';
+  ctx.fillText('W — к боту    ·    S — к стойке', 500, 360);
+  ctx.fillText('ПРОБЕЛ — пропустить диалог', 500, 384);
+  ctx.fillText('ЛКМ — взять стакан, таскать, тянуть кран, добавлять', 500, 408);
+
+  ctx.fillStyle = 'rgba(255,180,120,0.7)';
+  ctx.font = '13px "Courier New"';
+  ctx.fillText('Стакан можно бросить — он упадёт с гравитацией!', 500, 448);
+
+  const blink = 0.5 + 0.5*Math.sin(game.time*4);
+  ctx.save();
+  ctx.globalAlpha = blink;
+  ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#5ce8ff';
+  ctx.font = 'bold 22px "Courier New"';
+  ctx.fillText('НАЖМИ ПРОБЕЛ ИЛИ КЛИКНИ', 500, 510);
+  ctx.restore();
+
+  if(game.best > 0){
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '14px "Courier New"';
+    ctx.fillText('РЕКОРД: ' + game.best, 500, 552);
+  }
+}
+
+function drawGameOver(){
+  ctx.fillStyle = 'rgba(8,4,6,0.85)';
+  ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+
+  ctx.save();
+  ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 40;
+  ctx.fillStyle = '#ff5a3d';
+  ctx.font = 'bold 54px "Courier New"';
+  ctx.fillText('УСТРАНЁН', 500, 220);
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(220,220,220,0.7)';
+  ctx.font = '16px "Courier New"';
+  ctx.fillText('Роботы нашли замену бармену.', 500, 270);
+  ctx.fillText('Автоматический диспенсер не спорит и не устаёт.', 500, 296);
+
+  ctx.fillStyle = '#5ce8ff';
+  ctx.font = 'bold 28px "Courier New"';
+  ctx.fillText('ОЧКОВ: ' + game.points, 500, 360);
+
+  if(game.points > game.best){
+    ctx.fillStyle = '#ffd257';
+    ctx.font = 'bold 18px "Courier New"';
+    ctx.fillText('★ НОВЫЙ РЕКОРД ★', 500, 396);
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '16px "Courier New"';
+    ctx.fillText('РЕКОРД: ' + game.best, 500, 396);
+  }
+
+  const blink = 0.5 + 0.5*Math.sin(game.time*4);
+  ctx.globalAlpha = blink;
+  ctx.fillStyle = '#5ce8ff';
+  ctx.font = 'bold 20px "Courier New"';
+  ctx.fillText('ПРОБЕЛ — ПОПРОБОВАТЬ СНОВА', 500, 480);
+  ctx.globalAlpha = 1;
+}
+
+function drawResult(){
+  if(!game.resultInfo) return;
+  const r = game.resultInfo;
+
+  ctx.save();
+  ctx.globalAlpha = 0.75;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+  if(r.timeout){
+    ctx.save();
+    ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 30;
+    ctx.fillStyle = '#ff5a3d';
+    ctx.font = 'bold 46px "Courier New"';
+    ctx.fillText('ВРЕМЯ ВЫШЛО', 500, 260);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '16px "Courier New"';
+    ctx.fillText('Бот ушёл, не дождавшись. −1 жизнь.', 500, 305);
+  } else if(r.ok){
+    let title = 'ПРИНЯТО';
+    if(r.q >= 95) title = 'ИДЕАЛЬНО!';
+    else if(r.q >= 80) title = 'ОТЛИЧНО!';
+    else if(r.q >= 60) title = 'НЕПЛОХО';
+
+    ctx.save();
+    ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 30;
+    ctx.fillStyle = '#7de8ff';
+    ctx.font = 'bold 46px "Courier New"';
+    ctx.fillText(title, 500, 255);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = '16px "Courier New"';
+    ctx.fillText('Качество напитка: ' + r.q + '%', 500, 300);
+
+    ctx.fillStyle = '#ffd257';
+    ctx.font = 'bold 28px "Courier New"';
+    ctx.fillText('+' + r.pts + ' ОЧКОВ', 500, 350);
+  } else {
+    ctx.save();
+    ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 30;
+    ctx.fillStyle = '#ff5a3d';
+    ctx.font = 'bold 46px "Courier New"';
+    ctx.fillText('ОТВРАТИТЕЛЬНО', 500, 255);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '16px "Courier New"';
+    ctx.fillText('Качество: ' + r.q + '%  ·  Бот недоволен', 500, 305);
+
+    ctx.fillStyle = '#ff5a3d';
+    ctx.font = 'bold 22px "Courier New"';
+    ctx.fillText('−1 ЖИЗНЬ', 500, 348);
+  }
+}
+
+/* ============================================================
+   ГЛАВНЫЙ ЦИКЛ
+   ============================================================ */
+function draw(){
+  ctx.save();
+  if(game.shake > 0){
+    ctx.translate((Math.random()-0.5)*game.shake*16, (Math.random()-0.5)*game.shake*16);
+  }
+
+  if(game.phase === 'menu'){
+    drawMenu();
+  } else if(game.phase === 'gameover'){
+    drawGameOver();
+  } else {
+    if(game.view === 'front') drawFront();
+    else drawBack();
+
+    drawHUD();
+
+    if(game.phase === 'result') drawResult();
+  }
+
+  ctx.restore();
+  drawScanlines();
+}
+
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
