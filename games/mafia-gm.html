@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мафия · ИИ за столом</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14110d; --panel:#1f1a14; --panel2:#0f0d0a; --border:#3a3226; --border2:#4a3f2e;
+    --amber:#d1a054; --cream:#e9e2d3; --muted:#9c9284; --muted2:#6b6255; --danger:#8c2f39;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; color:var(--cream); font-family:'Inter',sans-serif;
+    background:radial-gradient(ellipse at 50% -10%, #241d15 0%, #14110d 60%);
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:32px 16px 64px;}
+  header{text-align:center;margin-bottom:24px;}
+  h1{font-family:'Bebas Neue',sans-serif;letter-spacing:.08em;color:var(--amber);font-size:2.2rem;margin:0;}
+  .subtitle{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted2);margin-top:4px;}
+  .tabs{display:flex;gap:4px;margin-bottom:0;}
+  .tab-btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;
+    font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600;
+    background:#171310;border:1px solid #2a241b;border-bottom:none;border-radius:6px 6px 0 0;
+    color:#8a8071;cursor:pointer;
+  }
+  .tab-btn.active{background:var(--panel);border-color:var(--border2);color:var(--cream);}
+  .panel{background:var(--panel);border:1px solid var(--border2);border-radius:0 6px 6px 6px;padding:20px;min-height:420px;}
+  label.eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);display:block;margin-bottom:8px;}
+  input[type=text], textarea, select{
+    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;
+    padding:8px 12px;color:var(--cream);font-size:.9rem;font-family:'Inter',sans-serif;
+  }
+  input[type=text]:focus, textarea:focus, select:focus{outline:none;border-color:var(--amber);}
+  textarea.mono, .mono{font-family:'IBM Plex Mono',monospace;}
+  .row{display:flex;gap:8px;}
+  button{
+    font-family:'Inter',sans-serif;cursor:pointer;border:none;border-radius:5px;
+  }
+  button:disabled{opacity:.3;cursor:default;}
+  .btn-primary{
+    background:var(--amber);color:#1a140c;font-weight:700;text-transform:uppercase;
+    letter-spacing:.03em;padding:11px;width:100%;font-size:.85rem;
+  }
+  .btn-ghost{
+    background:transparent;border:1px solid var(--border);color:var(--muted);
+    padding:6px 10px;font-size:.75rem;display:inline-flex;align-items:center;gap:5px;
+  }
+  .btn-ghost:hover{border-color:var(--amber);color:var(--cream);}
+  .btn-icon{background:#3a3226;color:var(--cream);padding:0 12px;border-radius:5px;font-size:1rem;}
+  .btn-icon:hover{background:#4a3f2e;}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;background:var(--bg);
+    border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:.85rem;margin:3px;
+  }
+  .chip button{background:none;color:var(--muted2);font-size:.9rem;padding:0;line-height:1;}
+  .chip button:hover{color:var(--danger);}
+  .preset{font-size:.72rem;padding:4px 8px;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;margin:3px 3px 0 0;}
+  .preset:hover{border-color:var(--amber);color:var(--cream);}
+  .rules{font-size:.78rem;color:var(--muted);margin-top:14px;}
+  .rules summary{cursor:pointer;color:var(--amber);}
+  .rules ul{margin:8px 0 0;padding-left:18px;}
+  .rules li{margin-bottom:3px;}
+  .banner{background:#2a2015;border:1px solid #5a3f22;border-radius:5px;padding:10px 12px;font-size:.85rem;display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .banner .flex-btn{margin-left:auto;background:var(--danger);color:#fff;padding:6px 10px;font-size:.75rem;border-radius:5px;}
+  .field{margin-bottom:18px;}
+  .hint{font-size:.72rem;color:var(--muted2);margin-top:6px;}
+  .status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .status-left{display:flex;align-items:center;gap:8px;font-size:.9rem;text-transform:uppercase;letter-spacing:.03em;}
+  .roles-grid{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:10px;font-size:.75rem;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:14px;}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
+  .dead{opacity:.4;text-decoration:line-through;}
+  .sleep-box{text-align:center;padding:32px 0;background:var(--bg);border:1px solid var(--border);border-radius:5px;}
+  .actor-line{font-size:.9rem;margin-bottom:10px;}
+  .actor-name{color:var(--amber);font-weight:600;}
+  .manual-box{background:#2a2015;border:1px solid #5a3f22;border-radius:5px;padding:12px;font-size:.85rem;margin-top:12px;}
+  .manual-box select{margin:8px 0;}
+  .log-panel{background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:10px;height:260px;overflow-y:auto;font-size:.75rem;}
+  .log-entry{margin-bottom:5px;}
+  .log-entry.system{color:#8a8071;font-style:italic;}
+  .log-tag{color:var(--muted2);}
+  .log-actor{color:var(--amber);font-weight:600;}
+  .end-box{text-align:center;padding:40px 0;}
+  .end-box h2{font-family:'Bebas Neue',sans-serif;letter-spacing:.05em;font-size:1.8rem;margin:10px 0 4px;}
+  .flex-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  ::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+  .log-entry.private{background:#2a1f1f;border-left:2px solid #8c2f39;padding-left:6px;color:#b08a7a;}
+  .role-select{display:flex;align-items:center;gap:8px;margin:4px 0;}
+  .role-select select{width:auto;flex:1;padding:4px 8px;font-size:.8rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>МАФИЯ · ИИ ЗА СТОЛОМ</h1>
+    <div class="subtitle" id="subtitle">Ведущий вручную играет роль модератора между моделями</div>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+const ROLE_MAFIA = "Мафия";
+const ROLE_CIV = "Мирный житель";
+const ROLE_SHERIFF = "Шериф";
+const SETTING_PRESETS = [
+  "Ток-шоу в прямом эфире","Кухня ресторана после смены","Заседание правления компании",
+  "Круиз на старом лайнере","Офис в ночь перед дедлайном","Семейный ужин по случаю юбилея",
+];
+
+let uid = 1;
+const nextId = () => uid++;
+
+// ---------- State ----------
+let state = {
+  tab: "setup",
+  players: [],
+  nameInput: "",
+  setting: "",
+  started: false,
+  showRoles: false,
+  gameOver: null,
+  round: 1,
+  cyclePhase: "day",
+  dayStep: "talk",
+  nightStep: "decide",
+  turnQueue: [],
+  turnIdx: 0,
+  nominees: [],
+  votes: {},
+  mafiaSuggestion: null,
+  nightVictim: null,
+  log: [],
+  inputText: "",
+  manualNeeded: null,
+  manualPick: "",
+  copied: false,
+  showPrivateLogs: false,
+  // FIX: новый режим назначения ролей
+  roleAssignmentMode: "random", // "random" или "manual"
+  useSheriff: false,
+  // Интервью после раунда (опциональная фишка, не влияет на игру)
+  interview: null, // { playerId, question } когда идёт интервью
+  interviewPlayerPick: "",
+  interviewQuestionInput: "",
+  interviewAnswerInput: "",
+};
+
+function set(patch){ Object.assign(state, patch); render(); }
+
+// ---------- Helpers ----------
+function normalize(str){ return (str||"").toLowerCase().replace(/["'«»`]/g,"").trim(); }
+function resolvePlayerByName(rawName, candidates){
+  if(!rawName) return null;
+  const n = normalize(rawName);
+  if(!n) return null;
+  const exact = candidates.find(p => normalize(p.name) === n);
+  if(exact) return exact.id;
+  const contains = candidates
+    .filter(p => n.includes(normalize(p.name)) || normalize(p.name).includes(n))
+    .sort((a,b) => b.name.length - a.name.length)[0];
+  return contains ? contains.id : null;
+}
+function parseCommand(text, keyword){
+  const re = new RegExp(keyword + "\\s*:\\s*([^\\n\\r]+)", "i");
+  const m = text.match(re);
+  if(!m) return null;
+  return m[1].replace(/[.!?]+$/,"").trim();
+}
+function esc(s){ const d=document.createElement('div'); d.innerText = s==null?"":String(s); return d.innerHTML; }
+
+function aliveIds(list = state.players){ return list.filter(p=>p.alive).map(p=>p.id); }
+function byId(id, list = state.players){ return list.find(p=>p.id===id); }
+function aliveMafia(list = state.players){ return list.filter(p=>p.alive && p.role===ROLE_MAFIA); }
+function aliveCiv(list = state.players){ return list.filter(p=>p.alive && p.role===ROLE_CIV); }
+function aliveTown(list = state.players){ return list.filter(p=>p.alive && p.role!==ROLE_MAFIA); }
+function stripCommandLine(text, keyword){
+  const re = new RegExp("^\\s*" + keyword + "\\s*:.*$", "im");
+  return text.split(/\r?\n/).filter(line => !re.test(line)).join("\n").trim();
+}
+function namesList(ids){ return ids.map(id => byId(id)?.name).filter(Boolean).join(", "); }
+function currentActor(){ const id = state.turnQueue[state.turnIdx]; return id ? byId(id) : null; }
+
+function addLog(entry){
+  state.log.push({ 
+    id: nextId(), 
+    round: state.round, 
+    cyclePhase: state.cyclePhase, 
+    ts: Date.now(), 
+    private: entry.private || false,
+    ...entry 
+  });
+}
+
+function checkWin(list){
+  const m = aliveMafia(list).length, c = aliveTown(list).length;
+  if(m === 0) return { winner:"civilians", reason:"Вся мафия обезврежена." };
+  if(m >= c) return { winner:"mafia", reason:"Мафия сравнялась числом с мирными жителями." };
+  return null;
+}
+function endGame(result, list){
+  state.gameOver = result;
+  addLog({ system:true, text:`ИГРА ОКОНЧЕНА. Победа: ${result.winner==="mafia"?"Мафия":"Мирные жители"}. ${result.reason} Роли: ${list.map(p=>`${p.name} — ${p.role}${p.alive?"":" (выбыл)"}`).join("; ")}.` });
+  set({ tab:"log" });
+}
+
+// ---------- Setup actions ----------
+function addPlayer(){
+  const trimmed = state.nameInput.trim();
+  if(!trimmed || state.players.length >= 8) return;
+  if(state.players.some(p => normalize(p.name) === normalize(trimmed))) return;
+  state.players.push({ id: nextId(), name: trimmed, role:null, alive:true, lastLogIndex:0, currentEmotion:null });
+  set({ nameInput:"" });
+}
+function removePlayer(id){ set({ players: state.players.filter(p=>p.id!==id) }); }
+
+// FIX: новая функция старта с учётом режима
+function startGame(){
+  if(state.players.length < 4 || !state.setting.trim()) return;
+
+  let withRoles;
+  if(state.roleAssignmentMode === "manual") {
+    // Проверяем, что все роли назначены
+    const missing = state.players.some(p => p.role === null);
+    if(missing) {
+      alert("Назначьте роль каждому игроку!");
+      return;
+    }
+    withRoles = state.players.map(p => ({ ...p, alive:true, lastLogIndex:0, currentEmotion:null }));
+  } else {
+    // Рандом
+    const mafiaCount = state.players.length >= 6 ? 2 : 1;
+    const shuffled = [...state.players].sort(()=>Math.random()-0.5);
+    const mafiaIds = new Set(shuffled.slice(0, mafiaCount).map(p=>p.id));
+    let sheriffId = null;
+    if(state.useSheriff){
+      const rest = shuffled.slice(mafiaCount);
+      if(rest.length > 0) sheriffId = rest[0].id;
+    }
+    withRoles = state.players.map(p => {
+      let role = ROLE_CIV;
+      if(mafiaIds.has(p.id)) role = ROLE_MAFIA;
+      else if(sheriffId === p.id) role = ROLE_SHERIFF;
+      return { ...p, role, alive:true, lastLogIndex:0, currentEmotion:null };
+    });
+  }
+
+  state.players = withRoles;
+  state.started = true;
+  state.round = 1;
+  state.cyclePhase = "day";
+  state.dayStep = "talk";
+  state.turnQueue = withRoles.map(p=>p.id);
+  state.turnIdx = 0;
+  state.nominees = [];
+  state.votes = {};
+  state.gameOver = null;
+  state.log = [{ id: nextId(), round:1, cyclePhase:"day", system:true, ts:Date.now(),
+    text:`Игра началась. Сеттинг: «${state.setting.trim()}». Игроков: ${withRoles.length}.`, private:false }];
+  set({ tab:"game" });
+}
+
+function resetAll(){
+  set({
+    players:[], started:false, gameOver:null, log:[], round:1, cyclePhase:"day", dayStep:"talk",
+    nominees:[], votes:{}, nightVictim:null, mafiaSuggestion:null, tab:"setup", setting: state.setting,
+    showPrivateLogs: false, roleAssignmentMode: "random", useSheriff: false,
+    interview: null, interviewPlayerPick: "", interviewQuestionInput: "", interviewAnswerInput: ""
+  });
+}
+
+// ---------- Prompt generation ----------
+function generatePrompt(){
+  const actor = currentActor();
+  if(!actor) return "";
+
+  // FIX: фильтруем ВСЕ приватные сообщения (включая системные)
+  const newLogs = state.log.slice(actor.lastLogIndex);
+  const otherMessages = newLogs.filter(e => {
+    if (e.private && e.visibleTo !== actor.id) return false; // приватные видит только адресат (например, шериф)
+    if (e.actor && e.actor === actor.name) return false; // свои сообщения
+    return true; // остальные (системные без actor или от других)
+  });
+
+  let replicsBlock = "";
+  if(otherMessages.length > 0){
+    replicsBlock = "Реплики других участников (в хронологическом порядке):\n" +
+      otherMessages.map(e => {
+        const from = e.actor ? e.actor : "Ведущий";
+        const emo = (e.actor && e.emotion) ? ` [эмоция: ${e.emotion}]` : "";
+        return `${from}${emo}: ${e.text}`;
+      }).join("\n") + "\n\n";
+  }
+
+  // ----- Основной промпт -----
+  const table = namesList(aliveIds());
+  const head = `Ты играешь в социальную игру «Мафия». Твоё имя за столом: ${actor.name}. Твоя роль: ${actor.role}. За столом (живые): ${table}.`;
+
+  let body = "";
+  if(state.cyclePhase==="day" && state.dayStep==="talk"){
+    if(state.round===1) body = `Это первый круг. Представься и выскажись в характере сеттинга, просто реплика от твоего лица, можешь рассказывать тактику мирным жителям.`;
+    else body = `Выскажись по поводу происходящего. Если хочешь кого-то заподозрить и выставить на голосование, обязательно добавь отдельной строкой команду:\nВЫСТАВИТЬ: <имя игрока>\nЕсли не хочешь никого выставлять — просто не пиши эту команду, если будет только один выставленный, то у вас не будет выбора за кого голосовать.`;
+  } else if(state.cyclePhase==="day" && state.dayStep==="justify"){
+    body = `Тебя выставили на голосование. Оправдайся перед остальными, оставаясь в характере сеттинга.`;
+  } else if(state.cyclePhase==="day" && state.dayStep==="vote"){
+    body = `Выставлены: ${namesList(state.nominees)}. Выбери, за кого голосуешь, и укажи отдельной строкой команду, ты можешь голосовать только за того игрока, которого выставили:\nГОЛОС: <имя игрока>\nМожешь коротко обосновать выбор в стиле сеттинга.`;
+  } else if(state.cyclePhase==="day" && state.dayStep==="lastword"){
+    body = `Тебя выставили из игры. Скажи последнее слово.`;
+  } else if(state.cyclePhase==="day" && state.dayStep==="morninglastword"){
+    body = `Этой ночью тебя убили. Скажи последние слова столу перед началом обсуждения. Можешь сказать правду о своих подозрениях.`;
+  } else if(state.cyclePhase==="night" && state.nightStep==="sheriff"){
+    const targets = namesList(aliveIds().filter(id => id !== actor.id));
+    body = `Ночь. Ты — ${actor.name}, ${ROLE_SHERIFF}. Возможные цели проверки: ${targets}. Выбери, кого проверить на принадлежность к мафии, обязательной командой:\nПРОВЕРИТЬ: <имя игрока>`;
+  } else if(state.cyclePhase==="night" && state.nightStep==="suggest"){
+    const partner = aliveMafia().find(p=>p.id!==actor.id);
+    const targets = namesList(aliveIds().filter(id => byId(id).role !== ROLE_MAFIA));
+    body = `Ночь. Ты — ${actor.name}, ${ROLE_MAFIA}. Твой сообщник: ${partner?partner.name:"нет в живых"}. Возможные цели: ${targets}. Предложи кандидата на устранение командой и обоснуй почему:\nПОДСКАЗКА: <имя игрока>`;
+  } else if(state.cyclePhase==="night" && state.nightStep==="decide"){
+    const solo = aliveMafia().length === 1;
+    const targets = namesList(aliveIds().filter(id => byId(id).role !== ROLE_MAFIA));
+    if(solo) body = `Ночь. Ты — ${actor.name}, единственный оставшийся ${ROLE_MAFIA}. Возможные цели: ${targets}. Выбери жертву командой, также можно подумать о тактике на день:\nУБИТЬ: <имя игрока>`;
+    else {
+      const partner = aliveMafia().find(p=>p.id!==actor.id);
+      const sug = state.mafiaSuggestion ? byId(state.mafiaSuggestion)?.name : "не предложил кандидата";
+      body = `Ночь. Ты — ${actor.name}, ${ROLE_MAFIA}. Твой сообщник ${partner?partner.name:""} предлагает устранить: ${sug}. Прими решение — согласись или выбери другого — командой и обоснуй напарнику почему:\nУБИТЬ: <имя игрока>`;
+    }
+  }
+
+  const emotionSteps = state.cyclePhase==="day" &&
+    ["talk","justify","vote","lastword","morninglastword"].includes(state.dayStep);
+  if(emotionSteps){
+    body += `\n\nЕсли хочешь показать остальным своё эмоциональное состояние, добавь отдельной строкой команду:\nЭМОЦИЯ: <название эмоции>\nОна будет видна всем как твой текущий статус, но саму эту строку из твоей реплики уберут — остальные не увидят команду, только результат, также эмоцию нужно писать одним словом, эмоция не обязательная.`;
+  }
+
+  return replicsBlock + head + "\n" + body;
+}
+
+function phaseLabel(){
+  if(state.cyclePhase==="day"){
+    if(state.dayStep==="talk") return state.round===1 ? "Знакомство" : "Высказывание";
+    if(state.dayStep==="justify") return "Оправдание";
+    if(state.dayStep==="vote") return "Голосование";
+    if(state.dayStep==="lastword") return "Последнее слово";
+    if(state.dayStep==="morninglastword") return "Посмертная записка";
+  } else {
+    if(state.nightStep==="suggest") return "Ночь · подсказка";
+    if(state.nightStep==="decide") return "Ночь · решение";
+    if(state.nightStep==="sheriff") return "Ночь · проверка шерифа";
+    if(state.nightStep==="sleep") return "Город спит";
+  }
+  return "";
+}
+
+// ---------- Transitions ----------
+function startNightPhase(list){
+  state.cyclePhase = "night";
+  const m = aliveMafia(list);
+  state.mafiaSuggestion = null;
+  state.nightVictim = null;
+  if(m.length >= 2){ state.nightStep="suggest"; state.turnQueue=[m[0].id]; }
+  else { state.nightStep="decide"; state.turnQueue = m[0] ? [m[0].id] : []; }
+  state.turnIdx = 0;
+}
+
+function goToSleepOrSheriff(list){
+  const sheriff = list.find(p => p.alive && p.role===ROLE_SHERIFF);
+  if(sheriff){ state.nightStep="sheriff"; state.turnQueue=[sheriff.id]; state.turnIdx=0; }
+  else { state.nightStep="sleep"; state.turnQueue=[]; state.turnIdx=0; }
+}
+
+function transitionAfterStep(list){
+  if(state.cyclePhase==="day"){
+    if(state.dayStep==="talk"){
+      if(state.round===1){
+        addLog({ system:true, text:"Первый круг завершён. Город засыпает." });
+        startNightPhase(list); return;
+      }
+      if(state.nominees.length===0){
+        addLog({ system:true, text:"Никого не выставили. Город засыпает." });
+        startNightPhase(list); return;
+      }
+      state.dayStep="justify"; state.turnQueue=[...state.nominees]; state.turnIdx=0; return;
+    }
+    if(state.dayStep==="justify"){
+      state.dayStep="vote"; state.turnQueue=aliveIds(list); state.turnIdx=0; state.votes={}; return;
+    }
+    if(state.dayStep==="vote"){
+      const tally={};
+      Object.values(state.votes).forEach(t => { tally[t]=(tally[t]||0)+1; });
+      const entries = Object.entries(tally).sort((a,b)=>b[1]-a[1]);
+      const top = entries[0];
+      const tie = entries.length>1 && entries[1][1]===(top?top[1]:0);
+      if(!top || tie){
+        addLog({ system:true, text:"Голоса разделились — никого не выставили. Город засыпает." });
+        startNightPhase(list); return;
+      }
+      const outId = Number(top[0]);
+      const updated = list.map(p => p.id===outId ? { ...p, alive:false } : p);
+      state.players = updated;
+      addLog({ system:true, text:`${byId(outId, updated)?.name} выставлен и покидает игру.` });
+      const win = checkWin(updated);
+      if(win){ endGame(win, updated); return; }
+      state.dayStep="lastword"; state.turnQueue=[outId]; state.turnIdx=0; return;
+    }
+    if(state.dayStep==="lastword"){
+      addLog({ system:true, text:"Ночь опускается на город." });
+      startNightPhase(list); return;
+    }
+    if(state.dayStep==="morninglastword"){
+      state.dayStep="talk"; state.turnQueue=aliveIds(list); state.turnIdx=0; return;
+    }
+  } else {
+    if(state.nightStep==="suggest"){
+      const m = aliveMafia(list);
+      state.nightStep="decide"; state.turnQueue=[m[1].id]; state.turnIdx=0; return;
+    }
+    if(state.nightStep==="decide"){
+      goToSleepOrSheriff(list); return;
+    }
+    if(state.nightStep==="sheriff"){
+      state.nightStep="sleep"; state.turnQueue=[]; state.turnIdx=0; return;
+    }
+  }
+}
+
+function resolveMorning(){
+  const victim = state.nightVictim ? byId(state.nightVictim) : null;
+  let updated = state.players;
+  if(victim && victim.alive){
+    updated = state.players.map(p => p.id===victim.id ? { ...p, alive:false } : p);
+    state.players = updated;
+    addLog({ system:true, text:`Наступает утро. Мафия расправилась с ${victim.name}.` });
+  } else {
+    addLog({ system:true, text:"Наступает утро. Этой ночью никто не пострадал." });
+  }
+  const win = checkWin(updated);
+  if(win){ endGame(win, updated); render(); return; }
+  state.round += 1;
+  state.cyclePhase="day";
+  state.nominees=[]; state.votes={}; state.mafiaSuggestion=null;
+  if(victim){
+    state.dayStep="morninglastword";
+    state.turnQueue=[victim.id];
+  } else {
+    state.dayStep="talk";
+    state.turnQueue = aliveIds(updated);
+  }
+  state.nightVictim=null;
+  state.turnIdx=0;
+  render();
+}
+
+function stepRequiredCommand(){
+  if(state.cyclePhase==="day" && state.dayStep==="vote") return "ГОЛОС";
+  if(state.cyclePhase==="night" && state.nightStep==="suggest") return "ПОДСКАЗКА";
+  if(state.cyclePhase==="night" && state.nightStep==="decide") return "УБИТЬ";
+  if(state.cyclePhase==="night" && state.nightStep==="sheriff") return "ПРОВЕРИТЬ";
+  return null;
+}
+
+// ---- Применение команды с флагом private ----
+function applyCommand(command, actorId, targetId, isPrivate = false){
+  const actor = byId(actorId), target = byId(targetId);
+  if(command==="ГОЛОС"){
+    state.votes = { ...state.votes, [actorId]: targetId };
+    addLog({ system:true, text:`→ ${actor.name} голосует за ${target?.name}.`, private: isPrivate });
+  } else if(command==="ПОДСКАЗКА"){
+    state.mafiaSuggestion = targetId;
+    addLog({ system:true, text:`→ мафия предлагает цель: ${target?.name}.`, private: isPrivate });
+  } else if(command==="УБИТЬ"){
+    state.nightVictim = targetId;
+    addLog({ system:true, text:`→ мафия выбирает жертву: ${target?.name}.`, private: isPrivate });
+  } else if(command==="ПРОВЕРИТЬ"){
+    const result = target && target.role===ROLE_MAFIA ? "мафия" : "не мафия";
+    addLog({ system:true, text:`→ Шериф проверяет ${target?.name}: результат — ${result}.`, private:true, visibleTo: actorId });
+  }
+}
+
+// ---- Обновление lastLogIndex для текущего игрока (после успешного хода) ----
+function markCurrentActorAsSeen(indexOverride){
+  const actorId = state.turnQueue[state.turnIdx];
+  const actor = byId(actorId);
+  if(actor) actor.lastLogIndex = indexOverride !== undefined && indexOverride !== null ? indexOverride : state.log.length;
+}
+
+function afterActorDone(indexOverride){
+  // Обновляем индекс для текущего игрока, чтобы он больше не видел эти сообщения
+  markCurrentActorAsSeen(indexOverride);
+  const nextIdx = state.turnIdx + 1;
+  if(nextIdx < state.turnQueue.length){ state.turnIdx = nextIdx; }
+  else { transitionAfterStep(state.players); }
+}
+
+function submitStep(){
+  const actor = currentActor();
+  if(!actor || !state.inputText.trim()) return;
+  const text = state.inputText.trim();
+  const stepLabel = phaseLabel();
+  // FIX: помечаем private ночные реплики И реплики во время голосования (анонимность обоснования)
+  const isPrivatePhase = state.cyclePhase === "night" || (state.cyclePhase==="day" && state.dayStep==="vote");
+
+  // Эмоция: обновляем статус игрока и прячем саму команду из видимого текста
+  const emotionRaw = parseCommand(text, "ЭМОЦИЯ");
+  let displayText = text;
+  if(emotionRaw){
+    actor.currentEmotion = emotionRaw;
+    displayText = stripCommandLine(text, "ЭМОЦИЯ") || displayText;
+  }
+
+  addLog({ actor: actor.name, role: actor.role, tag: stepLabel, text: displayText, private: isPrivatePhase, emotion: actor.currentEmotion || null });
+
+  // Обработка выставления (только день, не первый круг)
+  if(state.cyclePhase==="day" && state.dayStep==="talk" && state.round>1){
+    const nomRaw = parseCommand(text, "ВЫСТАВИТЬ");
+    if(nomRaw){
+      const target = resolvePlayerByName(nomRaw, state.players.filter(p=>p.alive));
+      if(target && target!==actor.id && !state.nominees.includes(target)){
+        state.nominees = [...state.nominees, target];
+        addLog({ system:true, text:`→ ${actor.name} выставляет ${byId(target)?.name}.` });
+      }
+    }
+  }
+
+  const required = stepRequiredCommand();
+  let selfVisibleFrom = null; // FIX: если команда создаёт приватный результат для самого актёра — не отмечаем его как увиденный
+  if(required){
+    const raw = parseCommand(text, required);
+    // FIX: голосовать можно только за выставленных, для остальных команд — любой живой (кроме себя)
+    const pool = required==="ГОЛОС"
+      ? state.players.filter(p=>state.nominees.includes(p.id))
+      : state.players.filter(p=>p.alive && p.id!==actor.id);
+    const target = raw ? resolvePlayerByName(raw, pool) : null;
+    if(!target){
+      state.manualNeeded = { command: required, preCommandLen: state.log.length };
+      state.inputText = "";
+      render();
+      return;
+    }
+    // Для голосования private=false, для ночных команд true
+    const isPrivate = (required !== "ГОЛОС");
+    const preCommandLen = state.log.length;
+    applyCommand(required, actor.id, target, isPrivate);
+    if(required === "ПРОВЕРИТЬ") selfVisibleFrom = preCommandLen;
+  }
+
+  state.inputText = "";
+  state.manualNeeded = null;
+  afterActorDone(selfVisibleFrom);  // внутри обновит lastLogIndex (с учётом отложенного результата) и переключит ход
+  render();
+}
+
+function confirmManualPick(){
+  if(!state.manualNeeded || !state.manualPick) return;
+  const required = state.manualNeeded.command;
+  const isPrivate = (required !== "ГОЛОС");
+  const preCommandLen = state.manualNeeded.preCommandLen;
+  applyCommand(required, state.turnQueue[state.turnIdx], Number(state.manualPick), isPrivate);
+  const selfVisibleFrom = required === "ПРОВЕРИТЬ" ? preCommandLen : null;
+  state.manualNeeded = null;
+  state.manualPick = "";
+  afterActorDone(selfVisibleFrom);
+  render();
+}
+
+// ---------- Интервью после раунда (необязательная фишка, на исход игры не влияет) ----------
+function startInterview(){
+  const playerId = Number(state.interviewPlayerPick);
+  const question = state.interviewQuestionInput.trim();
+  if(!playerId || !question) return;
+  state.interview = { playerId, question };
+  state.interviewAnswerInput = "";
+  render();
+}
+function generateInterviewPrompt(){
+  if(!state.interview) return "";
+  const p = byId(state.interview.playerId);
+  if(!p) return "";
+  return `Ты играешь в социальную игру «Мафия». Твоё имя за столом: ${p.name}. Твоя роль: ${p.role}. Это внеигровое интервью для стола/зрителей, отвечай в характере сеттинга, но помни, что оно не отменяет и не заменяет твои прошлые ходы.\nВопрос ведущего: ${state.interview.question}`;
+}
+function submitInterviewAnswer(){
+  if(!state.interview || !state.interviewAnswerInput.trim()) return;
+  const p = byId(state.interview.playerId);
+  if(p){
+    addLog({ actor: p.name, role: p.role, tag: "Интервью", text: state.interviewAnswerInput.trim(), private:false, emotion: p.currentEmotion || null });
+  }
+  state.interview = null;
+  state.interviewPlayerPick = "";
+  state.interviewQuestionInput = "";
+  state.interviewAnswerInput = "";
+  render();
+}
+function cancelInterview(){
+  state.interview = null;
+  state.interviewAnswerInput = "";
+  render();
+}
+
+function copyPrompt(){
+  const text = generatePrompt();
+  const done = () => { state.copied = true; render(); setTimeout(()=>{ state.copied=false; render(); }, 1500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); }catch(e){}
+  document.body.removeChild(ta);
+  done();
+}
+
+function logAsText(includePrivate = false){
+  return state.log
+    .filter(e => includePrivate || !e.private)
+    .map(e=>{
+      const tag = `[Круг ${e.round} · ${e.cyclePhase==="day"?"День":"Ночь"}${e.tag?" · "+e.tag:""}]`;
+      if(e.system) return `${tag} ${e.text}`;
+      return `${tag} ${e.actor}${e.role?" ("+e.role+")":""}${e.emotion?" ["+e.emotion+"]":""}: ${e.text}`;
+    }).join("\n");
+}
+function downloadLog(){
+  const blob = new Blob([logAsText(true)], { type:"text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `mafia-log-${Date.now()}.txt`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Render ----------
+function render(){
+  document.getElementById("subtitle").textContent = state.started
+    ? `Сеттинг: «${state.setting}»`
+    : "Ведущий вручную играет роль модератора между моделями";
+
+  const tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = "";
+  [["setup","Лицевая"],["game","Игровая"],["log","Протокол"]].forEach(([key,label])=>{
+    const b = document.createElement("button");
+    b.className = "tab-btn" + (state.tab===key ? " active" : "");
+    b.textContent = label;
+    b.onclick = () => set({ tab:key });
+    tabsEl.appendChild(b);
+  });
+
+  const panel = document.getElementById("panel");
+  if(state.tab==="setup") panel.innerHTML = renderSetup();
+  else if(state.tab==="game") panel.innerHTML = renderGame();
+  else panel.innerHTML = renderLog();
+
+  wireEvents();
+}
+
+function renderSetup(){
+  const chips = state.players.map(p => `
+    <span class="chip">${esc(p.name)}${state.started?"":`<button data-remove="${p.id}">✕</button>`}</span>
+  `).join("") || `<span style="color:var(--muted2);font-size:.85rem;">Пока никого не добавили</span>`;
+
+  const presets = SETTING_PRESETS.map(s => `<button class="preset" data-preset="${esc(s)}" ${state.started?"disabled":""}>${esc(s)}</button>`).join("");
+
+  // FIX: ручное назначение ролей
+  let manualRolesHtml = "";
+  if(state.roleAssignmentMode === "manual" && !state.started) {
+    manualRolesHtml = `<div class="field"><label class="eyebrow">Назначьте роли вручную</label>`;
+    state.players.forEach(p => {
+      manualRolesHtml += `
+        <div class="role-select">
+          <span style="width:100px;">${esc(p.name)}</span>
+          <select data-role-player="${p.id}">
+            <option value="">— выберите —</option>
+            <option value="${ROLE_MAFIA}" ${p.role===ROLE_MAFIA?"selected":""}>${ROLE_MAFIA}</option>
+            <option value="${ROLE_CIV}" ${p.role===ROLE_CIV?"selected":""}>${ROLE_CIV}</option>
+            <option value="${ROLE_SHERIFF}" ${p.role===ROLE_SHERIFF?"selected":""}>${ROLE_SHERIFF}</option>
+          </select>
+        </div>
+      `;
+    });
+    manualRolesHtml += `</div>`;
+  }
+
+  return `
+    ${state.started ? `
+      <div class="banner">
+        <span>Игра уже идёт — менять состав нельзя.</span>
+        <button class="flex-btn" id="btn-reset">Новая игра</button>
+      </div>` : ""}
+
+    <div class="field">
+      <label class="eyebrow">Участники (модели), до 8</label>
+      <div class="row">
+        <input type="text" id="name-input" ${state.started?"disabled":""} placeholder="Например: Клод, GPT-5, Gemini…" value="${esc(state.nameInput)}">
+        <button class="btn-icon" id="btn-add" ${state.started || state.players.length>=8 ? "disabled":""}>+</button>
+      </div>
+      <div style="margin-top:10px;">${chips}</div>
+      <div class="hint">4–8 игроков. При рандоме мафии — 1 при 4–5 игроках, 2 при 6–8. Шериф — опционально, один игрок среди мирных.</div>
+    </div>
+
+    <div class="field">
+      <label class="eyebrow">Режим назначения ролей</label>
+      <div style="display:flex;gap:10px;">
+        <label><input type="radio" name="role-mode" value="random" ${state.roleAssignmentMode==="random"?"checked":""} ${state.started?"disabled":""}> Рандом</label>
+        <label><input type="radio" name="role-mode" value="manual" ${state.roleAssignmentMode==="manual"?"checked":""} ${state.started?"disabled":""}> Вручную</label>
+      </div>
+      ${state.roleAssignmentMode==="random" ? `
+      <div style="margin-top:8px;">
+        <label><input type="checkbox" id="use-sheriff" ${state.useSheriff?"checked":""} ${state.started?"disabled":""}> Добавить шерифа (проверяет одного игрока каждую ночь)</label>
+      </div>` : ""}
+    </div>
+
+    ${manualRolesHtml}
+
+    <div class="field">
+      <label class="eyebrow">Сеттинг раунда</label>
+      <input type="text" id="setting-input" ${state.started?"disabled":""} placeholder="Например: Кухня ресторана после смены" value="${esc(state.setting)}">
+      <div style="margin-top:8px;">${presets}</div>
+    </div>
+
+    <button class="btn-primary" id="btn-start" ${state.started || state.players.length<4 || !state.setting.trim() ? "disabled":""}>▶ Начать игру</button>
+
+    <details class="rules">
+      <summary>Правила и команды</summary>
+      <ul>
+        <li>Роли: мирный житель, мафия и опционально шериф. Максимум игроков — 8, мафии — 2.</li>
+        <li>Сеттинг называется один раз в начале игры и больше не повторяется в промптах.</li>
+        <li>День: высказывание и выставление (кроме 1-го круга) → оправдание → голосование → последнее слово.</li>
+        <li>Голосовать можно только за тех, кого выставили. Само обоснование голоса скрыто от стола — видно только «кто за кого проголосовал», чтобы мнение не менялось под влиянием чужих слов.</li>
+        <li>Если ночью кого-то убили — утром у него сначала посмертная записка, и только потом стол начинает обсуждение.</li>
+        <li>Ночь: ход мафии (при двух — один подсказывает, второй решает) → проверка шерифа (если жив) → город спит.</li>
+        <li>Результат проверки шерифа виден только ему в его следующем промпте — остальные о нём не узнают, пока сам шериф не расскажет днём.</li>
+        <li>Эмоции: любой игрок может добавить строку ЭМОЦИЯ: название — она станет видимым статусом рядом с его именем, но сама строка-команда из реплики скрывается.</li>
+        <li>Интервью: необязательная фишка на экране «город спит» — можно задать любому живому игроку вопрос вне сюжета, ответ публикуется в общий лог и никак не влияет на исход игры.</li>
+        <li>Команды в ответах моделей: ВЫСТАВИТЬ: имя · ГОЛОС: имя · ПОДСКАЗКА: имя · УБИТЬ: имя · ПРОВЕРИТЬ: имя · ЭМОЦИЯ: название.</li>
+      </ul>
+    </details>
+  `;
+}
+
+function renderGame(){
+  if(!state.started) return `<p style="color:var(--muted);font-size:.9rem;">Сначала настрой игру на вкладке «Лицевая».</p>`;
+
+  if(state.gameOver){
+    return `
+      <div class="end-box">
+        <div style="font-size:2rem;">💀</div>
+        <h2>Победа: ${state.gameOver.winner==="mafia"?"Мафия":"Мирные жители"}</h2>
+        <p style="color:var(--muted);font-size:.9rem;">${esc(state.gameOver.reason)}</p>
+        <p style="color:var(--muted2);font-size:.75rem;margin-top:10px;">Полный протокол — во вкладке «Протокол».</p>
+      </div>`;
+  }
+
+  const dotColor = (role) => role===ROLE_MAFIA ? "#8c2f39" : role===ROLE_SHERIFF ? "#4a7d9c" : "#5a7d5a";
+  const rolesGrid = state.showRoles ? `
+    <div class="roles-grid">
+      ${state.players.map(p => `
+        <div class="${p.alive?"":"dead"}">
+          <span class="dot" style="background:${dotColor(p.role)}"></span>${esc(p.name)} — ${esc(p.role)}${p.currentEmotion?` <span style="color:var(--muted2);">(${esc(p.currentEmotion)})</span>`:""}
+        </div>`).join("")}
+    </div>` : "";
+  const emotionsRow = state.players.some(p=>p.currentEmotion) ? `
+    <div class="roles-grid" style="grid-template-columns:1fr;margin-top:-4px;">
+      ${state.players.filter(p=>p.alive && p.currentEmotion).map(p => `<div>${esc(p.name)}: <span style="color:var(--amber);">${esc(p.currentEmotion)}</span></div>`).join("")}
+    </div>` : "";
+
+  const icon = state.cyclePhase==="day" ? "☀" : "☾";
+
+  const statusRow = `
+    <div class="status-row">
+      <div class="status-left">${icon} Круг ${state.round} · ${phaseLabel()}</div>
+      <button class="btn-ghost" id="btn-toggle-roles">${state.showRoles?"🙈":"👁"} Роли</button>
+    </div>`;
+
+  if(state.cyclePhase==="night" && state.nightStep==="sleep"){
+    const dayLogs = state.log.filter(e => e.round === state.round && e.cyclePhase === "day" && !e.private);
+    const summary = dayLogs.length ? dayLogs.map(e => {
+      if(e.system) return `[Ведущий] ${e.text}`;
+      return `[${e.actor}] ${e.text}`;
+    }).join("\n") : "За день не было публичных реплик.";
+
+    const interviewBox = state.interview ? `
+      <div class="manual-box" style="text-align:left;">
+        <p><strong>🎤 Интервью:</strong> ${esc(byId(state.interview.playerId)?.name||"")}</p>
+        <div class="field">
+          <div class="flex-between">
+            <label class="eyebrow" style="margin:0;color:var(--muted);">Промт для копирования</label>
+            <button class="btn-ghost" id="btn-copy-interview">⧉ Копировать</button>
+          </div>
+          <textarea class="mono" rows="3" readonly>${esc(generateInterviewPrompt())}</textarea>
+        </div>
+        <div class="field">
+          <label class="eyebrow" style="color:var(--muted);">Ответ модели</label>
+          <textarea class="mono" rows="3" id="interview-answer-input" placeholder="Вставь ответ сюда…">${esc(state.interviewAnswerInput)}</textarea>
+        </div>
+        <div class="row">
+          <button class="btn-primary" id="btn-submit-interview" ${!state.interviewAnswerInput.trim()?"disabled":""}>Опубликовать ответ</button>
+          <button class="btn-ghost" id="btn-cancel-interview">Отмена</button>
+        </div>
+      </div>` : `
+      <div class="manual-box" style="text-align:left;">
+        <p>🎤 Необязательно: провести интервью с любым живым игроком перед тем, как наступит утро.</p>
+        <select id="interview-player-select">
+          <option value="">— выбери игрока —</option>
+          ${state.players.filter(p=>p.alive).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+        </select>
+        <input type="text" id="interview-question-input" placeholder="Вопрос ведущего…" value="${esc(state.interviewQuestionInput)}" style="margin-top:8px;">
+        <br><button class="btn-ghost" style="margin-top:8px;" id="btn-start-interview" ${!state.interviewPlayerPick || !state.interviewQuestionInput.trim() ? "disabled":""}>Начать интервью</button>
+      </div>`;
+
+    return `
+      ${statusRow}${emotionsRow}${rolesGrid}
+      <div class="sleep-box">
+        <div style="font-size:1.6rem;margin-bottom:8px;">☾</div>
+        <p style="color:var(--muted);font-size:.9rem;margin-bottom:16px;">Город спит. Мафия сделала выбор.</p>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:12px;text-align:left;font-size:.8rem;margin-bottom:16px;max-height:150px;overflow-y:auto;">
+          <strong>Сводка за день:</strong><br>
+          <span style="white-space:pre-wrap;">${esc(summary)}</span>
+        </div>
+        ${interviewBox}
+        <button class="btn-primary" style="width:auto;padding:10px 20px;margin-top:12px;" id="btn-morning">Наступает утро</button>
+      </div>`;
+  }
+
+  const actor = currentActor();
+  const manualBox = state.manualNeeded ? `
+    <div class="manual-box">
+      <p>Команда «${esc(state.manualNeeded.command)}» не распознана автоматически. Выбери цель вручную:</p>
+      <select id="manual-select">
+        <option value="">— выбери игрока —</option>
+        ${(state.manualNeeded.command==="ГОЛОС" ? state.players.filter(p=>state.nominees.includes(p.id)) : state.players.filter(p=>p.alive && p.id!==currentActor()?.id))
+          .map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}
+      </select>
+      <br><button class="btn-ghost" id="btn-confirm-manual" ${!state.manualPick?"disabled":""}>Подтвердить выбор</button>
+    </div>` : "";
+
+  const promptText = generatePrompt();
+
+  return `
+    ${statusRow}${emotionsRow}${rolesGrid}
+    <div class="actor-line">Сейчас ходит: <span class="actor-name">${esc(actor?.name||"")}</span>
+      <span style="color:var(--muted2);"> (${state.turnIdx+1}/${state.turnQueue.length})</span></div>
+
+    <div class="field">
+      <div class="flex-between">
+        <label class="eyebrow" style="margin:0;color:var(--muted);">Промт для копирования</label>
+        <button class="btn-ghost" id="btn-copy">${state.copied?"✓ Скопировано":"⧉ Копировать"}</button>
+      </div>
+      <textarea class="mono" rows="5" readonly>${esc(promptText)}</textarea>
+    </div>
+
+    <div class="field">
+      <label class="eyebrow" style="color:var(--muted);">Ответ модели</label>
+      <textarea class="mono" rows="4" id="answer-input" placeholder="Вставь сюда ответ, скопированный из чата модели…">${esc(state.inputText)}</textarea>
+      <button class="btn-primary" style="margin-top:8px;" id="btn-submit" ${!state.inputText.trim()?"disabled":""}>Отправить</button>
+    </div>
+    ${manualBox}
+  `;
+}
+
+function renderLog(){
+  const rolesTable = state.started ? `
+    <div class="roles-grid" style="grid-template-columns:1fr 1fr;">
+      ${state.players.map(p => `<div class="${p.alive?"":"dead"}">${esc(p.name)} — ${(state.gameOver || !p.alive) ? esc(p.role) : "?"}</div>`).join("")}
+    </div>
+    <p style="color:var(--muted);font-size:.8rem;margin:6px 0 14px;">Сеттинг: «${esc(state.setting)}»</p>
+  ` : "";
+
+  const filteredLogs = state.log.filter(e => state.showPrivateLogs || !e.private);
+  const entries = filteredLogs.map(e => {
+    const tag = `[Круг ${e.round} · ${e.cyclePhase==="day"?"День":"Ночь"}${e.tag?" · "+esc(e.tag):""}]`;
+    const privateClass = e.private ? " private" : "";
+    if(e.system) return `<div class="log-entry system${privateClass}"><span class="log-tag">${tag}</span> ${esc(e.text)}</div>`;
+    const emoTag = e.emotion ? ` <span style="color:var(--amber);">[${esc(e.emotion)}]</span>` : "";
+    return `<div class="log-entry${privateClass}"><span class="log-tag">${tag}</span> <span class="log-actor">${esc(e.actor)}${e.role?" ("+esc(e.role)+")":""}${emoTag}:</span> ${esc(e.text)}</div>`;
+  }).join("") || `<p style="color:var(--muted2);">Записей пока нет.</p>`;
+
+  return `
+    <div class="flex-between">
+      <label class="eyebrow" style="margin:0;">Протокол игры</label>
+      <div>
+        <button class="btn-ghost" id="btn-toggle-private">${state.showPrivateLogs ? "🙈 Скрыть приватные" : "👁 Показать приватные"}</button>
+        <button class="btn-ghost" id="btn-download" ${state.log.length===0?"disabled":""}>⭳ Скачать .txt</button>
+      </div>
+    </div>
+    ${rolesTable}
+    <div class="log-panel mono">${entries}</div>
+    <textarea class="mono" style="margin-top:12px;" rows="4" readonly placeholder="Полный текст протокола (с учётом фильтра)…">${esc(logAsText(state.showPrivateLogs))}</textarea>
+  `;
+}
+
+function wireEvents(){
+  const $ = (sel) => document.querySelector(sel);
+
+  const nameInput = $("#name-input");
+  if(nameInput){
+    nameInput.oninput = (e) => { state.nameInput = e.target.value; };
+    nameInput.onkeydown = (e) => { if(e.key==="Enter") addPlayer(); };
+  }
+  const settingInput = $("#setting-input");
+  if(settingInput) settingInput.oninput = (e) => {
+    state.setting = e.target.value;
+    const btn = $("#btn-start");
+    if(btn) btn.disabled = state.started || state.players.length<4 || !state.setting.trim();
+  };
+
+  const btnAdd = $("#btn-add"); if(btnAdd) btnAdd.onclick = () => { addPlayer(); };
+  document.querySelectorAll("[data-remove]").forEach(el => {
+    el.onclick = () => removePlayer(Number(el.getAttribute("data-remove")));
+  });
+  document.querySelectorAll("[data-preset]").forEach(el => {
+    el.onclick = () => set({ setting: el.getAttribute("data-preset") });
+  });
+
+  // FIX: обработка переключателя режима ролей
+  document.querySelectorAll('input[name="role-mode"]').forEach(el => {
+    el.onchange = (e) => {
+      if(!state.started) {
+        state.roleAssignmentMode = e.target.value;
+        render();
+      }
+    };
+  });
+
+  // FIX: обработка ручного выбора роли
+  document.querySelectorAll('[data-role-player]').forEach(sel => {
+    sel.onchange = (e) => {
+      const playerId = Number(e.target.getAttribute('data-role-player'));
+      const role = e.target.value;
+      const player = byId(playerId);
+      if(player) {
+        player.role = role || null;
+        // обновляем кнопку старта
+        const btn = $("#btn-start");
+        if(btn) btn.disabled = state.started || state.players.length<4 || !state.setting.trim() || state.players.some(p => p.role === null);
+      }
+    };
+  });
+
+  const useSheriff = $("#use-sheriff");
+  if(useSheriff) useSheriff.onchange = (e) => { state.useSheriff = e.target.checked; };
+
+  const btnStart = $("#btn-start"); if(btnStart) btnStart.onclick = startGame;
+  const btnReset = $("#btn-reset"); if(btnReset) btnReset.onclick = resetAll;
+
+  const btnToggleRoles = $("#btn-toggle-roles");
+  if(btnToggleRoles) btnToggleRoles.onclick = () => set({ showRoles: !state.showRoles });
+
+  const btnMorning = $("#btn-morning"); if(btnMorning) btnMorning.onclick = resolveMorning;
+  const btnCopy = $("#btn-copy"); if(btnCopy) btnCopy.onclick = copyPrompt;
+
+  const interviewPlayerSelect = $("#interview-player-select");
+  if(interviewPlayerSelect) interviewPlayerSelect.onchange = (e) => {
+    state.interviewPlayerPick = e.target.value;
+    const btn = $("#btn-start-interview");
+    if(btn) btn.disabled = !state.interviewPlayerPick || !state.interviewQuestionInput.trim();
+  };
+  const interviewQuestionInput = $("#interview-question-input");
+  if(interviewQuestionInput) interviewQuestionInput.oninput = (e) => {
+    state.interviewQuestionInput = e.target.value;
+    const btn = $("#btn-start-interview");
+    if(btn) btn.disabled = !state.interviewPlayerPick || !state.interviewQuestionInput.trim();
+  };
+  const btnStartInterview = $("#btn-start-interview"); if(btnStartInterview) btnStartInterview.onclick = startInterview;
+  const btnCancelInterview = $("#btn-cancel-interview"); if(btnCancelInterview) btnCancelInterview.onclick = cancelInterview;
+  const btnCopyInterview = $("#btn-copy-interview");
+  if(btnCopyInterview) btnCopyInterview.onclick = () => {
+    const text = generateInterviewPrompt();
+    const done = () => {};
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+    else fallbackCopy(text, done);
+  };
+  const interviewAnswerInput = $("#interview-answer-input");
+  if(interviewAnswerInput) interviewAnswerInput.oninput = (e) => {
+    state.interviewAnswerInput = e.target.value;
+    const btn = $("#btn-submit-interview");
+    if(btn) btn.disabled = !e.target.value.trim();
+  };
+  const btnSubmitInterview = $("#btn-submit-interview"); if(btnSubmitInterview) btnSubmitInterview.onclick = submitInterviewAnswer;
+
+  const answerInput = $("#answer-input");
+  if(answerInput){
+    answerInput.oninput = (e) => { state.inputText = e.target.value; $("#btn-submit").disabled = !e.target.value.trim(); };
+  }
+  const btnSubmit = $("#btn-submit"); if(btnSubmit) btnSubmit.onclick = submitStep;
+
+  const manualSelect = $("#manual-select");
+  if(manualSelect){
+    manualSelect.onchange = (e) => { state.manualPick = e.target.value; $("#btn-confirm-manual").disabled = !e.target.value; };
+  }
+  const btnConfirmManual = $("#btn-confirm-manual"); if(btnConfirmManual) btnConfirmManual.onclick = confirmManualPick;
+
+  const btnDownload = $("#btn-download"); if(btnDownload) btnDownload.onclick = downloadLog;
+
+  const btnTogglePrivate = $("#btn-toggle-private");
+  if(btnTogglePrivate) btnTogglePrivate.onclick = () => set({ showPrivateLogs: !state.showPrivateLogs });
+}
+
+render();
+</script>
+</body>
+</html>

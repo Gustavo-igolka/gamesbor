@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Мозаика — три в ряд</title>
+<style>
+:root{
+  --bg:#12202b; --panel:#1b2f3e; --panel2:#26404f; --ink:#f3ecdc; --mute:#8fa5b3; --accent:#f2b632; --accent-ink:#2a1e00;
+  --cell-a:#20384a; --cell-b:#1a2f3f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;
+  user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+#app{position:fixed;inset:0;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+.screen.active{display:flex}
+
+/* ---------- Menu ---------- */
+#menu{align-items:center;justify-content:center;overflow:auto}
+.menu-inner{width:min(92vw,400px);padding:24px 0;display:flex;flex-direction:column;gap:18px}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(46px,15vw,76px);line-height:1;margin:0;text-align:center;letter-spacing:.5px}
+.sub{margin:-6px 0 0;text-align:center;color:var(--mute);font-size:16px}
+.shapes{display:flex;justify-content:center;gap:10px;margin:2px 0 6px}
+.sh{position:relative;width:38px;height:38px}
+.sh .g{animation:born .5s both}
+.group{display:flex;flex-direction:column;gap:8px}
+.lbl{color:var(--mute);font-size:14px}
+.seg{display:flex;background:var(--panel);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;padding:12px 6px;border-radius:10px;font-size:16px;color:var(--mute);transition:background .15s,color .15s}
+.seg button.on{background:var(--panel2);color:var(--ink);box-shadow:inset 0 0 0 2px var(--accent)}
+.row{flex-direction:row;align-items:center;justify-content:space-between;background:var(--panel);border-radius:14px;padding:10px 14px}
+.switch{width:54px;height:30px;border-radius:15px;background:#3a5264;position:relative;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch[aria-pressed="true"]{background:#2a9d8f}
+.switch[aria-pressed="true"]::after{transform:translateX(24px)}
+.play{background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:22px;padding:16px;border-radius:16px;
+  box-shadow:0 5px 0 #b8861a;transition:transform .08s,box-shadow .08s}
+.play:active{transform:translateY(4px);box-shadow:0 1px 0 #b8861a}
+.ghost{padding:10px 14px;border-radius:12px;color:var(--mute);font-size:15px;background:var(--panel)}
+.ghost:active{background:var(--panel2)}
+.links{display:flex;justify-content:center}
+.best{margin:0;text-align:center;color:var(--mute);font-size:15px;min-height:1.3em}
+
+/* ---------- Game ---------- */
+#game{padding-left:12px;padding-right:12px}
+#game header{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;gap:8px}
+.modeName{color:var(--mute);font-size:15px;text-align:center;flex:1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:4px 0 10px}
+.stat{background:var(--panel);border-radius:12px;padding:8px 6px;text-align:center}
+.stat small{display:block;color:var(--mute);font-size:12px}
+.stat b{font-size:24px;font-variant-numeric:tabular-nums}
+.stat.low b{color:#ff8a6b}
+.boardWrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding-bottom:12px}
+#board{position:relative;border-radius:14px;overflow:hidden;touch-action:none;
+  background:repeating-conic-gradient(var(--cell-a) 0% 25%,var(--cell-b) 0% 50%) 0 0/calc(var(--s)*2) calc(var(--s)*2);
+  box-shadow:0 0 0 4px var(--panel),0 12px 30px rgba(0,0,0,.35)}
+.tile{position:absolute;left:0;top:0;transition-property:transform;transition-timing-function:cubic-bezier(.3,.75,.35,1);will-change:transform}
+
+/* Фишки: у каждого цвета своя форма */
+.g{position:absolute;inset:7%;transition:transform .12s;
+  background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.55),rgba(255,255,255,0) 42%),linear-gradient(150deg,var(--l),var(--b) 65%)}
+.c0{--b:#e4572e;--l:#ff9d78;clip-path:circle(50%)}
+.c1{--b:#e8a317;--l:#ffd770;clip-path:inset(4% round 24%)}
+.c2{--b:#1f9486;--l:#62d6c6;clip-path:polygon(50% 3%,97% 92%,3% 92%)}
+.c3{--b:#3a78d6;--l:#8fbcff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.c4{--b:#8a4fd3;--l:#c59bff;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)}
+.c5{--b:#6fa812;--l:#b9ec5b;clip-path:polygon(50% 0%,62% 35%,98% 36%,69% 58%,80% 93%,50% 72%,20% 93%,31% 58%,2% 36%,38% 35%)}
+.cb{clip-path:circle(50%);background:conic-gradient(#e4572e,#f2b632,#6fa812,#1f9486,#3a78d6,#8a4fd3,#e4572e)}
+.cb::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,#fff 0 17%,rgba(255,255,255,0) 19%)}
+.xs::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(#fff,#fff) 50% 55%/60% 15% no-repeat,linear-gradient(#fff,#fff) 50% 55%/15% 60% no-repeat;opacity:.95}
+.g.sel{transform:scale(1.14)}
+.g.pop{animation:pop .24s ease-in forwards}
+.g.born{animation:born .35s ease-out}
+.g.hint{animation:hint .8s ease-in-out infinite}
+@keyframes pop{30%{transform:scale(1.25);filter:brightness(1.6)}to{transform:scale(0);opacity:0}}
+@keyframes born{from{transform:scale(.2);opacity:0}60%{transform:scale(1.25)}to{transform:scale(1);opacity:1}}
+@keyframes hint{50%{transform:scale(1.18)}}
+.float{position:absolute;font-weight:800;font-size:22px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6);pointer-events:none;
+  animation:floatUp .9s ease-out forwards;white-space:nowrap}
+@keyframes floatUp{from{transform:translate(-50%,-50%) scale(.7);opacity:0}15%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}to{transform:translate(-50%,-180%);opacity:0}}
+#toast{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(10,18,25,.92);padding:9px 16px;border-radius:20px;
+  font-size:15px;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;z-index:5}
+#toast.on{opacity:1}
+
+/* ---------- Overlays ---------- */
+.overlay{position:absolute;inset:0;background:rgba(8,14,20,.78);display:none;align-items:center;justify-content:center;z-index:10;padding:20px}
+.overlay.on{display:flex}
+.card{background:var(--panel);border-radius:20px;padding:24px;width:min(100%,360px);display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.card h2{margin:0;font-family:Georgia,serif;font-size:30px;text-align:center}
+.card p{margin:0;color:var(--mute);line-height:1.45;font-size:15px}
+.card .big{font-size:56px;font-weight:800;text-align:center;color:var(--ink);line-height:1.1;font-variant-numeric:tabular-nums}
+.card .rec{text-align:center;color:var(--accent);font-weight:700}
+.card .btn{padding:14px;border-radius:14px;background:var(--panel2);font-size:17px}
+.card .btn.main{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.help li{margin-bottom:8px;color:var(--ink);line-height:1.4;font-size:15px}
+.help ul{margin:0;padding-left:18px}
+.legend{display:flex;gap:6px;justify-content:center}
+.legend .sh{width:30px;height:30px}
+@media (prefers-reduced-motion:reduce){.g.hint{animation:none;outline:3px solid #fff}.sh .g{animation:none}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- МЕНЮ -->
+  <section id="menu" class="screen active">
+    <div class="menu-inner">
+      <h1>Мозаика</h1>
+      <p class="sub">Три в ряд</p>
+      <div class="shapes" id="shapes" aria-hidden="true"></div>
+
+      <div class="group">
+        <div class="lbl">Режим</div>
+        <div class="seg" id="segMode">
+          <button data-v="moves">25 ходов</button>
+          <button data-v="time">60 секунд</button>
+          <button data-v="free">Без лимита</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="lbl">Сложность</div>
+        <div class="seg" id="segColors">
+          <button data-v="4">Легко</button>
+          <button data-v="5">Средне</button>
+          <button data-v="6">Сложно</button>
+        </div>
+      </div>
+
+      <div class="group row"><span>Звук</span><button class="switch" id="sw" aria-pressed="true" aria-label="Звук"></button></div>
+
+      <button class="play" id="play">Играть</button>
+      <div class="links"><button class="ghost" id="helpBtn">Как играть</button></div>
+      <p class="best" id="menuBest"></p>
+    </div>
+  </section>
+
+  <!-- ИГРА -->
+  <section id="game" class="screen">
+    <header>
+      <button class="ghost" id="menuBtn">Меню</button>
+      <div class="modeName" id="modeName"></div>
+      <button class="ghost" id="hintBtn">Подсказка</button>
+    </header>
+    <div class="stats">
+      <div class="stat"><small>Очки</small><b id="vScore">0</b></div>
+      <div class="stat" id="statMid"><small id="lMid">Ходы</small><b id="vMid">0</b></div>
+      <div class="stat"><small>Рекорд</small><b id="vBest">0</b></div>
+    </div>
+    <div class="boardWrap"><div id="board"></div></div>
+    <div id="toast"></div>
+  </section>
+
+  <!-- Пауза -->
+  <div class="overlay" id="pauseOv">
+    <div class="card">
+      <h2>Пауза</h2>
+      <button class="btn main" id="resumeBtn">Продолжить</button>
+      <button class="btn" id="restartBtn">Начать заново</button>
+      <button class="btn" id="toMenuBtn">В меню</button>
+    </div>
+  </div>
+
+  <!-- Конец игры -->
+  <div class="overlay" id="overOv">
+    <div class="card">
+      <h2 id="overTitle">Игра окончена</h2>
+      <div class="big" id="overScore">0</div>
+      <div class="rec" id="overRec"></div>
+      <button class="btn main" id="againBtn">Играть снова</button>
+      <button class="btn" id="overMenuBtn">В меню</button>
+    </div>
+  </div>
+
+  <!-- Правила -->
+  <div class="overlay" id="helpOv">
+    <div class="card help">
+      <h2>Как играть</h2>
+      <ul>
+        <li>Меняй местами соседние фишки — проведи пальцем или коснись двух по очереди.</li>
+        <li>Собери три и больше одинаковых в ряд или в столбец, и они исчезнут.</li>
+        <li>Четыре в ряд (или угол из шести) даёт фишку с плюсом: она убирает всю свою строку и столбец.</li>
+        <li>Пять в ряд даёт радужную фишку: поменяй её с любой соседней, и с поля пропадут все фишки того цвета.</li>
+        <li>Фишки различаются и цветом, и формой.</li>
+      </ul>
+      <div class="legend" id="legend" aria-hidden="true"></div>
+      <button class="btn main" id="helpClose">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const N = 8;
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = n => Math.floor(Math.random() * n);
+const board = $('#board');
+
+/* ---------- Настройки и рекорды ---------- */
+const cfg = { mode: 'moves', colors: 5, sound: true };
+try { Object.assign(cfg, JSON.parse(localStorage.getItem('mosaic-cfg') || '{}')); } catch (e) {}
+const saveCfg = () => { try { localStorage.setItem('mosaic-cfg', JSON.stringify(cfg)); } catch (e) {} };
+const bestKey = () => 'mosaic-best-' + cfg.mode + cfg.colors;
+const getBest = () => { try { return +localStorage.getItem(bestKey()) || 0; } catch (e) { return 0; } };
+const setBest = v => { try { localStorage.setItem(bestKey(), v); } catch (e) {} };
+
+/* ---------- Звук ---------- */
+let ac = null;
+function initAudio() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (ac && ac.state === 'suspended') ac.resume();
+}
+function tone(f, d = .12, type = 'sine', v = .08, when = 0) {
+  if (!cfg.sound || !ac) return;
+  const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + when;
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + d + .02);
+}
+const sfx = {
+  swap() { tone(330, .08, 'sine', .05); },
+  match(c) { tone(392 * Math.pow(1.122, Math.min(c, 8) * 2), .16, 'triangle', .09); },
+  bad() { tone(160, .16, 'square', .04); },
+  special() { [523, 659, 784, 1046].forEach((f, i) => tone(f, .2, 'triangle', .07, i * .06)); },
+  over() { [523, 440, 349, 262].forEach((f, i) => tone(f, .25, 'triangle', .07, i * .12)); },
+  tap() { tone(520, .05, 'sine', .04); }
+};
+
+/* ---------- Меню ---------- */
+const screens = { menu: $('#menu'), game: $('#game') };
+function show(name) { for (const k in screens) screens[k].classList.toggle('active', k === name); }
+
+function paintShapes(el, size) {
+  el.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const s = document.createElement('div'); s.className = 'sh';
+    s.style.width = s.style.height = size + 'px';
+    const g = document.createElement('div'); g.className = 'g c' + i; g.style.inset = '0';
+    g.style.animationDelay = (i * 0.07) + 's';
+    s.appendChild(g); el.appendChild(s);
+  }
+}
+paintShapes($('#shapes'), 38);
+paintShapes($('#legend'), 30);
+
+function syncMenu() {
+  document.querySelectorAll('#segMode button').forEach(b => b.classList.toggle('on', b.dataset.v === cfg.mode));
+  document.querySelectorAll('#segColors button').forEach(b => b.classList.toggle('on', +b.dataset.v === cfg.colors));
+  $('#sw').setAttribute('aria-pressed', cfg.sound);
+  const b = getBest();
+  $('#menuBest').textContent = b ? 'Рекорд в этом режиме: ' + b : 'Рекорда в этом режиме пока нет';
+}
+$('#segMode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cfg.mode = b.dataset.v; saveCfg(); syncMenu(); });
+$('#segColors').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cfg.colors = +b.dataset.v; saveCfg(); syncMenu(); });
+$('#sw').addEventListener('click', () => { cfg.sound = !cfg.sound; saveCfg(); initAudio(); sfx.tap(); syncMenu(); });
+$('#helpBtn').addEventListener('click', () => $('#helpOv').classList.add('on'));
+$('#helpClose').addEventListener('click', () => $('#helpOv').classList.remove('on'));
+$('#play').addEventListener('click', () => { initAudio(); startGame(); });
+
+/* ---------- Состояние игры ---------- */
+let S = 48, K = 5, grid = [], uid = 0;
+let score = 0, movesLeft = 0, movesMade = 0, time = 60, best = 0;
+let running = false, paused = false, busy = false, lastSwap = null;
+let selected = null, hintTimer = null;
+
+const modeTitle = { moves: '25 ходов', time: '60 секунд', free: 'Без лимита' };
+
+const pos = (r, c) => `translate(${c * S}px,${r * S}px)`;
+function place(t, dist = 1, dur) {
+  t.el.style.transitionDuration = (dur !== undefined ? dur : .13 + .055 * dist) + 's';
+  t.el.style.transform = pos(t.r, t.c);
+}
+function draw(t) {
+  const g = t.el.firstChild;
+  g.className = 'g ' + (t.special === 'color' ? 'cb' : 'c' + t.color) + (t.special === 'cross' ? ' xs' : '');
+}
+function mk(color, r, c, fromR) {
+  const t = { color, special: null, r, c };
+  const el = document.createElement('div');
+  el.className = 'tile'; el.innerHTML = '<div class="g"></div>';
+  el.style.width = el.style.height = S + 'px';
+  el._t = t; t.el = el; draw(t);
+  el.style.transitionDuration = '0s';
+  el.style.transform = pos(fromR !== undefined ? fromR : r, c);
+  board.appendChild(el);
+  if (fromR !== undefined) { void el.offsetWidth; place(t, r - fromR); }
+  return t;
+}
+
+function layout() {
+  const wrap = document.querySelector('.boardWrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  S = Math.max(24, Math.floor(Math.min(w, h) / N));
+  board.style.width = board.style.height = (S * N) + 'px';
+  board.style.setProperty('--s', S + 'px');
+  grid.forEach(row => row.forEach(t => {
+    if (!t) return;
+    t.el.style.width = t.el.style.height = S + 'px';
+    place(t, 0, 0);
+  }));
+}
+window.addEventListener('resize', () => { if (screens.game.classList.contains('active')) layout(); });
+
+/* ---------- Логика поля ---------- */
+const tm = () => grid.map(row => row.map(t => t ? t.color : -2));
+
+function anyRun(m) {
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const v = m[r][c]; if (v < 0) continue;
+    if (c + 2 < N && m[r][c + 1] === v && m[r][c + 2] === v) return true;
+    if (r + 2 < N && m[r + 1][c] === v && m[r + 2][c] === v) return true;
+  }
+  return false;
+}
+function swapPairs(m) {
+  const out = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) for (const [dr, dc] of [[0, 1], [1, 0]]) {
+    const r2 = r + dr, c2 = c + dc; if (r2 >= N || c2 >= N) continue;
+    const a = m[r][c], b = m[r2][c2]; if (a < 0 && b < 0) continue;
+    m[r][c] = b; m[r2][c2] = a;
+    if (anyRun(m)) out.push([r, c, r2, c2]);
+    m[r][c] = a; m[r2][c2] = b;
+  }
+  return out;
+}
+function findRuns() {
+  const runs = [];
+  for (let r = 0; r < N; r++) {
+    let c = 0;
+    while (c < N) {
+      const t = grid[r][c];
+      if (!t || t.color < 0) { c++; continue; }
+      let e = c + 1;
+      while (e < N && grid[r][e] && grid[r][e].color === t.color) e++;
+      if (e - c >= 3) runs.push({ dir: 'h', cells: grid[r].slice(c, e) });
+      c = e;
+    }
+  }
+  for (let c = 0; c < N; c++) {
+    let r = 0;
+    while (r < N) {
+      const t = grid[r][c];
+      if (!t || t.color < 0) { r++; continue; }
+      let e = r + 1;
+      while (e < N && grid[e][c] && grid[e][c].color === t.color) e++;
+      if (e - r >= 3) { const cells = []; for (let i = r; i < e; i++) cells.push(grid[i][c]); runs.push({ dir: 'v', cells }); }
+      r = e;
+    }
+  }
+  return runs;
+}
+function hasBomb() { return grid.some(row => row.some(t => t && t.special === 'color')); }
+function hasAnyMove() { return hasBomb() || swapPairs(tm()).length > 0; }
+
+function findHint() {
+  const cand = swapPairs(tm()).map(([r, c, r2, c2]) => [grid[r][c], grid[r2][c2]]);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const t = grid[r][c];
+    if (t && t.special === 'color') {
+      for (const [dr, dc] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+        const o = grid[r + dr] && grid[r + dr][c + dc]; if (o) cand.push([t, o]);
+      }
+    }
+  }
+  return cand.length ? cand[rnd(cand.length)] : null;
+}
+function clearHint() { clearTimeout(hintTimer); board.querySelectorAll('.g.hint').forEach(g => g.classList.remove('hint')); }
+function scheduleHint() { clearTimeout(hintTimer); hintTimer = setTimeout(showHint, 6000); }
+function showHint() {
+  if (!running || paused || busy) return;
+  clearHint();
+  const p = findHint(); if (!p) return;
+  p.forEach(t => t.el.firstChild.classList.add('hint'));
+}
+
+/* ---------- Ввод ---------- */
+function select(t) { deselect(); selected = t; t.el.firstChild.classList.add('sel'); sfx.tap(); }
+function deselect() { if (selected) selected.el.firstChild.classList.remove('sel'); selected = null; }
+const adjacent = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
+
+let drag = null;
+board.addEventListener('pointerdown', e => {
+  if (busy || !running || paused) return;
+  initAudio();
+  const el = e.target.closest('.tile'); if (!el) return;
+  drag = { t: el._t, x: e.clientX, y: e.clientY, moved: false };
+  clearHint();
+});
+board.addEventListener('pointermove', e => {
+  if (!drag || drag.moved || busy) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < S * .35) return;
+  drag.moved = true;
+  let dr = 0, dc = 0;
+  if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1; else dr = dy > 0 ? 1 : -1;
+  const t = drag.t, o = grid[t.r + dr] && grid[t.r + dr][t.c + dc];
+  drag = null;
+  if (o) attempt(t, o);
+});
+board.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const t = drag.t, moved = drag.moved; drag = null;
+  if (moved || busy || !running || paused) return;
+  if (!selected) select(t);
+  else if (selected === t) deselect();
+  else if (adjacent(selected, t)) { const s = selected; deselect(); attempt(s, t); }
+  else select(t);
+  if (!busy) scheduleHint();
+});
+board.addEventListener('pointercancel', () => { drag = null; });
+
+/* ---------- Ход ---------- */
+function swapTiles(a, b) {
+  const ar = a.r, ac2 = a.c;
+  grid[a.r][a.c] = b; grid[b.r][b.c] = a;
+  a.r = b.r; a.c = b.c; b.r = ar; b.c = ac2;
+  place(a, 1, .17); place(b, 1, .17);
+}
+
+async function attempt(a, b) {
+  if (busy || !running || paused) return;
+  if (cfg.mode === 'time' && time <= 0) return;
+  busy = true; clearHint(); deselect();
+  lastSwap = [a, b];
+  swapTiles(a, b); sfx.swap(); await sleep(185);
+
+  const pre = new Set(), targets = new Map();
+  const ca = a.special === 'color', cb = b.special === 'color';
+  if (ca && cb) { pre.add(a); pre.add(b); targets.set(a, -1); targets.set(b, -1); }
+  else if (ca) { pre.add(a); targets.set(a, b.color); }
+  else if (cb) { pre.add(b); targets.set(b, a.color); }
+  else { if (a.special === 'cross') pre.add(a); if (b.special === 'cross') pre.add(b); }
+
+  if (!pre.size && !findRuns().length) {
+    swapTiles(a, b); sfx.bad(); await sleep(185);
+    lastSwap = null; busy = false; scheduleHint(); return;
+  }
+  if (cfg.mode === 'moves') movesLeft--;
+  movesMade++; hud();
+  await resolve(pre, targets);
+  await afterResolve();
+}
+
+function dominantColor() {
+  const cnt = new Array(K).fill(0);
+  grid.forEach(row => row.forEach(t => { if (t && t.color >= 0) cnt[t.color]++; }));
+  return cnt.indexOf(Math.max(...cnt));
+}
+function expand(clear, targets) {
+  const q = [...clear].filter(t => t.special), done = new Set();
+  while (q.length) {
+    const t = q.pop(); if (done.has(t)) continue; done.add(t);
+    const add = [];
+    if (t.special === 'cross') {
+      for (let i = 0; i < N; i++) { add.push(grid[t.r][i]); add.push(grid[i][t.c]); }
+    } else if (t.special === 'color') {
+      let col = targets.get(t); if (col === undefined) col = dominantColor();
+      grid.forEach(row => row.forEach(x => { if (x && (col === -1 || x.color === col)) add.push(x); }));
+    }
+    for (const x of add) if (x && !clear.has(x)) { clear.add(x); if (x.special) q.push(x); }
+  }
+}
+
+function floatText(txt, r, c) {
+  const f = document.createElement('div'); f.className = 'float'; f.textContent = txt;
+  f.style.left = ((c + .5) * S) + 'px'; f.style.top = ((r + .5) * S) + 'px';
+  board.appendChild(f); setTimeout(() => f.remove(), 950);
+}
+
+async function resolve(pre = new Set(), targets = new Map()) {
+  let combo = 0;
+  while (true) {
+    const runs = findRuns();
+    const clear = new Set(pre), make = new Map();
+    const inH = new Set(), inV = new Set();
+    for (const run of runs) {
+      run.cells.forEach(t => { clear.add(t); (run.dir === 'h' ? inH : inV).add(t); });
+      if (run.cells.length >= 4) {
+        const t = run.cells.find(x => lastSwap && lastSwap.includes(x)) || run.cells[run.cells.length >> 1];
+        const type = run.cells.length >= 5 ? 'color' : 'cross';
+        if (!make.has(t) || type === 'color') make.set(t, type);
+      }
+    }
+    inH.forEach(t => { if (inV.has(t) && !make.has(t)) make.set(t, 'cross'); });
+    pre = new Set();
+    if (!clear.size) break;
+
+    expand(clear, targets); targets = new Map();
+    make.forEach((_, t) => clear.delete(t));
+    combo++;
+
+    let sr = 0, sc = 0;
+    clear.forEach(t => { sr += t.r; sc += t.c; });
+    const n = Math.max(1, clear.size);
+    const gain = clear.size * 10 * combo + make.size * 40;
+    score += gain; hud();
+    floatText('+' + gain + (combo > 1 ? '  ×' + combo : ''), sr / n, sc / n);
+
+    clear.forEach(t => t.el.firstChild.classList.add('pop'));
+    make.forEach((type, t) => {
+      t.special = type; if (type === 'color') t.color = -1;
+      draw(t); t.el.firstChild.classList.add('born');
+    });
+    make.size ? sfx.special() : sfx.match(combo);
+    await sleep(250);
+    clear.forEach(t => { t.el.remove(); if (grid[t.r][t.c] === t) grid[t.r][t.c] = null; });
+    lastSwap = null;
+    gravity();
+    await sleep(340);
+  }
+}
+
+function gravity() {
+  for (let c = 0; c < N; c++) {
+    let w = N - 1;
+    for (let r = N - 1; r >= 0; r--) {
+      const t = grid[r][c];
+      if (t) {
+        if (r !== w) { grid[w][c] = t; grid[r][c] = null; const d = w - r; t.r = w; place(t, d); }
+        w--;
+      }
+    }
+    const k = w + 1;
+    for (let r = w; r >= 0; r--) grid[r][c] = mk(rnd(K), r, c, r - k);
+  }
+}
+
+async function afterResolve() {
+  lastSwap = null;
+  if (cfg.mode === 'moves' && movesLeft <= 0) { endGame(); return; }
+  if (cfg.mode === 'time' && time <= 0) { endGame(); return; }
+  if (!hasAnyMove()) { await shuffleBoard(); }
+  busy = false; scheduleHint();
+}
+
+async function shuffleBoard() {
+  toast('Ходов нет — перемешиваем');
+  await sleep(500);
+  const tiles = []; grid.forEach(row => row.forEach(t => { if (t) tiles.push(t); }));
+  let tries = 0;
+  do {
+    tiles.forEach(t => { if (t.special !== 'color') t.color = rnd(K); });
+    tries++;
+  } while (tries < 200 && (anyRun(tm()) || (!hasBomb() && !swapPairs(tm()).length)));
+  tiles.forEach(t => { draw(t); t.el.firstChild.classList.add('born'); });
+  sfx.special();
+  await sleep(450);
+}
+
+/* ---------- Интерфейс игры ---------- */
+let toastT;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1700);
+}
+function hud() {
+  $('#vScore').textContent = score;
+  $('#vBest').textContent = Math.max(best, score);
+  const mid = $('#vMid'), box = $('#statMid');
+  box.classList.remove('low');
+  if (cfg.mode === 'moves') { $('#lMid').textContent = 'Осталось ходов'; mid.textContent = Math.max(0, movesLeft); if (movesLeft <= 5) box.classList.add('low'); }
+  else if (cfg.mode === 'time') { $('#lMid').textContent = 'Время'; mid.textContent = Math.ceil(time); if (time <= 10) box.classList.add('low'); }
+  else { $('#lMid').textContent = 'Ходов сделано'; mid.textContent = movesMade; }
+}
+
+function startGame() {
+  K = cfg.colors; best = getBest();
+  score = 0; movesMade = 0; movesLeft = 25; time = 60;
+  running = true; paused = false; busy = true; lastSwap = null; selected = null;
+  ['pauseOv', 'overOv', 'helpOv'].forEach(id => $('#' + id).classList.remove('on'));
+  $('#modeName').textContent = modeTitle[cfg.mode] + ' · ' + ['', '', '', '', 'легко', 'средне', 'сложно'][K];
+  show('game');
+  board.innerHTML = ''; grid = [];
+  layout();
+
+  let m;
+  do {
+    m = [];
+    for (let r = 0; r < N; r++) {
+      const row = [];
+      for (let c = 0; c < N; c++) {
+        let v;
+        do { v = rnd(K); } while ((c >= 2 && row[c - 1] === v && row[c - 2] === v) || (r >= 2 && m[r - 1][c] === v && m[r - 2][c] === v));
+        row.push(v);
+      }
+      m.push(row);
+    }
+  } while (!swapPairs(m).length);
+
+  for (let r = 0; r < N; r++) {
+    grid.push([]);
+    for (let c = 0; c < N; c++) grid[r].push(mk(m[r][c], r, c, r - N - (N - c) * .3));
+  }
+  hud();
+  setTimeout(() => { busy = false; scheduleHint(); }, 700);
+}
+
+function endGame() {
+  if (!running) return;
+  running = false; busy = true; clearHint(); deselect();
+  const isRec = score > best && score > 0;
+  if (isRec) { setBest(score); best = score; }
+  $('#overTitle').textContent = cfg.mode === 'time' ? 'Время вышло' : 'Ходы закончились';
+  $('#overScore').textContent = score;
+  $('#overRec').textContent = isRec ? 'Новый рекорд!' : (best ? 'Рекорд: ' + best : '');
+  sfx.over();
+  setTimeout(() => $('#overOv').classList.add('on'), 350);
+}
+
+function pauseGame() {
+  if (!running || paused) return;
+  paused = true; clearHint(); deselect();
+  $('#pauseOv').classList.add('on');
+}
+function resumeGame() { paused = false; $('#pauseOv').classList.remove('on'); if (!busy) scheduleHint(); }
+function toMenu() {
+  running = false; paused = false; busy = false; clearHint();
+  ['pauseOv', 'overOv'].forEach(id => $('#' + id).classList.remove('on'));
+  show('menu'); syncMenu();
+}
+
+$('#menuBtn').addEventListener('click', pauseGame);
+$('#hintBtn').addEventListener('click', () => { initAudio(); if (!busy) { clearHint(); showHint(); } });
+$('#resumeBtn').addEventListener('click', resumeGame);
+$('#restartBtn').addEventListener('click', startGame);
+$('#toMenuBtn').addEventListener('click', toMenu);
+$('#againBtn').addEventListener('click', startGame);
+$('#overMenuBtn').addEventListener('click', toMenu);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (paused) resumeGame(); else pauseGame(); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+
+setInterval(() => {
+  if (!running || paused || cfg.mode !== 'time' || time <= 0) return;
+  time = Math.max(0, time - .1); hud();
+  if (time <= 0 && !busy) endGame();
+}, 100);
+
+syncMenu();
+})();
+</script>
+</body>
+</html>
