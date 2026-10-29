@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Сборник игр</title>
+<style>
+  :root { --bg:#0e0f14; --card:#1a1c26; --acc:#7c5cff; --txt:#e8e9f0; --dim:#8b8fa3; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--txt); font-family:system-ui,sans-serif; }
+  header { padding:20px 16px 8px; }
+  h1 { margin:0 0 4px; font-size:24px; }
+  .sub { color:var(--dim); font-size:14px; }
+  #search { width:100%; margin-top:14px; padding:12px 14px; border-radius:12px; border:1px solid #2a2d3d;
+            background:var(--card); color:var(--txt); font-size:16px; outline:none; }
+  #search:focus { border-color:var(--acc); }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; padding:16px; }
+  .card { background:var(--card); border-radius:16px; padding:16px; cursor:pointer; border:1px solid transparent;
+          transition:transform .1s, border-color .15s; }
+  .card:active { transform:scale(.97); }
+  .card:hover { border-color:var(--acc); }
+  .emoji { font-size:34px; }
+  .title { font-weight:600; margin-top:8px; }
+  .desc { color:var(--dim); font-size:13px; margin-top:4px; }
+  .empty { color:var(--dim); text-align:center; padding:40px 16px; grid-column:1/-1; }
+
+  #player { display:none; position:fixed; inset:0; background:#000; z-index:10; }
+  #player iframe { width:100%; height:100%; border:0; background:#fff; }
+  #back { position:fixed; top:calc(env(safe-area-inset-top) + 8px); left:8px; z-index:11; display:none;
+          padding:8px 12px; border-radius:999px; border:0; background:rgba(0,0,0,.6); color:#fff;
+          font-size:14px; backdrop-filter:blur(6px); opacity:.75; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎮 Сборник игр</h1>
+  <div class="sub">RKC Studio</div>
+  <input id="search" type="search" placeholder="Поиск игры...">
+</header>
+
+<div id="grid"></div>
+
+<button id="back">← Меню</button>
+<div id="player"><iframe id="frame" allow="fullscreen; autoplay; gamepad"></iframe></div>
+
+<script>
+// ====== СПИСОК ИГР — добавляй сюда новые строки ======
+// file — путь к хтмлке относительно этого index.html
+const GAMES = [
+  { title: "Спагетти-Спидран", file: "games/spaghetti-speedrun.html", emoji: "🍝", desc: "Платформер-спидран" },
+  { title: "Отель «Закат»", file: "games/hotel-maze.html", emoji: "🏨", desc: "Хоррор, ночная смена" },
+  { title: "Казик «Блябуду Рояль»", file: "games/kazik-neo.html", emoji: "🎰", desc: "Слоты, шахматы, мины" },
+  { title: "Battle Simulator", file: "games/battle-simulator.html", emoji: "⚔️", desc: "Красные против Синих" },
+  { title: "Мозаика", file: "games/mozaika-match3.html", emoji: "💎", desc: "Три в ряд" },
+  { title: "Мафия · ИИ за столом", file: "games/mafia-gm.html", emoji: "🕵️", desc: "Ведущий для игры с ИИ" },
+  { title: "Симулятор электрощитка", file: "games/electric-panel.html", emoji: "⚡", desc: "Щёлкай автоматы" },
+  { title: "XIZUS: The Final Cut", file: "games/xizus.html", emoji: "🗄️", desc: "Проверка документов" },
+  { title: "Xizus vs Faerg", file: "games/xizus-vs-faerg-td.html", emoji: "🛡️", desc: "Tower defense (v5)" },
+];
+// =====================================================
+
+const grid = document.getElementById('grid');
+const search = document.getElementById('search');
+const player = document.getElementById('player');
+const frame = document.getElementById('frame');
+const back = document.getElementById('back');
+
+function render(filter = '') {
+  const q = filter.trim().toLowerCase();
+  const list = GAMES.filter(g => (g.title + ' ' + (g.desc || '')).toLowerCase().includes(q));
+  grid.innerHTML = list.length ? '' : '<div class="empty">Ничего не найдено</div>';
+  list.forEach(g => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<div class="emoji">${g.emoji || '🎮'}</div>
+      <div class="title">${g.title}</div>
+      <div class="desc">${g.desc || ''}</div>`;
+    el.onclick = () => openGame(g.file);
+    grid.appendChild(el);
+  });
+}
+
+function openGame(file) {
+  frame.src = file;
+  player.style.display = 'block';
+  back.style.display = 'block';
+  history.pushState({ game: file }, '', '#' + encodeURIComponent(file));
+}
+
+function closeGame() {
+  frame.src = 'about:blank';
+  player.style.display = 'none';
+  back.style.display = 'none';
+}
+
+back.onclick = () => history.back();
+window.addEventListener('popstate', () => {
+  if (location.hash.length > 1) openGame(decodeURIComponent(location.hash.slice(1)));
+  else closeGame();
+});
+
+search.addEventListener('input', e => render(e.target.value));
+render();
+
+// открыть игру по прямой ссылке вида .../#games/game1.html
+if (location.hash.length > 1) openGame(decodeURIComponent(location.hash.slice(1)));
+</script>
+</body>
+</html>
