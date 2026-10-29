@@ -55,9 +55,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 #splash h1{margin:0;font-size:clamp(40px,9vw,92px);font-weight:200;letter-spacing:.12em}
 #splash p{margin:0;color:var(--dim);font-weight:300;animation:pulse 1.8s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
-.pan{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(3,5,12,.82);backdrop-filter:blur(8px)}
-.pan.on{display:flex}
-.box{width:min(460px,92vw);max-height:84vh;overflow:auto;background:rgba(20,26,50,.92);border-radius:22px;padding:20px 22px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+
+/* ===== DRAWER-ПАНЕЛИ ===== */
+.pan{position:fixed;inset:0;z-index:25;display:block;background:rgba(3,5,12,0);backdrop-filter:blur(0);-webkit-backdrop-filter:blur(0);opacity:0;pointer-events:none;transition:opacity .3s,background .35s,backdrop-filter .35s}
+.pan.on{opacity:1;pointer-events:auto;background:rgba(3,5,12,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.pan .box{position:absolute;left:0;top:0;bottom:0;width:min(440px,100vw);height:100%;max-height:100%!important;background:linear-gradient(180deg,rgba(18,24,46,.985),rgba(12,16,36,.97));border-radius:0 24px 24px 0;box-shadow:8px 0 48px rgba(0,0,0,.6),inset -1px 0 0 rgba(255,255,255,.08);padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);overflow-y:auto;overflow-x:hidden;transform:translateX(-100%);transition:transform .42s cubic-bezier(.2,.85,.2,1);will-change:transform}
+.pan.on .box{transform:translateX(0)}
+.pan .box h3{padding-right:52px}
+
 .box h3{margin:0 0 4px;font-weight:300;font-size:24px}
 .box small{color:var(--dim)}
 .tr{display:flex;gap:14px;align-items:center;padding:11px 0;border-top:1px solid rgba(255,255,255,.08)}
@@ -74,6 +79,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
 .st2{display:flex;gap:18px;flex-wrap:wrap;color:var(--dim);font-size:14px}
 .st2 b{color:var(--txt);font-weight:600}
+
+#panClose{position:fixed;top:calc(env(safe-area-inset-top) + 16px);right:calc(env(safe-area-inset-right) + 16px);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:20px;cursor:pointer;z-index:26;opacity:0;pointer-events:none;transform:scale(.9);transition:opacity .25s,transform .25s,background .2s;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#panClose.on{opacity:1;pointer-events:auto;transform:scale(1)}
+#panClose:hover,#panClose:focus-visible{background:rgba(255,255,255,.24);outline:none}
+
 #toast{position:fixed;z-index:40;left:50%;top:calc(env(safe-area-inset-top) + 16px);transform:translate(-50%,-140%);display:flex;gap:12px;align-items:center;padding:12px 20px;border-radius:16px;background:rgba(18,24,46,.96);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 12px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
 #toast.on{transform:translate(-50%,0)}
 #toast i{font-style:normal;font-size:30px}#toast b{display:block;font-size:15px}#toast span{font-size:13px;color:var(--dim)}
@@ -103,7 +113,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 @media(max-width:700px){#bShop,#bTro,#bMute,#bFs{display:none}#top{padding:calc(env(safe-area-inset-top) + 10px) 12px 0}#tools button{width:42px;height:42px}#tools{gap:4px}
  #clock{display:none}#tabs{top:calc(env(safe-area-inset-top) + 62px)}#tabs button{padding:10px 16px;font-size:16px}
  .pill{padding:13px 26px}#info{min-height:170px}#count{right:14px}
- .pan{align-items:flex-end}.box{width:100vw;max-height:88vh;border-radius:22px 22px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}}
+ .pan .box{width:100vw;border-radius:0 20px 20px 0;padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px)}}
 
 #afk{position:fixed;inset:0;z-index:35;background:rgba(2,4,10,.78);display:flex;align-items:center;justify-content:flex-end;padding:0 clamp(20px,6vw,90px);opacity:0;pointer-events:none;transition:opacity 1.2s}
 #afk.on{opacity:1;pointer-events:auto}
@@ -180,6 +190,8 @@ body.rm #season span{display:none}
 </div>
 <div id="hints"><span>◀ ▶ игра</span><span>▲ ▼ раздел</span><span>Enter играть</span><span>I подробнее</span><span>F избранное</span><span>R рулетка</span><span>T трофеи</span></div>
 <div id="count"></div>
+
+<button id="panClose" aria-label="Закрыть">✕</button>
 
 <div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
 <div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
@@ -466,6 +478,28 @@ const GAMES=[
     {id:'scene',      n:'Своя сцена',    d:'Создай хотя бы один объект и запусти игру',         t:'silver'},
     {id:'realgame',   n:'Геймдизайнер',  d:'Управляемый объект + переменная в запущенной игре', t:'gold'}
   ]},
+
+ {title:"Последний болт",file:"games/last-bolt.html",emoji:"🍸",desc:"Бар для роботов",cat:"logic",c:"#ff7a33",c2:"#2b0f0c",new:true,dev:["kb"],
+  info:"Мир пал, но роботы хотят выпить. Ты — последний бармен. Готовь коктейли по рецептам, смешивай, добавляй гарнир и отдавай клиенту до того, как он уйдёт.",
+  how:["W — к боту, S — к стойке с кранами","ЛКМ — взять стакан, перетащить под кран, потянуть кран вниз","ЛКМ на гарнире — добавить","Удерживай и таскай стакан по столу — так смешивается","ПРОБЕЛ — пропустить диалог","Отпусти над роботом — отдать напиток"],
+  ach:[
+    {id:'play',          n:'Открытая смена',      d:'Начни первую смену',                            t:'bronze'},
+    {id:'take_glass',    n:'Официант',            d:'Возьми первый стакан с полки',                  t:'bronze'},
+    {id:'pour_first',    n:'Первый налив',        d:'Налéй любой ингредиент',                        t:'bronze'},
+    {id:'add_garnish',   n:'Украшение',           d:'Добавь первый гарнир',                          t:'bronze'},
+    {id:'first_success', n:'Не уволен',           d:'Отдай первый принятый напиток',                 t:'bronze'},
+    {id:'first_perfect', n:'Бармен',              d:'Идеальный напиток (95%+)',                      t:'bronze'},
+    {id:'break_glass',   n:'Посуда бьётся',       d:'Разбей стакан',                                 t:'bronze'},
+    {id:'win_5',         n:'Смена идёт',          d:'Отдай 5 принятых напитков за всё время',        t:'silver'},
+    {id:'recipes_3',     n:'Начал разбираться',   d:'Приготовь 3 разных рецепта',                    t:'silver'},
+    {id:'all_ingredients', n:'Все четыре',        d:'Используй все 4 ингредиента',                   t:'silver'},
+    {id:'fast_serve',    n:'Скорость',            d:'Отдай напиток качества 80%+ менее чем за 15 с', t:'silver'},
+    {id:'score_500',     n:'Пять сотен',          d:'500 очков в одной смене',                       t:'silver'},
+    {id:'all_recipes',   n:'Бармен-эксперт',      d:'Приготовь все 9 рецептов',                      t:'gold', max:9},
+    {id:'all_customers', n:'Знаком со всеми',     d:'Обслужи всех 9 клиентов',                       t:'gold', max:9},
+    {id:'perfect_chain', n:'Три в ряд',           d:'Три идеальных напитка подряд',                  t:'gold'},
+    {id:'long_game',     n:'Долгая смена',        d:'10 принятых напитков за одну смену',            t:'gold'}
+  ]},
 ];
 const CATS=[['all','Все'],['recent','Недавние'],['fav','Избранное'],['horror','Хоррор'],['arcade','Аркады'],['strat','Стратегии'],['logic','Логика'],['race','Гонки'],['apps','Приложения']];
 const EMPTY={recent:'Ты ещё ни во что не играл',fav:'Нажми ☆ или F, чтобы добавить игру сюда'};
@@ -508,7 +542,7 @@ function award(id){if(ST.tro[id])return;ST.tro[id]=Date.now();earn(25);const t=T
  if(id!=='plat'&&TRO.every(x=>x[0]==='plat'||ST.tro[x[0]]))setTimeout(()=>award('plat'),1500)}
 function check(){const n=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].n).length;if(n>=1)award('first');if(n>=3)award('three');if(n>=GAMES.length)award('all')}
 const pans=()=>[...document.querySelectorAll('.pan.on')];
-function closePans(){pans().forEach(p=>p.classList.remove('on'));snd(420,.1)}
+function closePans(){pans().forEach(p=>p.classList.remove('on'));$('panClose').classList.remove('on');snd(420,.1)}
 const dateRu=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
 
 // ---------- ДОСТИЖЕНИЯ ПО ИГРАМ ----------
@@ -602,7 +636,7 @@ function achPanel(file){
   $('acPlay').onclick=()=>{closePans();openGame(file,true)};
  }
  $('acClose').onclick=closePans;
- $('achP').classList.add('on');snd(600,.1);
+ $('achP').classList.add('on');$('panClose').classList.add('on');snd(600,.1);
 }
 
 function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[g.file],cat=CATS.find(c=>c[0]===g.cat);
@@ -620,7 +654,7 @@ function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[
  <h4>Твоя статистика</h4><div class="st2">${st&&st.n?`<span>Запусков: <b>${st.n}</b></span><span>Время: <b>${fmt(st.t)}</b></span><span>Последний раз: <b>${dateRu(st.last)}</b></span>`:'<span>Ещё не запускалась</span>'}</div>
  <div class="row"><button class="pill" id="dPlay">Играть</button>${aTotal?`<button class="pill" id="dAch">🏆 Достижения (${aDone}/${aTotal})</button>`:''}<button class="pill" id="dClose">Закрыть</button></div>`;
  $('dPlay').onclick=()=>{closePans();launch()};if(aTotal)$('dAch').onclick=()=>{closePans();achPanel(g.file)};
- $('dClose').onclick=closePans;$('detP').classList.add('on');snd(600,.1)}
+ $('dClose').onclick=closePans;$('detP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
 
 function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),tm=v.reduce((a,x)=>a+(x.t||0),0),P=ST.prof,L=lvl(ST.xp),c0=15*(L-1)**2,c1=15*L*L;
  const A=achTotalGlobal();
@@ -637,7 +671,7 @@ function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),
  else if(sb){const cr=()=>({email:$('pMail').value.trim(),password:$('pPass').value});
   $('pIn').onclick=async()=>{const{error}=await sb.auth.signInWithPassword(cr());toast(error?'⚠️':'✅',error?'Не вошли':'Вы вошли',error?error.message:'')};
   $('pUp').onclick=async()=>{const{data,error}=await sb.auth.signUp(cr());if(error)toast('⚠️','Не получилось',error.message);else if(!data.session)toast('📧','Подтверди почту','Потом нажми «Войти»')}}
- $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');snd(600,.1)}
+ $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
 function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro,ach:ST.ach,achp:ST.achp,coins:ST.coins,xp:ST.xp,owned:ST.owned}},a=document.createElement('a');
  a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='rkc-profile.json';document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('💾','Профиль сохранён','Файл rkc-profile.json лежит в загрузках')}
@@ -654,7 +688,10 @@ $('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfi
 function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contains('on');
  if(on){const got=TRO.filter(t=>ST.tro[t[0]]).length;
   $('troBox').innerHTML=`<h3>Трофеи сайта</h3><small>Получено ${got} из ${TRO.length} · достижения по играм — в «Подробнее»</small>`+TRO.map(t=>`<div class="tr ${ST.tro[t[0]]?'':'lock'}"><i>${t[1]}</i><div><b>${t[2]}</b><span>${t[3]}</span></div></div>`).join('')}
- p.classList.toggle('on',on);snd(on?600:420,.1)}
+ p.classList.toggle('on',on);
+ if(on)$('panClose').classList.add('on');
+ else closePans();
+ snd(on?600:420,.1)}
 
 // ---------- каталог ----------
 const getList=()=>{const L=baseList();return ST.devOnly?L.filter(g=>!g.dev||g.dev.includes(DEV)):L};
@@ -722,7 +759,7 @@ addEventListener('message', e => {
  else if(d.type === 'rkc:ach:progress' && typeof d.id === 'string') progressAch(d.id, +d.cur || 0);
 });
 
-// ---------- кнопка меню ----------
+// ---------- кнопка меню в игре ----------
 function placeBack(){const p=ST.bk||{r:1,y:.5};back.style.top=Math.min(innerHeight-56,Math.max(8,p.y*innerHeight))+'px';back.style.left=(p.r?innerWidth-52:8)+'px'}
 let pid=null,mv=false,sx=0,sy=0;
 back.addEventListener('pointerdown',e=>{pid=e.pointerId;back.setPointerCapture(pid);sx=e.clientX;sy=e.clientY;mv=false;back.classList.add('drag')});
@@ -759,6 +796,9 @@ if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?do
 back.onclick=null;addEventListener('popstate',fromHash);addEventListener('pagehide',endSession);
 addEventListener('resize',()=>{select(S.cur);if(inGame)placeBack()});
 
+// Глобальная кнопка закрытия drawer
+$('panClose').onclick=closePans;
+
 // геймпад
 let gl=0;(function pad(){const p=(navigator.getGamepads?[...navigator.getGamepads()]:[]).find(Boolean),now=performance.now();
  if(p&&now>gl){const b=i=>p.buttons[i]&&p.buttons[i].pressed,ax=p.axes[0]||0,ay=p.axes[1]||0;let used=true;
@@ -788,7 +828,9 @@ const avh=(a,f,sz)=>`<span class="av" style="${sz?`width:${sz}px;height:${sz}px;
 function refreshTop(){$('bProf').innerHTML=avh(ST.prof.avatar,'none');$('coinb').textContent='🪙 '+ST.coins}
 function devBtn(){const b=$('bDev');b.textContent=DEV==='touch'?'📱':'💻';b.classList.toggle('off',!ST.devOnly);b.title=ST.devOnly?'Только игры для этого устройства (нажми — показать все)':'Показаны все игры (нажми — только для этого устройства)'}
 let shopTab='av';
-function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains('on');p.classList.toggle('on',on);if(!on){snd(420,.1);return}
+function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains('on');
+ if(!on){closePans();return}
+ p.classList.add('on');$('panClose').classList.add('on');
  const P=ST.prof,own=(k,pr)=>pr===0||ST.owned.includes(shopTab+':'+k),tabs=[['av','Аватары'],['fr','Рамки'],['ti','Титулы']];
  $('shopBox').innerHTML=`<h3>Магазин</h3><small>🪙 ${ST.coins} · монеты дают запуски, минуты в играх и трофеи</small>
  <div class="row" style="margin-top:10px">${tabs.map(x=>`<button class="pill${shopTab===x[0]?' sel':''}" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>
@@ -820,7 +862,7 @@ async function pull(){const{data}=await sb.from('rkc_profiles').select('*').eq('
  if(data.ach)for(const f in data.ach){if(!files.has(f))continue;ST.ach[f]=ST.ach[f]||{};for(const id in data.ach[f])if(!ST.ach[f][id])ST.ach[f][id]=data.ach[f][id]}
  if(data.achp)for(const f in data.achp){if(!files.has(f))continue;ST.achp[f]=ST.achp[f]||{};for(const id in data.achp[f])ST.achp[f][id]=Math.max(ST.achp[f][id]||0,num(data.achp[f][id]))}
  save();await push();setCat(S.cat)}
-async function lb(){$('lbBox').innerHTML='<h3>Рейтинг</h3><small>Загрузка…</small>';$('lbP').classList.add('on');
+async function lb(){$('lbBox').innerHTML='<h3>Рейтинг</h3><small>Загрузка…</small>';$('lbP').classList.add('on');$('panClose').classList.add('on');
  const{data,error}=await sb.rpc('rkc_leaderboard');
  $('lbBox').innerHTML='<h3>Рейтинг</h3><small>Топ-20 по опыту</small>'+(error?'<p>Не удалось загрузить</p>':(data||[]).map((r,i)=>`<div class="tr">${avh(r.avatar,r.frame,40)}<div><b>${i+1}. ${esc(r.nickname)}</b><span>${esc(r.title||'без титула')} · Ур. ${lvl(r.xp)}</span></div></div>`).join('')||'<p>Пока никого</p>')+'<div class="row"><button class="pill" id="lClose">Закрыть</button></div>';
  $('lClose').onclick=closePans}
@@ -862,7 +904,8 @@ new MutationObserver(poke).observe(player,{attributes:true,attributeFilter:['cla
 function applyPrefs(){document.body.classList.remove('tsS','tsL');if(ST.tileSz==='s')document.body.classList.add('tsS');if(ST.tileSz==='l')document.body.classList.add('tsL');
  document.body.classList.toggle('rm',!!ST.rm);applySeason();if(!inGame)select(S.cur)}
 const MENU_KEYS=['◀ ▶ — выбрать игру','▲ ▼ — раздел','Enter — играть','I — подробнее','F — избранное','R — случайная игра','T — трофеи сайта','S — магазин','P — профиль','M — звук','Q — это меню'];
-function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');if(!on){p.classList.remove('on');snd(420,.1);return}
+function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');
+ if(!on){closePans();return}
  const opt=(k,items,cur)=>items.map(x=>`<button class="pill${String(cur)===String(x[0])?' sel':''}" data-set="${k}:${x[0]}">${x[1]}</button>`).join('');
  const afk=ST.afkSec===undefined?60:ST.afkSec;
  $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры, профиль и настройки</small>
@@ -877,12 +920,14 @@ function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains(
  <div class="row"><button class="pill" id="mClose">Закрыть</button></div>
  <div class="mft"><b>RKC Studio</b>Студия-разработчик RKCPlay<br><button id="mTos">Пользовательское соглашение</button></div>`;
  const B=$('menuBox');
- B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])()});
+ B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();setTimeout(()=>({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])(),60)});
  B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
   if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
   save();applyPrefs();menu(true);if(k==='snd'&&!ST.mute)sOk()});
- $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;p.classList.add('on');snd(600,.1)}
-function tos(){closePans();$('tosBox').innerHTML=`<div class="tos"><h3>Пользовательское соглашение RKC</h3><small>Редакция от 29 октября 2026</small>
+ $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;
+ p.classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
+function tos(){closePans();setTimeout(()=>{
+ $('tosBox').innerHTML=`<div class="tos"><h3>Пользовательское соглашение RKC</h3><small>Редакция от 29 октября 2026</small>
  <h4>1. Что это</h4><p>RKCPlay — закрытая коллекция игр студии RKC. Её делает автор для себя и друзей.</p>
  <h4>2. Доступ</h4><p>Доступ только по ссылке от RKC.</p>
  <h4>3. Профиль и данные</h4><p>Ник, аватар, прогресс, монеты, достижения и статистика хранятся на твоём устройстве. При входе в аккаунт они копируются в облако (Supabase).</p>
@@ -892,7 +937,9 @@ function tos(){closePans();$('tosBox').innerHTML=`<div class="tos"><h3>Поль�
  <h4>7. Удаление данных</h4><p>Очисти данные сайта в браузере, чтобы стереть локальный профиль.</p>
  <h4>8. Изменения</h4><p>Соглашение может обновляться.</p>
  <div class="row"><button class="pill" id="tBack">← В меню</button><button class="pill" id="tClose">Закрыть</button></div></div>`;
- $('tBack').onclick=()=>{closePans();menu(true)};$('tClose').onclick=closePans;$('tosP').classList.add('on');snd(600,.1)}
+ $('tBack').onclick=()=>{closePans();setTimeout(()=>menu(true),60)};$('tClose').onclick=closePans;
+ $('tosP').classList.add('on');$('panClose').classList.add('on');snd(600,.1);
+},60)}
 // ---------- сезонные режимы ----------
 const SEASONS={
  halloween:{name:'Хэллоуин',ico:'🎃',p:['🎃','🦇','👻','🕸️'],a:'rgba(255,110,20,.30)',b:'rgba(130,50,210,.24)',r:[1020,1102],hi:'Жуткий месяц в RKCPlay'},
