@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Сборник игр</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 @property --c{syntax:'<color>';inherits:true;initial-value:#1c3a8a}
 :root{--txt:#f2f5ff;--dim:#9aa6c8;--tile:clamp(110px,18vw,180px);--gap:clamp(14px,2.4vw,26px)}
@@ -85,6 +86,24 @@ button{font:inherit;color:inherit;cursor:pointer}
 #back.on:hover,#back.on.drag{opacity:1}
 #back.drag{transition:none}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.av{display:inline-grid;place-items:center;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.12);font-size:30px;flex:none;vertical-align:middle}
+#bProf .av{width:30px;height:30px;font-size:17px;background:none}
+#coinb{font-size:14px;margin-left:8px;color:#ffd84a;white-space:nowrap}
+.box input{width:100%;padding:11px 14px;margin:4px 0;border-radius:12px;border:0;background:rgba(255,255,255,.1);color:#fff;font:inherit;user-select:text}
+.bar{height:8px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}.bar i{display:block;height:100%;background:#ffd84a}
+.shopg{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;margin:12px 0}
+.it{border-radius:14px;background:rgba(255,255,255,.07);padding:10px 4px;text-align:center;font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;min-height:96px;justify-content:center}
+.it.on{outline:2px solid #ffd84a}.it small{color:var(--dim)}
+.pill.sel{background:#fff;color:#0a1230}
+#bDev.off{opacity:.45}
+.lk{position:absolute;left:8%;bottom:8%;font-size:16px}
+.tile.nodev{filter:saturate(.25) brightness(.8)}
+@media(pointer:coarse){#hints{display:none}.tile{--tile:clamp(120px,30vw,170px)}}
+@media(max-width:700px){#brand{display:none}#top{padding:calc(env(safe-area-inset-top) + 10px) 12px 0}#tools button{width:42px;height:42px}#tools{gap:4px}
+ #clock{display:none}#tabs{top:calc(env(safe-area-inset-top) + 62px)}#tabs button{padding:10px 16px;font-size:16px}
+ .pill{padding:13px 26px}#info{min-height:170px}#count{right:14px}
+ .pan{align-items:flex-end}.box{width:100vw;max-height:88vh;border-radius:22px 22px 0 0;padding:20px 20px calc(env(safe-area-inset-bottom) + 20px)}}
 </style>
 </head>
 <body>
@@ -93,7 +112,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 <path d="M0 200C200 120 400 280 600 200S1000 120 1200 200"/><path d="M0 240C200 160 400 320 600 240S1000 160 1200 240"/><path d="M0 280C200 200 400 360 600 280S1000 200 1200 280"/><path d="M0 320C200 240 400 400 600 320S1000 240 1200 320"/></g></svg>
 
 <div id="top"><div id="brand">RKC Studio</div>
-<div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="clock"></span></div></div>
+<div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
 <nav id="tabs" aria-label="Разделы"></nav>
 
 <div id="stage">
@@ -107,6 +126,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
 <div id="detP" class="pan"><div id="detBox" class="box"></div></div>
 <div id="profP" class="pan"><div id="profBox" class="box"></div></div>
+<div id="shopP" class="pan"><div id="shopBox" class="box"></div></div>
+<div id="lbP" class="pan"><div id="lbBox" class="box"></div></div>
 <input type="file" id="pfile" accept="application/json,.json" hidden>
 <div id="toast"><i></i><div><b></b><span></span></div></div>
 <div id="splash"><h1>RKC Studio</h1><p>Нажми любую кнопку</p></div>
@@ -116,33 +137,36 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 <script>
 // ====== СПИСОК ИГР — добавляй сюда новые строки ======
-// cat: horror | arcade | strat | logic | race | apps; new:true даёт значок NEW
+// auth:true — игра только для вошедших (замок 🔒); dev: kb = ПК (клавиатура/мышь), touch = телефон/планшет; cat: horror | arcade | strat | logic | race | apps; new:true даёт значок NEW
 const GAMES=[
  {title:"Dead by Canvas",file:"games/dead-by-canvas.html",emoji:"🔦",desc:"Выживание от маньяка в тёмном лесу",cat:"horror",c:"#d0432f",c2:"#3a0d0d",new:true,dev:["kb","touch"],
   info:"Тёмный лес, маньяк и пять генераторов. Почини три из них и беги к воротам на востоке. Прячься в кустах, роняй палетки и не промахивайся мимо красной зоны.",
   how:["WASD или стрелки — бег, Shift — красться","E — удерживай, чтобы чинить генератор, нажми, чтобы уронить палетку","Пробел или клик — попасть в красную зону проверки навыка","На телефоне: джойстик, кнопка действия и тап по экрану для проверки"]},
- {title:"Обломов: Беги, Илья Ильич!",file:"games/oblomov-run.html",emoji:"🛋️",desc:"Забег по мотивам романа",cat:"arcade",c:"#9bbf4c",c2:"#3b4a2a",new:true,
-  info:"Забег по мотивам романа Гончарова."},
+ {title:"Обломов: Беги, Илья Ильич!",file:"games/oblomov-run.html",dev:["kb","touch"],emoji:"🛋️",desc:"Забег по мотивам романа",cat:"arcade",c:"#9bbf4c",c2:"#3b4a2a",new:true,
+  info:"Забег по мотивам романа Гончарова.",
+  how:["Свайп влево или вправо — сменить дорожку, на ПК: A/D или стрелки","Свайп вверх — прыжок (W, ↑ или пробел), вниз — подкат или кувырок в воздухе (S или ↓)","Пауза — Esc или P, на телефоне — тап по верху экрана по центру"]},
  {title:"Спагетти-Спидран",file:"games/spaghetti-speedrun.html",emoji:"🍝",desc:"Платформер-спидран",cat:"arcade",c:"#ff8a3d",c2:"#c2331f",dev:["kb","touch"],
   info:"Платформер на скорость. Таймер стартует с первого движения, так что успевай осмотреться.",
   how:["A и D — бег, Shift — ускорение","Пробел — прыжок, удерживай, чтобы прыгнуть выше"]},
  {title:"Отель «Закат»",file:"games/hotel-maze.html",emoji:"🏨",desc:"Хоррор, ночная смена",cat:"horror",c:"#8a3dff",c2:"#2a0f5e",dev:["kb"],
   info:"Ночная смена в отеле. Свети фонариком, вставляй предохранители в щиток, закрывай и открывай железную дверь и отгоняй врагов крестом.",
   how:["WASD — идти, мышь — направить фонарик","Левая кнопка мыши — взять предмет, вставить предохранитель или нажать кнопку","E — применить крест на видимого врага"]},
- {title:"Казик «Блябуду Рояль»",file:"games/kazik-neo.html",emoji:"🎰",desc:"Слоты, шахматы, мины",cat:"logic",c:"#ffcf33",c2:"#b3260f",
+ {title:"Казик «Блябуду Рояль»",file:"games/kazik-neo.html",dev:["kb","touch"],emoji:"🎰",desc:"Слоты, шахматы, мины",cat:"logic",c:"#ffcf33",c2:"#b3260f",
   info:"Слоты, шахматы и мины в одном казино.",how:["Поставь ставку и нажми «Играть»"]},
- {title:"Battle Simulator",file:"games/battle-simulator.html",emoji:"⚔️",desc:"Красные против Синих",cat:"strat",c:"#3d7bff",c2:"#d62f3f",
-  info:"Эпичная битва двух армий: красные против синих."},
+ {title:"Battle Simulator",file:"games/battle-simulator.html",dev:["kb","touch"],emoji:"⚔️",desc:"Красные против Синих",cat:"strat",c:"#3d7bff",c2:"#d62f3f",
+  info:"Эпичная битва двух армий: красные против синих. Ты за синих: нанимай бойцов за монеты и улучшай базу.",
+  how:["Нажимай на карточки юнитов (мечник, лучник, гигант, маг), чтобы нанять за монеты","«Улучшить базу» усиливает твою базу","Кнопки 1x, 2x и 5x меняют скорость, есть пауза и перезапуск"]},
  {title:"Мозаика",file:"games/mozaika-match3.html",emoji:"💎",desc:"Три в ряд",cat:"logic",c:"#2fd6c4",c2:"#2a56c9",dev:["kb","touch"],
   info:"Классическое «три в ряд» с рекордом в меню.",how:["Меняй местами соседние камни, чтобы собрать три в ряд","Подробные правила — кнопка «Как играть» в меню игры"]},
- {title:"Мафия · ИИ за столом",file:"games/mafia-gm.html",emoji:"🕵️",desc:"Ведущий для игры с ИИ",cat:"logic",c:"#c23a5a",c2:"#25122a",
+ {title:"Мафия · ИИ за столом",file:"games/mafia-gm.html",dev:["kb","touch"],emoji:"🕵️",desc:"Ведущий для игры с ИИ",cat:"logic",c:"#c23a5a",c2:"#25122a",
   info:"Ведущий для настольной мафии, где за столом сидят ИИ-игроки.",
   how:["Роли: мирный житель, мафия и по желанию шериф","До 8 игроков, мафии не больше двух","Все правила и команды — в разделе внутри игры"]},
- {title:"Симулятор электрощитка",file:"games/electric-panel.html",emoji:"⚡",desc:"Щёлкай автоматы",cat:"arcade",c:"#ffe033",c2:"#4a5a6e",
+ {title:"Симулятор электрощитка",file:"games/electric-panel.html",dev:["kb","touch"],emoji:"⚡",desc:"Щёлкай автоматы",cat:"arcade",c:"#ffe033",c2:"#4a5a6e",
   info:"Щёлкай рычажки щитка. Если захочется хаоса — есть кнопка «Авария!».",how:["Кликай по рычажкам и по кнопке T"]},
- {title:"XIZUS: The Final Cut",file:"games/xizus.html",emoji:"🗄️",desc:"Проверка документов",cat:"logic",c:"#6b8cae",c2:"#1d2733",
-  info:"Проверка документов в терминале."},
- {title:"Xizus vs Faerg",file:"games/xizus-vs-faerg-td.html",emoji:"🛡️",desc:"Tower defense (v5)",cat:"strat",c:"#43c466",c2:"#14502e",
+ {title:"XIZUS: The Final Cut",file:"games/xizus.html",dev:["kb","touch"],emoji:"🗄️",desc:"Проверка документов",cat:"logic",c:"#6b8cae",c2:"#1d2733",
+  info:"Проверка документов в терминале: проверяй бумаги и решай, пропустить или отказать.",
+  how:["Кнопки Approve и Reject — одобрить или отклонить документ","Командная строка внизу принимает команды, на телефоне нужна экранная клавиатура"]},
+ {title:"Xizus vs Faerg",file:"games/xizus-vs-faerg-td.html",dev:["kb","touch"],emoji:"🛡️",desc:"Tower defense (v5)",cat:"strat",c:"#43c466",c2:"#14502e",
   info:"Tower defense. Перед боем башни нужно выбрать заранее.",how:["Перед миссией нажми «Инвентарь» вверху экрана и выбери 4 активные башни"]},
  {title:"Drift Wheel",file:"games/drift-wheel.html",emoji:"🏎️",desc:"Дрифт-гонка с соперниками и нитро",cat:"race",c:"#e63946",c2:"#2a0d12",new:true,dev:["kb","touch"],
   info:"Гонка на дрифте: 3 трассы, до 7 соперников с ИИ, 3 уровня сложности и выбор числа кругов. Копи нитро дрифтом и приезжай первым. Рекорд круга сохраняется.",
@@ -161,7 +185,8 @@ const $=id=>document.getElementById(id);
 const track=$('track'),player=$('player'),frame=$('frame'),back=$('back');
 let ST={fav:{},stats:{},tro:{},mute:false,bk:null};
 try{Object.assign(ST,JSON.parse(localStorage.getItem('rkc')||'{}'))}catch(e){}
-const save=()=>{try{localStorage.setItem('rkc',JSON.stringify(ST))}catch(e){}};
+ST.prof=Object.assign({name:'Игрок'+(1000+Math.random()*9000|0),avatar:'😀',frame:'none',title:''},ST.prof||{});ST.coins=ST.coins||0;ST.xp=ST.xp||0;ST.owned=ST.owned||[];
+const save=()=>{ST.ts=Date.now();try{localStorage.setItem('rkc',JSON.stringify(ST))}catch(e){}schedPush();refreshTop()};
 const S={cat:'all',cur:0,list:[]};let inGame=false,lastOpen=null,curFile=null,t0=0,rolling=false,tiles=[];
 
 // ---------- звук ----------
@@ -179,29 +204,37 @@ function toast(i,b,s){q.push([i,b,s]);if(!showing)pump()}
 function pump(){const n=q.shift();if(!n){showing=false;return}showing=true;const t=$('toast');
  t.querySelector('i').textContent=n[0];t.querySelector('b').textContent=n[1];t.querySelector('span').textContent=n[2];
  t.classList.add('on');setTimeout(()=>{t.classList.remove('on');setTimeout(pump,380)},3200)}
-function award(id){if(ST.tro[id])return;ST.tro[id]=Date.now();save();const t=TRO.find(x=>x[0]===id);toast(t[1],'Трофей: '+t[2],t[3]);chime();
+function award(id){if(ST.tro[id])return;ST.tro[id]=Date.now();earn(25);const t=TRO.find(x=>x[0]===id);toast(t[1],'Трофей: '+t[2],t[3]);chime();
  if(id!=='plat'&&TRO.every(x=>x[0]==='plat'||ST.tro[x[0]]))setTimeout(()=>award('plat'),1500)}
 function check(){const n=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].n).length;if(n>=1)award('first');if(n>=3)award('three');if(n>=GAMES.length)award('all')}
 const pans=()=>[...document.querySelectorAll('.pan.on')];
 function closePans(){pans().forEach(p=>p.classList.remove('on'));snd(420,.1)}
 const dateRu=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
 function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[g.file],cat=CATS.find(c=>c[0]===g.cat);
- const DV={kb:'Клавиатура',touch:'Касание'};
+ const DV={kb:'💻 ПК',touch:'📱 Телефон и планшет'};
  $('detBox').innerHTML=`<div class="dh" style="background:linear-gradient(150deg,${g.c},${g.c2})">${g.emoji}</div><h3>${g.title}</h3>
- <div class="chips" style="margin-top:6px"><span class="chip">${cat?cat[1]:''}</span>${g.new?'<span class="chip">NEW</span>':''}</div>
+ <div class="chips" style="margin-top:6px"><span class="chip">${cat?cat[1]:''}</span>${g.new?'<span class="chip">NEW</span>':''}${g.auth?'<span class="chip">🔒 Только для вошедших</span>':''}</div>
  <p>${g.info||g.desc}</p>
  ${g.how?'<h4>Как играть</h4><ul>'+g.how.map(h=>'<li>'+h+'</li>').join('')+'</ul>':''}
  ${g.dev?'<h4>Подходит для</h4><div class="chips">'+g.dev.map(d=>'<span class="chip">'+DV[d]+'</span>').join('')+'</div>':''}
  <h4>Твоя статистика</h4><div class="st2">${st&&st.n?`<span>Запусков: <b>${st.n}</b></span><span>Время: <b>${fmt(st.t)}</b></span><span>Последний раз: <b>${dateRu(st.last)}</b></span>`:'<span>Ещё не запускалась</span>'}</div>
  <div class="row"><button class="pill" id="dPlay">Играть</button><button class="pill" id="dClose">Закрыть</button></div>`;
  $('dPlay').onclick=()=>{closePans();launch()};$('dClose').onclick=closePans;$('detP').classList.add('on');snd(600,.1)}
-function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),t=v.reduce((a,x)=>a+(x.t||0),0);
- $('profBox').innerHTML=`<h3>Профиль</h3><small>Прогресс хранится в этом браузере. Сохрани его в файл, чтобы перенести на другое устройство.</small>
- <h4>Итоги</h4><div class="st2"><span>Запусков: <b>${n}</b></span><span>Время в играх: <b>${fmt(t)}</b></span><span>Трофеев: <b>${TRO.filter(x=>ST.tro[x[0]]).length} из ${TRO.length}</b></span><span>В избранном: <b>${Object.keys(ST.fav).length}</b></span></div>
- <div class="row"><button class="pill" id="pSave">Сохранить в файл</button><button class="pill" id="pLoad">Загрузить из файла</button></div>
- <div class="row"><button class="pill" id="pClose">Закрыть</button></div>`;
+function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),tm=v.reduce((a,x)=>a+(x.t||0),0),P=ST.prof,L=lvl(ST.xp),c0=15*(L-1)**2,c1=15*L*L;
+ $('profBox').innerHTML=`<div style="display:flex;gap:14px;align-items:center">${avh(P.avatar,P.frame)}<div style="flex:1;min-width:0"><b style="font-size:20px">${esc(P.name)}</b><div style="color:var(--dim);font-size:13px">${esc(P.title)||'Без титула'} · Ур. ${L}</div><div class="bar" style="margin-top:6px"><i style="width:${(ST.xp-c0)/(c1-c0)*100}%"></i></div></div></div>
+ <div class="st2" style="margin-top:12px"><span>🪙 <b>${ST.coins}</b></span><span>Запусков: <b>${n}</b></span><span>В играх: <b>${fmt(tm)}</b></span><span>Трофеев: <b>${TRO.filter(x=>ST.tro[x[0]]).length}/${TRO.length}</b></span></div>
+ <h4>Ник</h4><input id="pName" maxlength="20" value="${esc(P.name)}">
+ <h4>Облако</h4>${user?`<small>Вход: ${esc(user.email)}</small><div class="row"><button class="pill" id="pSync">Синхронизировать</button><button class="pill" id="pOut">Выйти</button></div>`:sb?`<small>Войди, чтобы профиль жил на всех устройствах</small><input id="pMail" type="email" placeholder="Почта"><input id="pPass" type="password" placeholder="Пароль (от 8 символов)"><div class="row" style="margin-top:8px"><button class="pill" id="pIn">Войти</button><button class="pill" id="pUp">Регистрация</button></div>`:'<small>Облако недоступно</small>'}
+ <div class="row"><button class="pill" id="pShop">🛒 Магазин</button><button class="pill" id="pLb" ${sb?'':'hidden'}>🏅 Рейтинг</button></div>
+ <div class="row"><button class="pill" id="pSave">В файл</button><button class="pill" id="pLoad">Из файла</button><button class="pill" id="pClose">Закрыть</button></div>`;
+ $('pName').onchange=e=>{let s=e.target.value.trim().slice(0,20);if(s.length<2)s=P.name;P.name=s;save();profile()};
+ $('pShop').onclick=()=>{closePans();shop(true)};if(sb)$('pLb').onclick=lb;
+ if(user){$('pSync').onclick=()=>pull().then(()=>{toast('☁️','Синхронизировано','');profile()});$('pOut').onclick=()=>sb.auth.signOut()}
+ else if(sb){const cr=()=>({email:$('pMail').value.trim(),password:$('pPass').value});
+  $('pIn').onclick=async()=>{const{error}=await sb.auth.signInWithPassword(cr());toast(error?'⚠️':'✅',error?'Не вошли':'Вы вошли',error?error.message:'')};
+  $('pUp').onclick=async()=>{const{data,error}=await sb.auth.signUp(cr());if(error)toast('⚠️','Не получилось',error.message);else if(!data.session)toast('📧','Подтверди почту','Потом нажми «Войти»')}}
  $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');snd(600,.1)}
-function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro}},a=document.createElement('a');
+function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro,coins:ST.coins,xp:ST.xp,owned:ST.owned}},a=document.createElement('a');
  a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='rkc-profile.json';document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('💾','Профиль сохранён','Файл rkc-profile.json лежит в загрузках')}
 function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||!o.data)throw 0;d=o.data}catch(e){toast('⚠️','Не получилось','Это не файл профиля RKC');return}
@@ -209,6 +242,7 @@ function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||
  for(const f in d.fav||{})if(files.has(f))ST.fav[f]=1;
  for(const f in d.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=d.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
  for(const id in d.tro||{})if(ids.has(id)){const v=num(d.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
+ ST.xp=Math.max(ST.xp,num(d.xp));ST.coins=Math.max(ST.coins,num(d.coins));if(Array.isArray(d.owned))ST.owned=[...new Set([...ST.owned,...d.owned.filter(x=>typeof x==='string')])];
  save();closePans();setCat(S.cat);toast('✅','Профиль загружен','Данные объединены с текущими')}
 $('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfile);e.target.value=''};
 function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contains('on');
@@ -217,7 +251,8 @@ function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contai
  p.classList.toggle('on',on);snd(on?600:420,.1)}
 
 // ---------- каталог ----------
-function getList(){const c=S.cat,st=ST.stats;
+const getList=()=>{const L=baseList();return ST.devOnly?L.filter(g=>!g.dev||g.dev.includes(DEV)):L};
+function baseList(){const c=S.cat,st=ST.stats;
  if(c==='recent')return GAMES.filter(g=>st[g.file]&&st[g.file].last).sort((a,b)=>st[b.file].last-st[a.file].last);
  if(c==='fav')return GAMES.filter(g=>ST.fav[g.file]);
  return c==='all'?GAMES:GAMES.filter(g=>g.cat===c)}
@@ -225,9 +260,9 @@ const fmt=ms=>ms<6e4?'меньше минуты':ms<36e5?Math.round(ms/6e4)+' м
 function buildTabs(){const t=$('tabs');t.innerHTML='';CATS.forEach(([id,name])=>{const b=document.createElement('button');b.textContent=name;b.dataset.id=id;b.onclick=()=>setCat(id,true);t.appendChild(b)})}
 function setCat(c,s){S.cat=c;[...$('tabs').children].forEach(b=>{const on=b.dataset.id===c;b.classList.toggle('on',on);if(on)b.scrollIntoView({inline:'center',block:'nearest'})});
  S.list=getList();S.cur=0;build();select(0);if(s)snd(400,.06,'triangle')}
-function build(){track.innerHTML='';tiles=S.list.map((g,i)=>{const t=document.createElement('div');t.className='tile'+(ST.fav[g.file]?' isfav':'');t.setAttribute('role','option');
+function build(){track.innerHTML='';tiles=S.list.map((g,i)=>{const t=document.createElement('div');t.className='tile'+(ST.fav[g.file]?' isfav':'')+(g.dev&&!g.dev.includes(DEV)?' nodev':'');t.setAttribute('role','option');
  t.style.background=`linear-gradient(150deg,${g.c},${g.c2})`;
- t.innerHTML=`<span class="ico">${g.emoji}</span>${g.new?'<span class="nw">NEW</span>':''}<span class="st">★</span>`;
+ t.innerHTML=`<span class="ico">${g.emoji}</span>${g.new?'<span class="nw">NEW</span>':''}${g.auth?'<span class="lk">🔒</span>':''}<span class="st">★</span>`;
  t.onclick=()=>i===S.cur?launch():select(i,true);track.appendChild(t);return t})}
 function select(i,s){const L=S.list,has=L.length>0;$('acts').style.display=has?'flex':'none';
  if(!has){tiles=[];$('title').textContent='Здесь пока пусто';$('desc').textContent=EMPTY[S.cat]||'';$('meta').innerHTML='';$('count').textContent='';return}
@@ -247,19 +282,22 @@ function dice(){if(rolling||inGame)return;if(S.cat!=='all')setCat('all');rolling
  const n=12+(Math.random()*8|0);let k=0;(function step(){select(S.cur+1,true);if(++k<n)setTimeout(step,55+k*15);else{rolling=false;sOk();setTimeout(launch,450)}})()}
 
 // ---------- запуск игры ----------
-function openGame(file,push){const s=ST.stats[file]||(ST.stats[file]={n:0,t:0,last:0});s.n++;s.last=Date.now();save();check();
+let pendingAuth=null,authReady=false;
+function openGame(file,push){const G=GAMES.find(x=>x.file===file);
+ if(G&&G.auth&&!user){if(sb&&!authReady){pendingAuth=[file,push];return}toast('🔒','Нужен вход','Эта игра только для вошедших — войди в профиле');if(location.hash)history.replaceState(null,'',location.pathname+location.search);profile();return}
+ const s=ST.stats[file]||(ST.stats[file]={n:0,t:0,last:0});s.n++;s.last=Date.now();if(Date.now()-(s.paid||0)>6e5){s.paid=Date.now();earn(5)}check();
  lastOpen=file;frame.src=file;player.classList.add('on');back.classList.add('on');inGame=true;curFile=file;t0=Date.now();placeBack();
  if(push)history.pushState({game:file},'','#'+encodeURIComponent(file));
  if(!ST.hint){ST.hint=1;save();toast('⌂','Кнопка меню','Её можно перетащить в любое место')}
  frame.onload=()=>{try{frame.focus()}catch(e){}}}
-function endSession(){if(!curFile)return;const e=Date.now()-t0;if(ST.stats[curFile])ST.stats[curFile].t+=e;if(e>=6e5)award('long');save();curFile=null}
+function endSession(){if(!curFile)return;const e=Date.now()-t0;if(ST.stats[curFile]){ST.stats[curFile].t+=e;earn(Math.floor(e/60000))}if(e>=6e5)award('long');save();curFile=null}
 function closeGame(){endSession();player.classList.remove('on');back.classList.remove('on');inGame=false;sBack();
  setTimeout(()=>{if(!inGame)frame.src='about:blank'},380);
  const f=curSel();S.list=getList();build();const k=S.list.findIndex(g=>g.file===f);select(k<0?0:k)}
 function curSel(){return lastOpen}
-function launch(){if(!S.list.length||inGame)return;sOk();openGame(S.list[S.cur].file,true)}
+function launch(){if(!S.list.length||inGame)return;sOk();{const g=S.list[S.cur];if(g.dev&&!g.dev.includes(DEV))toast('⚠️','Не для этого устройства','Игра рассчитана на '+(DEV==='touch'?'ПК':'телефон'))}openGame(S.list[S.cur].file,true)}
 function fromHash(){const f=location.hash.length>1?decodeURIComponent(location.hash.slice(1)):'';
- const g=GAMES.find(x=>x.file===f);if(g){setCat('all');select(GAMES.indexOf(g));openGame(f,false)}else if(inGame)closeGame()}
+ const g=GAMES.find(x=>x.file===f);if(g){setCat('all');select(Math.max(0,S.list.indexOf(g)));openGame(f,false)}else if(inGame)closeGame()}
 
 // ---------- кнопка меню: перетаскивается, чтобы не мешать играм ----------
 function placeBack(){const p=ST.bk||{r:1,y:.5};back.style.top=Math.min(innerHeight-56,Math.max(8,p.y*innerHeight))+'px';back.style.left=(p.r?innerWidth-52:8)+'px'}
@@ -282,14 +320,16 @@ addEventListener('keydown',e=>{
  if(e.key==='ArrowRight')select(S.cur+1,true);else if(e.key==='ArrowLeft')select(S.cur-1,true);
  else if(e.key==='ArrowDown')setCat(CATS[(ci+1)%CATS.length][0],true);else if(e.key==='ArrowUp')setCat(CATS[(ci+CATS.length-1)%CATS.length][0],true);
  else if(e.key==='Enter'&&!document.activeElement.matches('button'))launch();
- else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();
+ else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();else if(k==='s'||k==='ы')shop();
  else return;e.preventDefault()});
 addEventListener('wheel',e=>{if(inGame||pans().length>0)return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
  if(Math.abs(d)>12&&!wheel.l){select(S.cur+(d>0?1:-1),true);wheel.l=1;setTimeout(()=>wheel.l=0,180)}},{passive:true});
 const wheel={l:0};
-let sx0=null;addEventListener('touchstart',e=>{sx0=e.touches[0].clientX},{passive:true});
-addEventListener('touchend',e=>{if(sx0===null||inGame)return;const dx=e.changedTouches[0].clientX-sx0;sx0=null;if(Math.abs(dx)>45)select(S.cur+(dx<0?1:-1),true)},{passive:true});
-$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
+let sx0=null,sy0=0;addEventListener('touchstart',e=>{sx0=e.touches[0].clientX;sy0=e.touches[0].clientY},{passive:true});
+addEventListener('touchend',e=>{if(sx0===null||inGame||pans().length)return;const dx=e.changedTouches[0].clientX-sx0,dy=e.changedTouches[0].clientY-sy0;sx0=null;
+ if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy))select(S.cur+(dx<0?1:-1),true);
+ else if(Math.abs(dy)>70&&Math.abs(dy)>Math.abs(dx)*1.5){const ci=CATS.findIndex(c=>c[0]===S.cat);setCat(CATS[(ci+(dy<0?1:CATS.length-1))%CATS.length][0],true)}},{passive:true});
+$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('bShop').onclick=()=>shop();$('bDev').onclick=()=>{ST.devOnly=!ST.devOnly;save();devBtn();setCat(S.cat);toast(DEV==='touch'?'📱':'💻',ST.devOnly?'Только игры для этого устройства':'Показаны все игры','')};document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
 function mute(){ST.mute=!ST.mute;save();$('bMute').textContent=ST.mute?'🔇':'🔊';if(!ST.mute)sOk()}
 $('bMute').onclick=mute;$('bMute').textContent=ST.mute?'🔇':'🔊';
 if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();else $('bFs').style.display='none';
@@ -309,12 +349,65 @@ let gl=0;(function pad(){const p=(navigator.getGamepads?[...navigator.getGamepad
   if(used)gl=now+230}
  requestAnimationFrame(pad)})();
 
+// ---------- платформа, уровни, магазин, облако ----------
+const DEV=matchMedia('(pointer:coarse)').matches?'touch':'kb';
+if(ST.devOnly===undefined)ST.devOnly=DEV==='touch';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lvl=xp=>1+Math.floor(Math.sqrt(Math.max(0,xp)/15));
+function earn(n){if(n<=0)return;const a=lvl(ST.xp);ST.coins+=n;ST.xp+=n;save();if(lvl(ST.xp)>a){toast('⭐','Новый уровень: '+lvl(ST.xp),'Загляни в магазин');chime()}}
+const SHOP={
+ av:[['😀','',0],['😎','',0],['🐱','',0],['🦊','',60],['🐼','',60],['🤖','',100],['🚀','',120],['👾','',150],['🔥','',180],['🐉','',250],['🦄','',300],['👑','',500]],
+ fr:[['none','Без рамки',0,''],['gold','Золото',80,'0 0 0 3px #ffd84a'],['neon','Неон',150,'0 0 0 3px #41e3ff,0 0 16px #41e3ff'],['fire','Огонь',250,'0 0 0 3px #ff7a2f,0 0 18px #ff3d2f'],['royal','Королевская',400,'0 0 0 3px #b07bff,0 0 18px #7a3dff']],
+ ti:[['','Без титула',0],['Гонщик','Гонщик',60],['Выживший','Выживший',60],['Стратег','Стратег',100],['Коллекционер','Коллекционер',150],['Легенда','Легенда',500]]};
+const FLD={av:'avatar',fr:'frame',ti:'title'};
+const frCss=id=>(SHOP.fr.find(f=>f[0]===id)||[])[3]||'none';
+const avh=(a,f,sz)=>`<span class="av" style="${sz?`width:${sz}px;height:${sz}px;font-size:${sz*.55}px;`:''}box-shadow:${frCss(f)}">${esc(a)}</span>`;
+function refreshTop(){$('bProf').innerHTML=avh(ST.prof.avatar,'none');$('coinb').textContent='🪙 '+ST.coins}
+function devBtn(){const b=$('bDev');b.textContent=DEV==='touch'?'📱':'💻';b.classList.toggle('off',!ST.devOnly);b.title=ST.devOnly?'Только игры для этого устройства (нажми — показать все)':'Показаны все игры (нажми — только для этого устройства)'}
+let shopTab='av';
+function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains('on');p.classList.toggle('on',on);if(!on){snd(420,.1);return}
+ const P=ST.prof,own=(k,pr)=>pr===0||ST.owned.includes(shopTab+':'+k),tabs=[['av','Аватары'],['fr','Рамки'],['ti','Титулы']];
+ $('shopBox').innerHTML=`<h3>Магазин</h3><small>🪙 ${ST.coins} · монеты дают запуски, минуты в играх и трофеи</small>
+ <div class="row" style="margin-top:10px">${tabs.map(x=>`<button class="pill${shopTab===x[0]?' sel':''}" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>
+ <div class="shopg">${SHOP[shopTab].map(it=>{const k=it[0],pr=it[2],o=own(k,pr),eq=P[FLD[shopTab]]===k;
+  const pv=shopTab==='av'?avh(k,P.frame):shopTab==='fr'?avh(P.avatar,k):`<b>${esc(it[1])}</b>`;
+  return `<div class="it${eq?' on':''}" data-k="${esc(k)}">${pv}${shopTab==='fr'?'<div>'+esc(it[1])+'</div>':''}<small>${eq?'Надето':o?'Надеть':'🪙 '+pr}</small></div>`}).join('')}</div>
+ <div class="row"><button class="pill" id="sClose">Закрыть</button></div>`;
+ $('shopBox').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{shopTab=b.dataset.t;shop(true)});
+ $('shopBox').querySelectorAll('.it').forEach(el=>el.onclick=()=>{const k=el.dataset.k,it=SHOP[shopTab].find(x=>x[0]===k),pr=it[2];
+  if(!own(k,pr)){if(ST.coins<pr){toast('🪙','Не хватает монет','Нужно '+pr);return}ST.coins-=pr;ST.owned.push(shopTab+':'+k);sOk()}
+  ST.prof[FLD[shopTab]]=k;save();shop(true)});
+ $('sClose').onclick=()=>shop(false);snd(600,.1)}
+// облако (Supabase): таблица rkc_profiles, доступ только к своей строке
+const SB_URL='https://ljljtvywrmkmamhzyqha.supabase.co',SB_KEY='sb_publishable_1Sl3av1ub0piHKAM54BFDg_8wJ8hAF6';
+let sb=null,user=null,pt=0;
+try{if(window.supabase)sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+function schedPush(){if(!user)return;clearTimeout(pt);pt=setTimeout(push,3000)}
+async function push(){if(!sb||!user)return;const P=ST.prof;
+ const{error}=await sb.from('rkc_profiles').upsert({id:user.id,nickname:P.name,avatar:P.avatar,frame:P.frame,title:P.title,coins:ST.coins,xp:ST.xp,owned:ST.owned,fav:ST.fav,stats:ST.stats,tro:ST.tro,updated_at:new Date(ST.ts||Date.now()).toISOString()});
+ if(error)toast('⚠️','Облако',error.code==='23505'?'Этот ник занят — смени его в профиле':error.message)}
+async function pull(){const{data}=await sb.from('rkc_profiles').select('*').eq('id',user.id).maybeSingle();
+ if(!data){await push();return}
+ const files=new Set(GAMES.map(g=>g.file)),num=x=>Number.isFinite(x)&&x>=0?x:0;
+ if(new Date(data.updated_at)>(ST.ts||0)){Object.assign(ST.prof,{name:data.nickname,avatar:data.avatar,frame:data.frame,title:data.title});ST.coins=num(data.coins)}
+ ST.xp=Math.max(ST.xp,num(data.xp));ST.owned=[...new Set([...ST.owned,...(data.owned||[]).filter(x=>typeof x==='string')])];
+ for(const f in data.fav||{})if(files.has(f))ST.fav[f]=1;
+ for(const f in data.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=data.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
+ for(const id in data.tro||{}){const v=num(data.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
+ save();await push();setCat(S.cat)}
+async function lb(){$('lbBox').innerHTML='<h3>Рейтинг</h3><small>Загрузка…</small>';$('lbP').classList.add('on');
+ const{data,error}=await sb.rpc('rkc_leaderboard');
+ $('lbBox').innerHTML='<h3>Рейтинг</h3><small>Топ-20 по опыту</small>'+(error?'<p>Не удалось загрузить</p>':(data||[]).map((r,i)=>`<div class="tr">${avh(r.avatar,r.frame,40)}<div><b>${i+1}. ${esc(r.nickname)}</b><span>${esc(r.title||'без титула')} · Ур. ${lvl(r.xp)}</span></div></div>`).join('')||'<p>Пока никого</p>')+'<div class="row"><button class="pill" id="lClose">Закрыть</button></div>';
+ $('lClose').onclick=closePans}
+if(sb)sb.auth.onAuthStateChange((ev,sess)=>{user=sess?sess.user:null;authReady=true;if(pendingAuth){const[f,p]=pendingAuth;pendingAuth=null;setTimeout(()=>openGame(f,p),0)}setTimeout(async()=>{if(user)await pull().catch(()=>{});if($('profP').classList.contains('on'))profile();refreshTop()},0)});
+devBtn();refreshTop();
+
 const tick=()=>$('clock').textContent=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 tick();setInterval(tick,15000);
 
 buildTabs();setCat('all');
 const lastG=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].last).sort((a,b)=>ST.stats[b.file].last-ST.stats[a.file].last)[0];
-if(lastG)select(GAMES.indexOf(lastG));
+if(lastG)select(Math.max(0,S.list.indexOf(lastG)));
 if(location.hash.length>1&&GAMES.some(g=>g.file===decodeURIComponent(location.hash.slice(1)))){$('splash').classList.add('off');fromHash()}
 </script>
 </body>
