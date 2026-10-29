@@ -20,17 +20,24 @@ canvas{display:block;background:#8fc4e8;touch-action:none}
 <canvas id="c" width="800" height="450"></canvas>
 <div id="p"></div>
 <script>
-// ===== ЧИСТЫЙ ПОНЯТНЫЙ КОД. ПРОСЬБА НЕ ТРОГАТЬ, ВСЁ РАБОТАЕТ (наверное) =====
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+    try{
+        if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+        else if(window.parent && window.parent !== window)
+            window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+    }catch(e){}
+}
+var hasMoved=false,hasDied=false,hasFlipped=false,hasDived=false;
+
 var c=document.getElementById('c'),g=c.getContext('2d'),K={};
 var x=50,y=364,vx=0,vy=0,w=24,h=36,onG=0,t=0,tm=0,st=0,won=0,dd=0,cx=0,rd=-1,ZZZ=0,tmp=0,tmp2=0,i=0,j=0,q=0,n=0,crouch=0,cpx=50,cpy=364,acc=0,last=0,best=0,flash=0,spd=1,chg=0,bx=0,bothPrev=0,jb=0,jh=0,spPrev=0,ct=0,pg=0,sl=0;
-// платформы: x,y,w,h (последняя — потолок туннеля, не спрашивай)
 var P=[[0,400,500,50],[600,400,250,50],[950,350,120,20],[1170,310,100,20],[1600,400,300,50],[2060,400,200,50],[2360,400,500,50],[2960,360,100,20],[3160,320,100,20],[3360,400,400,50],[4320,400,300,50],[2500,330,250,42]];
-var M=[[1380,330,80,16,100],[3980,380,90,14,200]];   // x,y,w,h,размах
-var MP=[[1380,330],[3980,380]];            // где она сейчас (дубль M, так надо)
-var PMX=[1380,3980];                 // где она была
+var M=[[1380,330,80,16,100],[3980,380,90,14,200]];
+var MP=[[1380,330],[3980,380]];
+var PMX=[1380,3980];
 var S=[[700,385,60],[1650,385,40],[2400,385,50]];
 var E=[[1800,380,60],[3550,380,80]];
-// ГЕНЕРАТОР ДЛИННОГО УРОВНЯ (лень писать руками)
 var T=[],prt=[],cy=0,tr=0,trk=0,fc=1,fr=0;
 var CP=[[2100,364],[4710,364],[6400,-296],[8520,184],[9990,364],[10430,364]];
 function mv(a,b,c,d){ M.push([a,b,c,14,d]); MP.push([a,b]); PMX.push(a); }
@@ -46,7 +53,6 @@ for(i=0;i<5;i++){ T.push([10800+i*340,[330,270,330,250,300][i],60]); }
 P.push([12450,300,400,50]);
 
 var L0={P:P,M:M,MP:MP,PMX:PMX,S:S,E:E,T:T,CP:CP,fin:12650,fy:300,end:12900};
-// ===== ОБУЧАЮЩИЙ УРОВЕНЬ =====
 var L1={P:[[0,400,500,50],[650,400,1470,50],[1020,100,260,272],[2570,400,1850,50],[4160,130,400,20]],M:[],MP:[],PMX:[],S:[[1500,385,45]],E:[[1800,380,60]],T:[[4000,388,60]],CP:[[1380,364],[2000,364],[3000,364]],fin:4420,fy:130,end:4700};
 var HZ1=[
 [0,650,'1 · Бег и прыжок',['A / D — бег, Space — прыжок (держи пробел — выше)','Shift — ускорение. Таймер стартует с первого движения','Перепрыгни пропасть: короткий прыжок не долетит']],
@@ -72,6 +78,9 @@ function doAct(k){
  else if(k=='KeyC'){ x=hist[0][0]; y=hist[0][1]; vy=0; cdC=180; }
  else if(k=='KeyT'){ vy=-13; }
  seen[k]=1; try{ localStorage.setItem('spag_seen',JSON.stringify(seen)); }catch(e){}
+ // --- достижения: действия ---
+ if (seen['KeyQ']) rkcUnlock('dash');
+ if (Object.keys(ACT).every(function(k2){return seen[k2];})) rkcUnlock('master_actions');
  say('✦ '+a);
 }
 function play(k){
@@ -80,8 +89,8 @@ function play(k){
  if(k=='KeyA'){ fd=-1; } if(k=='KeyD'){ fd=1; } doAct(k);
  cb.push([k,fr]); if(cb.length>5){ cb.shift(); }
  var s=cb.filter(function(e){ return fr-e[1]<45; }).map(function(e){ return e[0]; }).join();
- if(onG==0&&/KeyS,KeyS$/.test(s)){ vy=14; cb=[]; say('✦ пикирование'); }
- else if(onG==0&&flp==0&&/KeyA,KeyD,KeyA,KeyD$|KeyD,KeyA,KeyD,KeyA$/.test(s)){ vy=-9; flp=1; cb=[]; say('✦ флип'); }
+ if(onG==0&&/KeyS,KeyS$/.test(s)){ vy=14; cb=[]; say('✦ пикирование'); if(!hasDived){hasDived=true;rkcUnlock('acrobat');} }
+ else if(onG==0&&flp==0&&/KeyA,KeyD,KeyA,KeyD$|KeyD,KeyA,KeyD,KeyA$/.test(s)){ vy=-9; flp=1; cb=[]; say('✦ флип'); if(!hasFlipped){hasFlipped=true;rkcUnlock('acrobat');} }
 }
 function mul(a){ return function(){ a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function genLevel(n){
@@ -193,7 +202,7 @@ function drawStuff(){
 }
 try{best=parseFloat(localStorage.getItem('spag_best'))||0;}catch(e){}
 
-function zz(a,b,cc,dd2){ // проверка столкновений (почти)
+function zz(a,b,cc,dd2){
  for(var n1=0;n1<P.length;n1++){
   if(a<P[n1][0]+P[n1][2]&&a+cc>P[n1][0]&&b<P[n1][1]+P[n1][3]&&b+dd2>P[n1][1]){return n1;}
  }
@@ -205,25 +214,27 @@ function zz(a,b,cc,dd2){ // проверка столкновений (почт�
  }
  return -1;
 }
-function oops(){ dd=dd+1; x=cpx; y=cpy; vx=0; vy=0; crouch=0; h=36; flash=20; bx=0; chg=0; hist=[]; us={}; if(1==1){ZZZ++;} }
+function oops(){
+ dd=dd+1; x=cpx; y=cpy; vx=0; vy=0; crouch=0; h=36; flash=20; bx=0; chg=0; hist=[]; us={};
+ // --- достижение: первая смерть ---
+ if (!hasDied) { hasDied = true; rkcUnlock('first_death'); }
+ if(1==1){ZZZ++;}
+}
 function reset(){ x=50;y=364;vx=0;vy=0;t=0;tm=0;st=0;won=0;dd=0;cpx=50;cpy=364;crouch=0;h=36;rd=-1;flash=0;bx=0;chg=0;jb=0;ct=0;sl=0;onG=0;hist=[];us={}; }
 function fmt(s){ var m=Math.floor(s/60);var ss=Math.floor(s%60);var cs=Math.floor((s*100)%100);
  return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss+'.'+(cs<10?'0':'')+cs; }
 
 function doStuff(){
  if(won==1){ if(won==1){ return; } }
- if(!K.KeyW){ t=t+1; }   // W морозит время (мира, не таймера)
+ if(!K.KeyW){ t=t+1; }
  for(i=0;i<M.length;i++){ PMX[i]=MP[i][0]; MP[i][0]=M[i][0]+Math.sin(t*0.025+i*1.7)*M[i][4]; }
- // едем на платформе
  if(rd>=1000){
   tmp=MP[rd-1000][0]-PMX[rd-1000];
   x=x+tmp;
   if(zz(x,y,w,h)>=0&&zz(x,y,w,h)<1000){ x=x-tmp; }
  }
- // если платформа въехала в нас — выталкиваем вверх, красиво
  tmp2=0;
  while(zz(x,y,w,h)>=1000&&tmp2<40){ y=y-1; tmp2=tmp2+1; }
- // управление
  q=0;
  if(K.KeyA){q=-1;}
  if(K.KeyD){q=1;}
@@ -231,10 +242,11 @@ function doStuff(){
  if(K.ShiftLeft||K.ShiftRight){spd=1.8;}else{spd=1;}
  vx=q*2.6*spd;
  if(K.KeyA||K.KeyD||K.Space){st=1;}
+ // --- достижение: первые шаги ---
+ if (st && !hasMoved) { hasMoved = true; rkcUnlock('first_move'); }
  if(K.KeyS){ if(crouch==0){crouch=1;y=y+16;h=20;} }
  else{ if(crouch==1){ if(zz(x,y-16,w,36)<0){crouch=0;y=y-16;h=36;} } }
  if(crouch==1){ vx=vx*0.5; }
- // накопитель (не спрашивай зачем)
  var both=K.KeyA&&K.KeyD;
  if(both){ chg=Math.min(chg+1,60); }
  else{
@@ -258,10 +270,8 @@ function doStuff(){
  if(K.Space&&jh<120&&onG==0){ vy=vy+0.25; jh=jh+1; }else{ vy=vy+0.5; }
  spPrev=K.Space?1:0;
  if(vy>12){vy=12;}
- // двигаем по X (копипаста — это фича)
  n=Math.max(1,Math.ceil(Math.abs(vx)));
  for(i=0;i<n;i++){ x=x+vx/n; if(zz(x,y,w,h)>=0){ x=x-vx/n; bx=0; break; } }
- // двигаем по Y
  onG=0; rd=-1;
  n=Math.max(1,Math.ceil(Math.abs(vy)));
  for(i=0;i<n;i++){
@@ -273,11 +283,9 @@ function doStuff(){
  if(onG==1&&pg==0&&K.KeyS){ sl=8; }
  pg=onG;
  if(sl>0){ sl=sl-1; }
- // шипы
  for(i=0;i<S.length;i++){
   if(x<S[i][0]+S[i][2]&&x+w>S[i][0]&&y+h>S[i][1]+3&&y<S[i][1]+15){ oops(); }
  }
- // враги (позиция считается тут и ещё в drawStuff, так надёжнее)
  for(j=0;j<E.length;j++){
   tmp=E[j][0]+Math.sin(t*0.04+j)*E[j][2];
   if(x<tmp+20&&x+w>tmp&&y<E[j][1]+20&&y+h>E[j][1]){ oops(); }
@@ -288,11 +296,25 @@ function doStuff(){
  if(flash>0){ flash=flash-1; }
  if(x>FIN&&y<FY){
   won=1;
-  if(md==0&&(best==0||tm<best)){ best=tm; try{localStorage.setItem('spag_best',String(best));}catch(e){} }
+  // --- достижения: финиш ---
+  rkcUnlock('finisher');
+  if (md==1) rkcUnlock('student');
+  if (md==2) rkcUnlock('endless');
+  if (md==2 && lvn >= 10) rkcUnlock('veteran');
+  if (md==0 && dd===0) rkcUnlock('immortal');
+  if (md==0) {
+      if (tm < 120) rkcUnlock('speedrunner');
+      if (tm < 60)  rkcUnlock('marathon');
+  }
+  if(md==0&&(best==0||tm<best)){
+      best=tm;
+      try{localStorage.setItem('spag_best',String(best));}catch(e){}
+      rkcUnlock('record');
+  }
  }
 }
 
-function oldDraw(){ // старая графика, удалять нельзя, вдруг пригодится
+function oldDraw(){
  cx=Math.max(0,Math.min(x-300,4620-800));
  g.clearRect(0,0,800,450);
  g.fillStyle='#8fc4e8'; g.fillRect(0,0,800,450);

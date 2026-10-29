@@ -86,6 +86,15 @@
   <div id="res"></div>
 </div>
 <script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+  try{
+    if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+    else if(window.parent && window.parent !== window)
+      window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+  }catch(e){}
+}
+
 (() => {
 'use strict';
 
@@ -315,14 +324,12 @@ function stepCar(c, steer, brake, nit, dt) {
   c.steer = steer;
   const cs = Math.cos(c.angle), sn = Math.sin(c.angle);
   let vf = c.vx*cs + c.vy*sn, vl = -c.vx*sn + c.vy*cs;
-  // BOOST применяется только к ботам (у игрока boost всегда 1)
   const skillMult = c.isP ? 1 : (c.skill * (c.boost || 1));
   const MAXV = (nit ? 1400 : 1000) * skillMult;
   if (!brake) {
     const p = 1 - Math.max(0, vf) / MAXV;
     vf += (1400 + (nit ? 1500 : 0)) * skillMult * Math.max(0.15, p) * dt;
   } else vf -= (vf > 0 ? 2400 : 800) * dt;
-  // Ослабляем drag при boost, чтобы боты не теряли скорость
   const dragCoef = c.isP ? 0.55 : (c.boost > 1.5 ? 0.35 : 0.55);
   vf -= vf * dragCoef * dt;
   const spd = Math.hypot(vf, vl);
@@ -383,13 +390,6 @@ function updateEffects(dt) {
   }
 }
 
-// ============================================================
-//  RUBBER-BAND (без потолка)
-// ============================================================
-// Бот позади игрока: boost пропорционален отрыву (до 4x). Снимается,
-// как только gap >= -30 (бот поравнялся или обогнал).
-// Игрок 3-й и хуже: боты впереди замедляются.
-// ============================================================
 function applyRubberBand(dt) {
   for (const c of cars) { c.slowed = false; c.boosted = false; c.boost = 1; }
 
@@ -398,20 +398,17 @@ function applyRubberBand(dt) {
 
   for (const c of cars) {
     if (c.isP) continue;
-    const gap = c.prog - car.prog;   // + бот впереди, - бот позади
+    const gap = c.prog - car.prog;
     const spd = Math.hypot(c.vx, c.vy);
 
     if (gap < -30) {
-      // ── Бот позади игрока — догоняет ──
       const dist = -gap - 30;
-      // boost растёт линейно: dist=150 → 2x, dist=450 → 4x, дальше — 4x (мягкий предел)
       const n = Math.min(dist / 150, 3);
       let boost = 1 + n;
-      if (c.isBlack) boost *= 1.2;   // чёрная — яростнее
+      if (c.isBlack) boost *= 1.2;
       c.boost = boost;
       c.boosted = true;
 
-      // Дополнительный разгон, если бот сильно отстал по скорости
       const targetSpd = 1000 * c.skill * boost;
       if (spd < targetSpd * 0.95 && spd > 1) {
         const accel = Math.min((targetSpd - spd) * 3, 4000) * dt;
@@ -420,7 +417,6 @@ function applyRubberBand(dt) {
         c.vy *= k;
       }
     } else if (isBehind && gap > 30) {
-      // ── Игрок 3-й и хуже, бот впереди — замедляется ──
       const n = clamp((gap - 30) / 180, 0, 1);
       const capMult = 1 - n * 0.55;
       const maxSpd = 1000 * c.skill * capMult;
@@ -622,7 +618,6 @@ function drawCar(c) {
   g.addColorStop(0, c.col[0]); g.addColorStop(0.5, c.col[1]); g.addColorStop(1, c.col[2]);
   ctx.fillStyle = g; rr(ctx, -23, -12.5, 46, 25, 8); ctx.fill();
   ctx.fillStyle = '#1b2733'; rr(ctx, -7, -9.5, 17, 19, 5); ctx.fill();
-  // У чёрной — тёмное стекло
   if (c.isBlack) {
     ctx.fillStyle = 'rgba(180,20,20,0.35)';
     rr(ctx, 2, -8, 7, 16, 3); ctx.fill();
@@ -630,7 +625,6 @@ function drawCar(c) {
     ctx.fillStyle = 'rgba(120,190,255,0.35)';
     rr(ctx, 2, -8, 7, 16, 3); ctx.fill();
   }
-  // Фары
   if (c.isBlack) {
     ctx.fillStyle = '#ff0000';
     ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 8;
@@ -645,14 +639,12 @@ function drawCar(c) {
   ctx.fillStyle = 'rgba(255,60,60,0.9)';
   rr(ctx, -23.5, -10, 2.5, 5, 1); ctx.fill();
   rr(ctx, -23.5,   5, 2.5, 5, 1); ctx.fill();
-  // Красная полоса на чёрной
   if (c.isBlack) {
     ctx.fillStyle = 'rgba(255,0,0,0.85)';
     rr(ctx, -20, -2, 42, 4, 1); ctx.fill();
   }
   ctx.restore();
 
-  // Индикатор агрессии
   if (!c.isP && c.aggr > 0.7 && c.spd > 200) {
     const t = performance.now() * 0.006;
     const pulse = 0.5 + 0.5 * Math.sin(t);
@@ -663,7 +655,6 @@ function drawCar(c) {
     ctx.restore();
   }
 
-  // ── ЧЁРНАЯ МАШИНА: аура, череп, злая подсветка ──
   if (c.isBlack) {
     const t = performance.now() * 0.005;
     const pulse = 0.5 + 0.5 * Math.sin(t * 1.6);
@@ -676,7 +667,6 @@ function drawCar(c) {
     ctx.stroke();
     ctx.restore();
 
-    // Череп
     const skT = performance.now() * 0.004;
     const skA = 0.75 + 0.25 * Math.sin(skT * 2);
     ctx.save();
@@ -688,7 +678,6 @@ function drawCar(c) {
     ctx.restore();
   }
 
-  // ── Замедляется (голубое кольцо) ──
   if (!c.isP && c.slowed && !c.isBlack) {
     const t = performance.now() * 0.004;
     const pulse = 0.5 + 0.5 * Math.sin(t);
@@ -702,7 +691,6 @@ function drawCar(c) {
     ctx.restore();
   }
 
-  // ── Догоняет (оранжевое кольцо) ──
   if (!c.isP && c.boosted) {
     const t = performance.now() * 0.005;
     const pulse = 0.5 + 0.5 * Math.sin(t);
@@ -804,7 +792,6 @@ function drawHUD(spd) {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
   }
 
-  // ── Инфо про rubber-band ──
   if (state === 'race' && others.length >= 1) {
     const pPos = order().indexOf(car) + 1;
     const boostedCount = others.filter(o => o.boosted).length;
@@ -828,7 +815,6 @@ function drawHUD(spd) {
       ctx.fillText(msg, W/2, H - 14);
       ctx.restore();
     }
-    // Предупреждение о чёрной позади
     if (blackBoosted) {
       const t = performance.now() * 0.008;
       const pulse = 0.5 + 0.5 * Math.sin(t);
@@ -931,6 +917,7 @@ function renderMenuScene(dt) {
   }
 }
 
+const wonMaps = new Set();
 const cfg = { map: 0, opp: 3, laps: 3, dif: 1 };
 let state = 'menu', cd = 3, goT = 0, raceT = 0;
 const PAL = [['#6aa8ff','#2f6fe0','#1d3f8a'], ['#7ee08a','#2fb457','#1b6b34'], ['#ffe066','#f0b400','#9a7000'],
@@ -969,15 +956,15 @@ function mkCar(slot, isP, k, isBlack = false) {
   const a = track[i], b = track[(i + 1) % N];
   const ang = Math.atan2(b.y - a.y, b.x - a.x), o = (slot & 1 ? -1 : 1) * 46;
   const aggr = isP ? 0 : (isBlack ? 1.0 : D.aggr[0] + Math.random() * (D.aggr[1] - D.aggr[0]));
-  const col = isP 
-    ? ['#ff5a68', '#e63946', '#a81f2c'] 
-    : isBlack 
-      ? ['#333333', '#0f0f0f', '#000000'] 
+  const col = isP
+    ? ['#ff5a68', '#e63946', '#a81f2c']
+    : isBlack
+      ? ['#333333', '#0f0f0f', '#000000']
       : PAL[k % PAL.length];
-  const skill = isP 
-    ? 1 
-    : isBlack 
-      ? Math.max(D.skill + 0.10, 1.05) 
+  const skill = isP
+    ? 1
+    : isBlack
+      ? Math.max(D.skill + 0.10, 1.05)
       : D.skill + (Math.random() - 0.5) * 0.03;
   return {
     x: a.x - Math.sin(ang) * o, y: a.y + Math.cos(ang) * o, angle: ang, vx: 0, vy: 0, vf: 0, vl: 0, steer: 0,
@@ -993,21 +980,17 @@ function mkCar(slot, isP, k, isBlack = false) {
 function setupRace() {
   buildMap(cfg.map);
   cars = [];
-  // Обычные боты
   for (let k = 0; k < cfg.opp; k++) {
     cars.push(mkCar(k, false, k, false));
   }
-  // Чёрная — предпоследняя (прямо перед игроком)
   cars.push(mkCar(cfg.opp, false, 0, true));
-  // Игрок — последний
   const player = mkCar(cfg.opp + 1, true, 0);
   cars.push(player);
   car = player;
 
-  // Расстановка: каждый получает свою позицию на старте
   const total = cars.length;
   for (let i = 0; i < total; i++) {
-    const slot = total - 1 - i;   // i=total-1 (игрок) → slot 0 (последний); i=0 (первый бот) → slot=total-1 (впереди)
+    const slot = total - 1 - i;
     const seg = TRACK_N - 2 - slot * 2;
     const side = (slot & 1) ? -1 : 1;
     placeCarAt(cars[i], seg, side);
@@ -1029,6 +1012,19 @@ function showRes() {
   const o = order(), pos = o.indexOf(car) + 1, best = getBest();
   let rec = false;
   if (!best || car.ft < best) { rec = true; try { localStorage.setItem(bk(), car.ft.toFixed(2)); } catch (e) {} }
+
+  // --- достижения ---
+  rkcUnlock('first_race');
+  if (rec) rkcUnlock('record');
+  if (pos === 1) {
+    rkcUnlock('winner');
+    if (cfg.dif === 2) rkcUnlock('hard_win');
+    if (cfg.dif === 3) rkcUnlock('impossible');
+    if (cfg.laps === 7) rkcUnlock('marathon');
+    wonMaps.add(cfg.map);
+    if (wonMaps.size >= 4) rkcUnlock('traveler');
+  }
+
   const diff = DIFFS[cfg.dif];
   let title;
   if (pos === 1) title = cfg.dif === 3 ? '🏆 ЛЕГЕНДА!' : '🏆 ПОБЕДА!';
@@ -1126,7 +1122,6 @@ function aiCtl(c, dt) {
   const adherence = clamp((c.skill - 0.5) / 0.6, 0.4, 1.0);
   let targetOff = racingLine[j] * adherence + c.lane * (1 - adherence * 0.5);
 
-  // Чёрная машина — специальный режим: всегда нацелена на игрока
   if (c.isBlack) {
     const pdx = car.x - c.x, pdy = car.y - c.y;
     const pd = Math.hypot(pdx, pdy);
@@ -1177,7 +1172,6 @@ function aiCtl(c, dt) {
     const kk = Math.abs(angD(segA((c.ni + d) % N) - segA(c.ni)));
     if (kk > kMax) kMax = kk;
   }
-  // На boost тормозим заранее
   const brakeMult = c.boost > 1 ? (1 + (c.boost - 1) * 0.22) : 1;
   const brakeV = Math.max(280, (1180 - kMax * 1050) * c.skill * brakeMult);
   let br = v > brakeV + 20 && kMax > 0.06;
@@ -1185,7 +1179,6 @@ function aiCtl(c, dt) {
   if (!c.nOn && c.nitro > 0.5 && kMax < 0.1 && !br) c.nOn = true;
   if (c.nOn && (c.nitro < 0.08 || kMax > 0.18 || br)) c.nOn = false;
 
-  // Чёрная — жжёт нитро агрессивнее
   if (c.isBlack && c.nitro > 0.15 && kMax < 0.14 && !br) c.nOn = true;
 
   if (c.rubber > 0 && c.prog < car.prog - 80) {
@@ -1211,7 +1204,6 @@ function stepRace(dt) {
     if (c.isP) { st = steerValue; br = brakeHeld; nit = nitroHeld && c.nitro > 0.02; }
     else {
       [st, br, nit] = aiCtl(c, dt);
-      // Форс-нитро при догоне
       if (c.boosted && c.boost > 1.3 && c.nitro > 0.1) nit = true;
       if (c.isBlack && c.boosted && c.nitro > 0.05) nit = true;
     }
@@ -1238,12 +1230,13 @@ function stepRace(dt) {
       if (c.slip > 95 && c.spd > 160) {
         driftTimer += dt; driftCombo = Math.min(6, 1 + driftTimer * 0.55);
         score += c.slip * dt * 0.05 * driftCombo; c.nitro = Math.min(1, c.nitro + 0.22 * dt); drifting = true;
+        // --- достижение: дрифт x2 ---
+        if (driftCombo >= 2) rkcUnlock('drifter');
       } else { driftTimer = 0; driftCombo = 1; drifting = false; }
       if (c.hit) { driftTimer = 0; driftCombo = 1; }
     }
   }
 
-  // Столкновения
   for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
     const a = cars[i], b = cars[j];
     const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);

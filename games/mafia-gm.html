@@ -103,6 +103,15 @@
 </div>
 
 <script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+  try{
+    if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+    else if(window.parent && window.parent !== window)
+      window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+  }catch(e){}
+}
+
 const ROLE_MAFIA = "Мафия";
 const ROLE_CIV = "Мирный житель";
 const ROLE_SHERIFF = "Шериф";
@@ -114,7 +123,6 @@ const SETTING_PRESETS = [
 let uid = 1;
 const nextId = () => uid++;
 
-// ---------- State ----------
 let state = {
   tab: "setup",
   players: [],
@@ -139,11 +147,9 @@ let state = {
   manualPick: "",
   copied: false,
   showPrivateLogs: false,
-  // FIX: новый режим назначения ролей
-  roleAssignmentMode: "random", // "random" или "manual"
+  roleAssignmentMode: "random",
   useSheriff: false,
-  // Интервью после раунда (опциональная фишка, не влияет на игру)
-  interview: null, // { playerId, question } когда идёт интервью
+  interview: null,
   interviewPlayerPick: "",
   interviewQuestionInput: "",
   interviewAnswerInput: "",
@@ -151,7 +157,6 @@ let state = {
 
 function set(patch){ Object.assign(state, patch); render(); }
 
-// ---------- Helpers ----------
 function normalize(str){ return (str||"").toLowerCase().replace(/["'«»`]/g,"").trim(); }
 function resolvePlayerByName(rawName, candidates){
   if(!rawName) return null;
@@ -185,13 +190,13 @@ function namesList(ids){ return ids.map(id => byId(id)?.name).filter(Boolean).jo
 function currentActor(){ const id = state.turnQueue[state.turnIdx]; return id ? byId(id) : null; }
 
 function addLog(entry){
-  state.log.push({ 
-    id: nextId(), 
-    round: state.round, 
-    cyclePhase: state.cyclePhase, 
-    ts: Date.now(), 
+  state.log.push({
+    id: nextId(),
+    round: state.round,
+    cyclePhase: state.cyclePhase,
+    ts: Date.now(),
     private: entry.private || false,
-    ...entry 
+    ...entry
   });
 }
 
@@ -204,10 +209,10 @@ function checkWin(list){
 function endGame(result, list){
   state.gameOver = result;
   addLog({ system:true, text:`ИГРА ОКОНЧЕНА. Победа: ${result.winner==="mafia"?"Мафия":"Мирные жители"}. ${result.reason} Роли: ${list.map(p=>`${p.name} — ${p.role}${p.alive?"":" (выбыл)"}`).join("; ")}.` });
+  rkcUnlock('game_master');
   set({ tab:"log" });
 }
 
-// ---------- Setup actions ----------
 function addPlayer(){
   const trimmed = state.nameInput.trim();
   if(!trimmed || state.players.length >= 8) return;
@@ -217,13 +222,11 @@ function addPlayer(){
 }
 function removePlayer(id){ set({ players: state.players.filter(p=>p.id!==id) }); }
 
-// FIX: новая функция старта с учётом режима
 function startGame(){
   if(state.players.length < 4 || !state.setting.trim()) return;
 
   let withRoles;
   if(state.roleAssignmentMode === "manual") {
-    // Проверяем, что все роли назначены
     const missing = state.players.some(p => p.role === null);
     if(missing) {
       alert("Назначьте роль каждому игроку!");
@@ -231,7 +234,6 @@ function startGame(){
     }
     withRoles = state.players.map(p => ({ ...p, alive:true, lastLogIndex:0, currentEmotion:null }));
   } else {
-    // Рандом
     const mafiaCount = state.players.length >= 6 ? 2 : 1;
     const shuffled = [...state.players].sort(()=>Math.random()-0.5);
     const mafiaIds = new Set(shuffled.slice(0, mafiaCount).map(p=>p.id));
@@ -261,6 +263,7 @@ function startGame(){
   state.log = [{ id: nextId(), round:1, cyclePhase:"day", system:true, ts:Date.now(),
     text:`Игра началась. Сеттинг: «${state.setting.trim()}». Игроков: ${withRoles.length}.`, private:false }];
   set({ tab:"game" });
+  rkcUnlock('first_game');
 }
 
 function resetAll(){
@@ -272,17 +275,15 @@ function resetAll(){
   });
 }
 
-// ---------- Prompt generation ----------
 function generatePrompt(){
   const actor = currentActor();
   if(!actor) return "";
 
-  // FIX: фильтруем ВСЕ приватные сообщения (включая системные)
   const newLogs = state.log.slice(actor.lastLogIndex);
   const otherMessages = newLogs.filter(e => {
-    if (e.private && e.visibleTo !== actor.id) return false; // приватные видит только адресат (например, шериф)
-    if (e.actor && e.actor === actor.name) return false; // свои сообщения
-    return true; // остальные (системные без actor или от других)
+    if (e.private && e.visibleTo !== actor.id) return false;
+    if (e.actor && e.actor === actor.name) return false;
+    return true;
   });
 
   let replicsBlock = "";
@@ -295,7 +296,6 @@ function generatePrompt(){
       }).join("\n") + "\n\n";
   }
 
-  // ----- Основной промпт -----
   const table = namesList(aliveIds());
   const head = `Ты играешь в социальную игру «Мафия». Твоё имя за столом: ${actor.name}. Твоя роль: ${actor.role}. За столом (живые): ${table}.`;
 
@@ -354,7 +354,6 @@ function phaseLabel(){
   return "";
 }
 
-// ---------- Transitions ----------
 function startNightPhase(list){
   state.cyclePhase = "night";
   const m = aliveMafia(list);
@@ -461,7 +460,6 @@ function stepRequiredCommand(){
   return null;
 }
 
-// ---- Применение команды с флагом private ----
 function applyCommand(command, actorId, targetId, isPrivate = false){
   const actor = byId(actorId), target = byId(targetId);
   if(command==="ГОЛОС"){
@@ -479,7 +477,6 @@ function applyCommand(command, actorId, targetId, isPrivate = false){
   }
 }
 
-// ---- Обновление lastLogIndex для текущего игрока (после успешного хода) ----
 function markCurrentActorAsSeen(indexOverride){
   const actorId = state.turnQueue[state.turnIdx];
   const actor = byId(actorId);
@@ -487,7 +484,6 @@ function markCurrentActorAsSeen(indexOverride){
 }
 
 function afterActorDone(indexOverride){
-  // Обновляем индекс для текущего игрока, чтобы он больше не видел эти сообщения
   markCurrentActorAsSeen(indexOverride);
   const nextIdx = state.turnIdx + 1;
   if(nextIdx < state.turnQueue.length){ state.turnIdx = nextIdx; }
@@ -499,10 +495,8 @@ function submitStep(){
   if(!actor || !state.inputText.trim()) return;
   const text = state.inputText.trim();
   const stepLabel = phaseLabel();
-  // FIX: помечаем private ночные реплики И реплики во время голосования (анонимность обоснования)
   const isPrivatePhase = state.cyclePhase === "night" || (state.cyclePhase==="day" && state.dayStep==="vote");
 
-  // Эмоция: обновляем статус игрока и прячем саму команду из видимого текста
   const emotionRaw = parseCommand(text, "ЭМОЦИЯ");
   let displayText = text;
   if(emotionRaw){
@@ -512,7 +506,6 @@ function submitStep(){
 
   addLog({ actor: actor.name, role: actor.role, tag: stepLabel, text: displayText, private: isPrivatePhase, emotion: actor.currentEmotion || null });
 
-  // Обработка выставления (только день, не первый круг)
   if(state.cyclePhase==="day" && state.dayStep==="talk" && state.round>1){
     const nomRaw = parseCommand(text, "ВЫСТАВИТЬ");
     if(nomRaw){
@@ -525,10 +518,9 @@ function submitStep(){
   }
 
   const required = stepRequiredCommand();
-  let selfVisibleFrom = null; // FIX: если команда создаёт приватный результат для самого актёра — не отмечаем его как увиденный
+  let selfVisibleFrom = null;
   if(required){
     const raw = parseCommand(text, required);
-    // FIX: голосовать можно только за выставленных, для остальных команд — любой живой (кроме себя)
     const pool = required==="ГОЛОС"
       ? state.players.filter(p=>state.nominees.includes(p.id))
       : state.players.filter(p=>p.alive && p.id!==actor.id);
@@ -539,7 +531,6 @@ function submitStep(){
       render();
       return;
     }
-    // Для голосования private=false, для ночных команд true
     const isPrivate = (required !== "ГОЛОС");
     const preCommandLen = state.log.length;
     applyCommand(required, actor.id, target, isPrivate);
@@ -548,7 +539,7 @@ function submitStep(){
 
   state.inputText = "";
   state.manualNeeded = null;
-  afterActorDone(selfVisibleFrom);  // внутри обновит lastLogIndex (с учётом отложенного результата) и переключит ход
+  afterActorDone(selfVisibleFrom);
   render();
 }
 
@@ -565,7 +556,6 @@ function confirmManualPick(){
   render();
 }
 
-// ---------- Интервью после раунда (необязательная фишка, на исход игры не влияет) ----------
 function startInterview(){
   const playerId = Number(state.interviewPlayerPick);
   const question = state.interviewQuestionInput.trim();
@@ -586,6 +576,7 @@ function submitInterviewAnswer(){
   if(p){
     addLog({ actor: p.name, role: p.role, tag: "Интервью", text: state.interviewAnswerInput.trim(), private:false, emotion: p.currentEmotion || null });
   }
+  rkcUnlock('interviewer');
   state.interview = null;
   state.interviewPlayerPick = "";
   state.interviewQuestionInput = "";
@@ -628,9 +619,9 @@ function downloadLog(){
   const a = document.createElement("a");
   a.href = url; a.download = `mafia-log-${Date.now()}.txt`; a.click();
   URL.revokeObjectURL(url);
+  rkcUnlock('chronicler');
 }
 
-// ---------- Render ----------
 function render(){
   document.getElementById("subtitle").textContent = state.started
     ? `Сеттинг: «${state.setting}»`
@@ -661,7 +652,6 @@ function renderSetup(){
 
   const presets = SETTING_PRESETS.map(s => `<button class="preset" data-preset="${esc(s)}" ${state.started?"disabled":""}>${esc(s)}</button>`).join("");
 
-  // FIX: ручное назначение ролей
   let manualRolesHtml = "";
   if(state.roleAssignmentMode === "manual" && !state.started) {
     manualRolesHtml = `<div class="field"><label class="eyebrow">Назначьте роли вручную</label>`;
@@ -912,7 +902,6 @@ function wireEvents(){
     el.onclick = () => set({ setting: el.getAttribute("data-preset") });
   });
 
-  // FIX: обработка переключателя режима ролей
   document.querySelectorAll('input[name="role-mode"]').forEach(el => {
     el.onchange = (e) => {
       if(!state.started) {
@@ -922,7 +911,6 @@ function wireEvents(){
     };
   });
 
-  // FIX: обработка ручного выбора роли
   document.querySelectorAll('[data-role-player]').forEach(sel => {
     sel.onchange = (e) => {
       const playerId = Number(e.target.getAttribute('data-role-player'));
@@ -930,7 +918,6 @@ function wireEvents(){
       const player = byId(playerId);
       if(player) {
         player.role = role || null;
-        // обновляем кнопку старта
         const btn = $("#btn-start");
         if(btn) btn.disabled = state.started || state.players.length<4 || !state.setting.trim() || state.players.some(p => p.role === null);
       }

@@ -72,6 +72,15 @@ button:hover,button:focus-visible{background:#d8b45c;color:#1a1311;outline:none}
 <div id="ov"><div class="card"><h1 id="ti"></h1><p id="tx"></p><div id="en"></div><p class="ctl" id="ct"></p><div class="bt" id="bt"></div></div></div>
 <div id="bk" class="off"><div class="pg" id="pg"><div class="tc" id="bkc"></div><h2 id="bkt"></h2><div id="bkx"></div><div class="bkf"><button id="bkp">← Назад</button><span id="bkn"></span><button id="bkq">Вперёд →</button><button id="bkz">Закрыть</button></div></div></div></div>
 <script>
+/* ===== RKCPlay: API достижений ===== */
+function rkcUnlock(id){
+    try{
+        if(window.parent && window.parent.RKC && window.parent.RKC.unlock) window.parent.RKC.unlock(id);
+        else if(window.parent && window.parent !== window)
+            window.parent.postMessage({type:'rkc:ach:unlock', id:id}, '*');
+    }catch(e){}
+}
+
 // ================= Настройки =================
 const T=48,TIME=180,SP=165,HA=.4,RANGE=320,AMB=85,DRAIN=1/80,NOISE_AT=450;
 const D=[[1,0],[-1,0],[0,1],[0,-1]];
@@ -154,11 +163,11 @@ const ENEMIES={
  E:{name:'Старик',info:'мирно бродит, но если на него долго светить, звереет и нападает',col:'#b8a27a',
   upd(m,dt){
    m.anger=m.anger||0;
-   if(m.st=='attack'){ // нападает, пока видит вас; потеряв из виду на 4 с, успокаивается
+   if(m.st=='attack'){
     if(m.los&&m.d<360)m.lost=4;else{m.lost-=dt;if(m.lost<=0){m.st='wander';m.anger=0;m.fld=null}}
     return stepMonster(m,pf,140,dt);
    }
-   m.anger=lit(m)?Math.min(1,m.anger+dt/3):Math.max(0,m.anger-dt/8); // ярость копится за ~3 с взгляда
+   m.anger=lit(m)?Math.min(1,m.anger+dt/3):Math.max(0,m.anger-dt/8);
    if(m.anger>=1){m.st='attack';m.lost=4;ach('f_angry');return}
    wander(m,55,dt);
   },
@@ -171,11 +180,11 @@ const ENEMIES={
   glow(m,x,y){if(m.st=='attack'){ctx.fillStyle='#ff3030';dot(x-4,y-8,2.5);dot(x+4,y-8,2.5)}}},
  L:{name:'Флод',info:'как Бродяга, но видит ближе; иногда игра выдаёт ему ваши координаты на одну секунду, и он идёт в эту точку',col:'#2ac0b0',
   upd(m,dt){
-   m.pt=(m.pt==null?rnd(4,9):m.pt)-dt;m.warn=m.pt<.9&&m.pt>0; // перед «подсказкой» свет мигает и идёт рябь
+   m.pt=(m.pt==null?rnd(4,9):m.pt)-dt;m.warn=m.pt<.9&&m.pt>0;
    if(m.pt<=0){m.pt=rnd(8,15);m.warn=false;m.st='ping';m.tc=[P.x/T|0,P.y/T|0];m.fld=field(m.tc[0],m.tc[1]);m.t=null;m.lost=7}
    const hf=hunt(m,200,3,dt);if(hf)return stepMonster(m,hf,125,dt);
    if(lureStep(m,85,dt))return;
-   if(m.st=='ping'){ // идёт на координаты, снятые в момент «подсказки», а не за вами
+   if(m.st=='ping'){
     m.lost-=dt;if(!m.fld)m.fld=field(m.tc[0],m.tc[1]);
     if(m.fld[(m.y/T|0)*W+(m.x/T|0)]==0||m.lost<=0){m.st='wander';m.fld=null;return}
     return stepMonster(m,m.fld,125,dt);
@@ -204,7 +213,7 @@ function hunt(m,rng,mem,dt){
 function wander(m,sp,dt){
  if(!m.fld||m.fld[(m.y/T|0)*W+(m.x/T|0)]==0){
   let c,n=0;
-  if(Math.random()<.3){ // иногда патрулирует поближе к игроку
+  if(Math.random()<.3){
    const nr=floors.filter(f=>{const d=Math.hypot(f[0]*T-P.x,f[1]*T-P.y);return d>T*5&&d<T*12});
    if(nr.length)c=nr[Math.random()*nr.length|0];
   }
@@ -230,12 +239,11 @@ ENEMIES.A={name:'Художник',info:'медленно гонится; тел
   if(m.tp>0){ctx.strokeStyle='rgba(224,160,64,'+(.4+.4*Math.sin(performance.now()/90))+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(m.x,m.y,18+(5-m.tp)*5,0,7);ctx.stroke()}},
  glow(m,x,y){ctx.fillStyle='#ffd27a';dot(x-5,y-3,2.5);dot(x+5,y-3,2.5)}};
 ENEMIES.A.hears=1;
-ENEMIES.Z.cool=5; // вес врага в «крутости» (по умолчанию 20); Зритель атмосферный
-ENEMIES.W.hears=ENEMIES.L.hears=ENEMIES.H.hears=1; // кто слышит приманку
-const sel=new Set(Object.keys(ENEMIES)); // какие враги включены в обычной игре
+ENEMIES.Z.cool=5;
+ENEMIES.W.hears=ENEMIES.L.hears=ENEMIES.H.hears=1;
+const sel=new Set(Object.keys(ENEMIES));
 
 // ================= Карта =================
-// Символы: X крест · D дверь · K кнопка · V камера (провода — строка @ в конце) · P старт и щиток · F предохранитель · B батарейка · # стена · G стекло · C штора · . пол · W S N H враги
 const ALLOWED='P'+Object.keys(ITEMS).join('')+Object.keys(TILES).join('')+Object.keys(ENEMIES).filter(k=>!ENEMIES[k].nospawn).join('');
 const BR='#'.repeat(31),COR='#'+'.'.repeat(29)+'#',row=(...r)=>'#'+r.join('#')+'#';
 const DA='###.#####.#####.#####.#####.###',DB='##.#####.#####.#####.#####.####';
@@ -256,8 +264,6 @@ const DEFAULT_MAP=(()=>{
  [[6,2,'G'],[24,9,'G'],[12,16,'G'],[5,4,'G'],[19,11,'G'],[13,7,'G'],[9,4,'C'],[21,11,'C'],[14,14,'C'],[26,7,'C'],[27,6,'B'],[29,20,'N'],[27,16,'E'],[28,2,'X'],[4,17,'X'],[9,17,'L'],[15,4,'D'],[14,3,'K'],[20,7,'D'],[21,8,'K'],[3,11,'D'],[2,10,'K'],[7,5,'V'],[23,5,'V'],[15,12,'V']].forEach(([x,y,c])=>m[y][x]=c);
  return [...m.map(r=>r.join('')),'@14,3>15,4;21,8>20,7;2,10>3,11;2,10>15,4'];
 })();
-// ================= Реестр базовых карт =================
-// Добавить карту: новый объект в MAPS (rows — строки карты как в «Текст карты», можно с последней строкой проводов «@»).
 const MAPS=[
  {id:'hotel',name:'Отель «Закат»',desc:'стандартная карта: пять комнат, все враги',rows:DEFAULT_MAP},
  {id:'train',name:'Тренировка',desc:'маленький зал: 2 предохранителя, Бродяга',rows:[
@@ -285,7 +291,7 @@ function sync(){
 }
 function find(ch){const r=[];map.forEach((row,y)=>row.forEach((c,x)=>{if(c==ch)r.push([x,y])}));return r}
 const mapText=()=>map.map(r=>r.join('')).join('\n')+'\n@'+wires.map(w=>w.b+'>'+w.d).join(';');
-function save(){ // любая правка делает карту «Моей»; прежняя «Моя» уходит в резервную копию
+function save(){
  try{if(mapSel!='mine'){const o=localStorage.getItem('hotelMap2');if(o)localStorage.setItem('hotelMapBackup',o)}
  localStorage.setItem('hotelMap2',mapText());localStorage.removeItem('hotelMapSel')}catch(e){}
  mapSel='mine';
@@ -362,12 +368,12 @@ function start(tst){
 }
 function updMonster(m,dt){
  m.d=Math.hypot(m.x-P.x,m.y-P.y);m.los=LOS(m.x,m.y,P.x,P.y);
- if(m.cross>0){ // распят: стоит, светится и не атакует, затем исчезает из раунда
+ if(m.cross>0){
   m.warn=false;m.cross-=dt;if(m.cross<=0){ach('cross_'+m.k);mons.splice(mons.indexOf(m),1)}return;
  }
  if(m.stun>0){m.stun-=dt;m.warn=false;return}
  if(m.d<20){
-  if(angel){ // Долф блокирует атаку один раз за раунд
+  if(angel){
    angel=false;aFx=1.5;say('Долф принял удар на себя! Бегите.');
    for(const o of mons)if(Math.hypot(o.x-P.x,o.y-P.y)<34){o.stun=4;ach('def_'+o.k)}
    return;
@@ -375,7 +381,7 @@ function updMonster(m,dt){
   ach('lose_'+m.k);lostBy=m.k;return end(false,'Вас поймал враг: '+ENEMIES[m.k].name+'.');
  }
  m.sk=Math.hypot(m.x-(m.lx||0),m.y-(m.ly||0))<.4?(m.sk||0)+dt:0;m.lx=m.x;m.ly=m.y;
- if(m.sk>1.5&&m.st!='attack'){m.fld=null;m.t=null;m.sk=0} // застрял — выбрать другой путь
+ if(m.sk>1.5&&m.st!='attack'){m.fld=null;m.t=null;m.sk=0}
  fn?fnAI(m,dt):ENEMIES[m.k].upd(m,dt);
 }
 function upd(dt){
@@ -385,12 +391,12 @@ function upd(dt){
  if(P.mv){const t=trail[trail.length-1];if(Math.hypot(P.x-t[0],P.y-t[1])>=10)trail.push([P.x,P.y])}
  P.a=Math.atan2(mouse.y-VH/2,mouse.x-VW/2);
  bat=Math.max(0,Math.min(1,bat-DRAIN*dt*(fn?.35*(od.l+od.r)+(tab?.5:0)-.8:drain())));lr=RANGE*(.35+.65*bat);
- tLeft-=dt;if(fn&&tLeft<=0){tLeft=0;return end(true,'🟡 Жёлтый: «6:00! Ты дожил, охранник. Зарплата: моё уважение.»')}if(tLeft<=0){tLeft=0;if(!ot)startOT();updOT(dt);if(S!='play')return;if(ot.ph=='red')lr=26} // фонарик гаснет, пока всё красное
+ tLeft-=dt;if(fn&&tLeft<=0){tLeft=0;return end(true,'🟡 Жёлтый: «6:00! Ты дожил, охранник. Зарплата: моё уважение.»')}if(tLeft<=0){tLeft=0;if(!ot)startOT();updOT(dt);if(S!='play')return;if(ot.ph=='red')lr=26}
  pfT-=dt;if(pfT<=0){pf=field(P.x/T|0,P.y/T|0);pfn=pf.map(v=>-v);pfT=.25}
  watcherTick(dt);
  if(fn&&fnTick(dt))return;
  for(const m of mons){updMonster(m,dt);if(S!='play')return}
- for(let i=0;i<mons.length;i++)for(let j=i+1;j<mons.length;j++){ // враги не слипаются в одну точку
+ for(let i=0;i<mons.length;i++)for(let j=i+1;j<mons.length;j++){
   const a=mons[i],b=mons[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
   if(d>0&&d<24){const k=(24-d)/2/d;if(!hard(a.x-dx*k,a.y-dy*k)){a.x-=dx*k;a.y-=dy*k}if(!hard(b.x+dx*k,b.y+dy*k)){b.x+=dx*k;b.y+=dy*k}}
  }
@@ -398,13 +404,10 @@ function upd(dt){
  if(tab&&camList.length){rdCams.add((ci%camList.length+camList.length)%camList.length);if(camList.length>1&&rdCams.size>=camList.length)ach('c_all')}
  lureCd=Math.max(0,lureCd-dt);lureFx=Math.max(0,lureFx-dt);if(lure){lure.t-=dt;if(lure.t<=0)lure=null}
 }
-// ================= Приманка: E в планшете =================
-// Звук и вспышка на текущей камере. Слышат враги с hears:1 (путь до камеры ≤ 28 клеток, закрытые двери глушат звук),
-// кроме тех, кто уже гонится за игроком. Остальные (Статуя, Шум, Старик, Зритель) не реагируют.
 let lure=null,lureCd=0,lureFx=0,lureN=0;
 function beep(){try{const a=beep.c||(beep.c=new (window.AudioContext||window.webkitAudioContext)()),o=a.createOscillator(),g=a.createGain(),t=a.currentTime;
  o.type='square';o.frequency.setValueAtTime(880,t);o.frequency.exponentialRampToValueAtTime(220,t+.35);
- g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.4);o.connect(g);g.connect(a.destination);o.start();o.stop(t+.4)}catch(e){}}
+ g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.4);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.4)}catch(e){}}
 function useLure(){
  if(S!='play'||!tab||!camList.length||lureCd>0)return;
  const c=camList[(ci%camList.length+camList.length)%camList.length],f=field(c[0],c[1]);
@@ -416,7 +419,7 @@ function useLure(){
  }
  ach('c_lure');if(n>=2)ach('c_lure2');
 }
-function lureStep(m,sp,dt){ // идёт на звук, постоит и послушает 2,5 с, затем возвращается к обычному поведению
+function lureStep(m,sp,dt){
  if(!lure||m.lureId!==lure.id)return false;
  const f=lure.f,c=(m.y/T|0)*W+(m.x/T|0);
  if(f[c]==0||m.lw!=null){m.lw=(m.lw==null?2.5:m.lw)-dt;if(m.lw<=0){m.lureId=0;m.lw=null;m.fld=null;return false}return true}
@@ -472,8 +475,8 @@ function show(title,text,btns){
  document.querySelectorAll('.mx,.sub,.rec').forEach(e=>e.remove());$('ov').firstChild.classList.remove('mm');$('en').innerHTML='';$('en').style.cssText='';const bt=$('bt');bt.innerHTML='';
  btns.forEach(([t,f])=>btn(bt,t,f));$('ov').classList.remove('off');
 }
+
 // ================= Ачивки =================
-// Группы с врагами строятся из ENEMIES сами: новый враг получает свои ачивки автоматически.
 const AG=[['p','Прохождение'],['w','Выиграть с [враг] в раунде'],['x','Очистить крестом [враг]'],['l','Проиграть от [враг или времени]'],['d','Защититься от [враг] (Долф)'],['i','Предметы'],['b','Строительство'],['c','Камеры и приманка'],['f','Весёлые'],['ch','Челленджи']];
 const ACH=[],defA=(g,id,n,d)=>ACH.push({g,id,n,d});
 for(const k in ENEMIES){const e=ENEMIES[k];
@@ -490,11 +493,12 @@ defA('l','lose_time','Время','Время вышло, и за вами пр�
 ].forEach(a=>defA(...a));
 let AS={a:{},wins:0},rdTab=false,rdBat=0,rdCams=new Set(),lastCool=0;
 try{AS=Object.assign(AS,JSON.parse(localStorage.getItem('hotelAch')||'{}'))}catch(e){}
+try{Object.keys(AS.a||{}).forEach(id=>rkcUnlock(id));}catch(e){}
 const saveA=()=>{try{localStorage.setItem('hotelAch',JSON.stringify(AS))}catch(e){}};
-function ach(id){ // в тестовом запуске считаются только ачивки строительства
+function ach(id){
  if(AS.a[id]||(test&&id[0]!='b'))return;
  const a=ACH.find(x=>x.id==id);if(!a)return;
- AS.a[id]=1;saveA();toasts.push(a);if(!toastOn)nextToast();
+ AS.a[id]=1;saveA();rkcUnlock(id);toasts.push(a);if(!toastOn)nextToast();
 }
 const toasts=[];let toastOn=false;
 function nextToast(){
@@ -527,9 +531,6 @@ function openAch(){
 }
 
 // ================= Овертайм: Снейк =================
-// Время вышло: экран краснеет, предметы и двери не работают. Снейк летит со стороны за картой напрямую, игнорируя стены (~8 с).
-// Крест (единственное, что работает) возвращает свет и запускает очищение, но в самом конце оно срывается:
-// Снейк ускоряется в 1,5 раза и снова краснеет. Убивает мгновенно, даже со щитом Долфа.
 let ot=null;const OT_CLEAN=6;
 function startOT(){
  tab=false;const a=Math.random()*7,R=Math.hypot(W*T,H*T)/2+140,x=W*T/2+Math.cos(a)*R,y=H*T/2+Math.sin(a)*R,d=Math.hypot(x-P.x,y-P.y);
@@ -570,7 +571,6 @@ function drawOT(ox,oy){
 }
 
 // ================= Голоса света после проигрыша =================
-// Голубой подсказывает, как победить врага, красный усмехается над не успевшим по таймеру.
 let lostBy=null;
 const TIPS={W:'Бродяга бежит, пока видит тебя. Уйди за угол, и он пойдёт только туда, где тебя потерял.',
  S:'Статуя двигается, только пока на неё не светят. Держи её в луче и не отводи свет.',
@@ -586,8 +586,7 @@ function voice(by){
  d.textContent=(red?'🔴 Красный свет: ':'🔵 Долф: ')+t+(red?'':' Крест (E) остановит любого, кого видишь.');$('en').appendChild(d);
 }
 
-// ================= Крутость: награда за сложность =================
-// враги (по весу), скорость (остаток времени), заряд фонарика. Считается только за победу в обычной игре.
+// ================= Крутость =================
 const RANKS=[[200,'Король отеля'],[150,'Легенда'],[100,'Смельчак'],[50,'Электрик'],[0,'Новичок']];
 const getBest=()=>{try{return +localStorage.getItem('hotelBest')||0}catch(e){return 0}};
 function coolText(){
@@ -633,7 +632,6 @@ function menu(){
 }
 
 // ================= Блокнот =================
-// t — тема, p — две страницы, h — свои заголовки страниц, blue — голубое оформление
 const BOOK=[
 {t:'Меню',p:[
 `Блокнот. Пишу карандашом, пока руки помнят.
@@ -731,39 +729,38 @@ function closeBook(){book=false;$('bk').classList.add('off')}
 BOOK.forEach(t=>btn($('bkc'),t.t,()=>{bp=PAGES.findIndex(g=>g.tp==t.t);renderBook()}));
 $('bkp').onclick=()=>flip(-1);$('bkq').onclick=()=>flip(1);$('bkz').onclick=closeBook;
 
-// ================= Зритель: события без точки появления =================
+// ================= Зритель =================
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const freeAt=(x,y)=>{const gy=y/T|0,gx=x/T|0;return grid[gy]!==undefined&&grid[gy][gx]===0&&op[gy][gx]===0};
 const nbFloor=(cx,cy)=>D.map(([a,b])=>[cx+a,cy+b]).filter(([x,y])=>grid[y]&&grid[y][x]===0&&op[y][x]===0);
-// клетка типа ch на расстоянии min..max от игрока, рядом с которой есть свободная клетка в зоне видимости
 function pickTile(ch,min,max){
  const c=find(ch).map(([x,y])=>[x,y,Math.hypot(x*T+T/2-P.x,y*T+T/2-P.y)]).filter(q=>q[2]>min&&q[2]<max).sort(()=>Math.random()-.5);
  for(const [x,y] of c){const n=nbFloor(x,y).filter(([a,b])=>LOS(P.x,P.y,a*T+T/2,b*T+T/2));if(n.length)return{x,y,n:n[Math.random()*n.length|0]}}
  return null;
 }
 const SPAWN={
- turn(){ // мелькает в луче после поворота фонарика
+ turn(){
   for(let i=0;i<14;i++){const a=P.a+rnd(-.25,.25),d=rnd(130,260),x=P.x+Math.cos(a)*d,y=P.y+Math.sin(a)*d;
    if(freeAt(x,y)&&LOS(P.x,P.y,x,y)){ws.push({kind:'flash',x,y,t:0,life:rnd(.25,.5)});return true}}
   return false;
  },
- cin(){ // стоит у шторы и уходит в неё
+ cin(){
   const q=pickTile('C',90,400);if(!q)return false;
   const ax=q.n[0]*T+T/2,ay=q.n[1]*T+T/2;ws.push({kind:'cin',x:ax,y:ay,ax,ay,cx:q.x*T+T/2,cy:q.y*T+T/2,t:0,life:1.9});return true;
  },
- cout(){ // выходит из шторы и проскальзывает перед игроком
+ cout(){
   const q=pickTile('C',100,420);if(!q)return false;
   const sx=q.x*T+T/2,sy=q.y*T+T/2,tx=P.x+Math.cos(P.a)*90,ty=P.y+Math.sin(P.a)*90,d=Math.hypot(tx-sx,ty-sy);
   if(d<60)return false;
   ws.push({kind:'cout',x:sx,y:sy,vx:(tx-sx)/d*300,vy:(ty-sy)/d*300,t:0,life:Math.min(2.2,(d+220)/300)});return true;
  },
- glass(v){ // смотрит из-за стекла
+ glass(v){
   const q=pickTile('G',100,420);if(!q)return false;
   ws.push({kind:'glass',v,x:q.x*T+T/2,y:q.y*T+T/2,t:0,life:v=='press'?rnd(2,3.5):v=='wave'?rnd(2,3.2):rnd(1.4,2.6)});return true;
  },
- gwave(){return SPAWN.glass('wave')}, // машет рукой из-за стекла
- gpress(){return SPAWN.glass('press')}, // прижимается к стеклу, пропадает, если подойти
- gwalk(){ // идёт рядом с вами по ту сторону стекла; пропадает, когда вы заходите на его сторону
+ gwave(){return SPAWN.glass('wave')},
+ gpress(){return SPAWN.glass('press')},
+ gwalk(){
   const free=(x,y)=>grid[y]&&grid[y][x]===0;
   const c=find('G').map(([x,y])=>({x,y,a:x*T+T/2,b:y*T+T/2})).filter(q=>{const d=Math.hypot(q.a-P.x,q.b-P.y);return d>60&&d<230}).sort(()=>Math.random()-.5);
   for(const q of c){
@@ -774,19 +771,19 @@ const SPAWN={
   }
   return false;
  },
- back(){ // появляется за спиной и пропадает, как только луч поворачивается к нему
+ back(){
   for(let i=0;i<14;i++){const a=P.a+Math.PI+rnd(-.5,.5),d=rnd(110,220),x=P.x+Math.cos(a)*d,y=P.y+Math.sin(a)*d;
    if(freeAt(x,y)&&LOS(P.x,P.y,x,y)){ws.push({kind:'back',x,y,t:0,life:rnd(4,7)});return true}}
   return false;
  },
- dpeek(){ // выглядывает из открытого дверного проёма
+ dpeek(){
   const q=pickTile('D',110,420);if(!q||ds[dkey(q.x,q.y)])return false;
   ws.push({kind:'dpeek',x:q.x*T+T/2,y:q.y*T+T/2,t:0,life:rnd(1.2,2)});return true;
  },
- cedge(){ // заглядывает в угол кадра камеры и уходит при переключении
+ cedge(){
   ws.push({kind:'cedge',x:-9999,y:-9999,t:0,life:rnd(1.3,2.4),cx:camT,sx:Math.random()<.5?-1:1,sy:Math.random()<.5?-1:1});return true;
  },
- cam(){ // на камерах: либо мелькает в кадре, либо закрывает весь экран камеры до переключения
+ cam(){
   if(Math.random()<.45){cover=true;coverStamp=camT;return true}
   const c=camList[(ci%camList.length+camList.length)%camList.length],X=c[0]*T+T/2,Y=c[1]*T+T/2;
   for(let i=0;i<14;i++){const a=rnd(0,6.28),d=rnd(70,230),x=X+Math.cos(a)*d,y=Y+Math.sin(a)*d;
@@ -794,7 +791,7 @@ const SPAWN={
   return false;
  }
 };
-const nextW=short=>{wT=short||Math.random()<.25?rnd(1.5,4):rnd(8,22)}; // иногда подряд, иногда долго тишина
+const nextW=short=>{wT=short||Math.random()<.25?rnd(1.5,4):rnd(8,22)};
 function watcherTick(dt){
  for(const w of ws){
   w.t+=dt;
@@ -808,7 +805,7 @@ function watcherTick(dt){
  ws=ws.filter(w=>w.t<w.life);
  const da=Math.abs(angDiff(P.a,wa));wa=P.a;
  if(!watcherOn)return;
- if(armed){ // ждём, пока игрок резко повернёт луч
+ if(armed){
   armed.t-=dt;
   if(tab||armed.t<=0){armed=null;nextW(true)}
   else if(da/dt>3&&SPAWN.turn()){armed=null;nextW()}
@@ -822,7 +819,7 @@ function watcherTick(dt){
  }
  nextW(true);
 }
-function gwalkStep(w){ // держится по ту сторону стекла напротив игрока
+function gwalkStep(w){
  const s=w.ax=='v'?Math.sign(P.y-w.gy):Math.sign(P.x-w.gx);
  if(s!=w.s||Math.hypot(P.x-w.gx,P.y-w.gy)>340){w.t=w.life;return}
  if(w.ax=='v'){w.x=Math.max(w.gx-T*2.2,Math.min(w.gx+T*2.2,P.x));w.y=w.gy-w.s*T*.75}
@@ -844,7 +841,7 @@ function drawWatcher(w){
  const gt=w.kind=='glass'?[w.x,w.y]:w.kind=='gwalk'?[w.gx,w.gy]:null;
  if(gt){const gx=(gt[0]/T|0)*T,gy=(gt[1]/T|0)*T;ctx.fillStyle='rgba(120,190,220,.34)';ctx.fillRect(gx,gy,T,T);ctx.strokeStyle='rgba(230,248,255,.65)';ctx.lineWidth=2;ctx.strokeRect(gx+2,gy+2,T-4,T-4)}
 }
-function glitchFx(){ // рябь и мигание перед тем, как Флод получит ваши координаты
+function glitchFx(){
  if(!mons.some(m=>m.warn))return;
  if(Math.random()<.35){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,VW,VH)}
  for(let i=0;i<9;i++){ctx.fillStyle='rgba(120,255,240,'+(.06+Math.random()*.12)+')';ctx.fillRect(0,Math.random()*VH,VW,1+Math.random()*3)}
@@ -878,7 +875,7 @@ function drawTile(x,y,tm){
   ctx.fillStyle='#3a2a21';ctx.fillRect(X,Y,T,T);
   ctx.fillStyle='#54392c';ctx.fillRect(X+2,Y+2,T-4,T-4);
   ctx.fillStyle='rgba(255,220,170,.1)';ctx.fillRect(X+2,Y+2,T-4,2);
-  if(south){ // лицевая сторона стены с панелью и золотым плинтусом
+  if(south){
    ctx.fillStyle='#6e4a36';ctx.fillRect(X,Y+T-15,T,15);
    ctx.fillStyle='#8a6446';ctx.fillRect(X,Y+T-15,T,2);
    ctx.fillStyle='#a98a4a';ctx.fillRect(X,Y+T-6,T,2);
@@ -895,7 +892,7 @@ function drawTile(x,y,tm){
  ctx.strokeStyle='rgba(200,160,90,.15)';ctx.lineWidth=1;ctx.strokeRect(X+4.5,Y+4.5,T-9,T-9);
  ctx.fillStyle='rgba(200,160,90,.09)';ctx.beginPath();ctx.moveTo(X+T/2,Y+13);ctx.lineTo(X+T-13,Y+T/2);ctx.lineTo(X+T/2,Y+T-13);ctx.lineTo(X+13,Y+T/2);ctx.fill();
  if(h%13==0){ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(X+T/2,Y+T/2,13,9,h%3,0,7);ctx.fill()}
- if(y>0&&map[y-1][x]=='#'){ // тень от стены сверху и слева
+ if(y>0&&map[y-1][x]=='#'){
   ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(X,Y,T,5);ctx.fillStyle='rgba(0,0,0,.17)';ctx.fillRect(X,Y+5,T,5);ctx.fillStyle='rgba(0,0,0,.07)';ctx.fillRect(X,Y+10,T,5);
  }
  if(x>0&&map[y][x-1]=='#'){ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(X,Y,4,T);ctx.fillStyle='rgba(0,0,0,.09)';ctx.fillRect(X+4,Y,5,T)}
@@ -979,7 +976,6 @@ function draw(){
  world(tm,P.x,P.y);
  ctx.restore();
 
- // темнота с мягкой кромкой луча (три слоя) и холодным оттенком
  dc.globalCompositeOperation='source-over';dc.clearRect(0,0,VW,VH);
  dc.fillStyle='rgba(4,6,13,.975)';dc.fillRect(0,0,VW,VH);
  dc.globalCompositeOperation='destination-out';
@@ -990,7 +986,6 @@ function draw(){
  for(const m of mons)if(m.cross>0){const sx=m.x+ox,sy=m.y+oy,g=dc.createRadialGradient(sx,sy,10,sx,sy,170);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');dc.fillStyle=g;dc.fillRect(sx-170,sy-170,340,340)}
  ctx.drawImage(dk,0,0);
 
- // тёплый свет фонарика поверх
  ctx.globalCompositeOperation='lighter';
  const wg=ctx.createRadialGradient(VW/2,VH/2,10,VW/2,VH/2,R);
  wg.addColorStop(0,'rgba(255,205,130,.2)');wg.addColorStop(.6,'rgba(255,190,110,.09)');wg.addColorStop(1,'rgba(255,180,100,0)');
@@ -1000,15 +995,14 @@ function draw(){
  ctx.beginPath();ctx.moveTo(VW/2,VH/2);for(const [x,y] of pa)ctx.lineTo(x+ox,y+oy);ctx.closePath();ctx.fillStyle=ag;ctx.fill();
  ctx.globalCompositeOperation='source-over';
  ctx.save();ctx.globalCompositeOperation='lighter';
- if(!fn&&LOS(P.x,P.y,PX,PY)){ // щиток светится во тьме: ориентир
+ if(!fn&&LOS(P.x,P.y,PX,PY)){
   const sx=PX+ox,sy=PY+oy,g=ctx.createRadialGradient(sx,sy,2,sx,sy,64),c=stored>=NF?'95,211,122':'217,137,58';
   g.addColorStop(0,'rgba('+c+',.4)');g.addColorStop(1,'rgba('+c+',0)');ctx.fillStyle=g;ctx.fillRect(sx-64,sy-64,128,128)}
- if(Math.sin(tm/400)>0)for(const [x,y] of camList){ // красные огоньки камер
+ if(Math.sin(tm/400)>0)for(const [x,y] of camList){
   const wx=x*T+T/2+8,wy=y*T+T/2-5;if(Math.hypot(wx-P.x,wy-P.y)>480||!LOS(P.x,P.y,x*T+T/2,y*T+T/2))continue;
   const sx=wx+ox,sy=wy+oy,g=ctx.createRadialGradient(sx,sy,1,sx,sy,18);g.addColorStop(0,'rgba(255,48,48,.75)');g.addColorStop(1,'rgba(255,48,48,0)');ctx.fillStyle=g;ctx.fillRect(sx-18,sy-18,36,36)}
  ctx.restore();
 
- // пылинки в луче
  for(const d of dust){
   const sx=(((d.x*VW+tm/1000*d.vx-P.x)%VW)+VW)%VW,sy=(((d.y*VH+tm/1000*d.vy-P.y)%VH)+VH)%VH;
   const dx=sx-VW/2,dy=sy-VH/2,dist=Math.hypot(dx,dy);
@@ -1016,35 +1010,32 @@ function draw(){
   ctx.fillStyle='rgba(255,236,190,'+(.18+.22*(.5+.5*Math.sin(tm/600+d.ph)))*(1-dist/R)+')';dot(sx,sy,d.r);
  }
 
- // светящиеся детали
  ctx.fillStyle='rgba('+(stored>=NF?'95,211,122':'217,137,58')+','+(.5+.5*Math.sin(tm/500))+')';dot(PX+ox,PY+oy-22,3);
  for(const m of mons){const g=ENEMIES[m.k].glow;if(g&&m.los&&m.d<520)g(m,m.x+ox,m.y+oy)}
- for(const m of mons)if(m.cross>0){ // яркий голубой свет распятия
+ for(const m of mons)if(m.cross>0){
   const sx=m.x+ox,sy=m.y+oy,k=Math.min(1,m.cross/.5),g=ctx.createRadialGradient(sx,sy,4,sx,sy,160);
   g.addColorStop(0,'rgba(170,235,255,'+.95*k+')');g.addColorStop(.4,'rgba(80,170,255,'+.45*k+')');g.addColorStop(1,'rgba(60,150,255,0)');
   ctx.globalCompositeOperation='lighter';ctx.fillStyle=g;ctx.fillRect(sx-160,sy-160,320,320);ctx.globalCompositeOperation='source-over';
   ctx.strokeStyle='rgba(255,255,255,'+k+')';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(sx,sy-44);ctx.lineTo(sx,sy-14);ctx.moveTo(sx-10,sy-36);ctx.lineTo(sx+10,sy-36);ctx.stroke();
  }
  for(const w of ws){if(w.hid||w.kind=='cedge')continue;if(Math.hypot(w.x-P.x,w.y-P.y)<400&&LOS(P.x,P.y,w.x,w.y))ach('f_watch');const d=Math.hypot(w.x-P.x,w.y-P.y);if(d<520&&LOS(w.x,w.y,P.x,P.y)){ctx.fillStyle='#f4f4ff';dot(w.x+ox-3,w.y+oy-19,1.7);dot(w.x+ox+3,w.y+oy-19,1.7)}}
- if(angel||aFx>0){ // голубая аура ангела-хранителя
+ if(angel||aFx>0){
   const cx=VW/2,cy=VH/2,r=angel?26+Math.sin(tm/300)*2:26+(1.5-aFx)*110,a=angel?.5:aFx/1.5;
   const ag2=ctx.createRadialGradient(cx,cy,r*.4,cx,cy,r+10);ag2.addColorStop(0,'rgba(120,200,255,0)');ag2.addColorStop(.8,'rgba(120,200,255,'+a*.5+')');ag2.addColorStop(1,'rgba(120,200,255,0)');
   ctx.globalCompositeOperation='lighter';ctx.fillStyle=ag2;ctx.fillRect(cx-r-12,cy-r-12,2*r+24,2*r+24);ctx.globalCompositeOperation='source-over';
   ctx.strokeStyle='rgba(160,220,255,'+a+')';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();
  }
 
- // виньетка и красный край при близкой опасности
  let dg=0;for(const m of mons)if(m.los&&m.d<260)dg=Math.max(dg,1-m.d/260);
  dang+=(dg-dang)*.08;
  const r0=Math.min(VW,VH)*.3,r1=Math.hypot(VW,VH)*.6,vg=ctx.createRadialGradient(VW/2,VH/2,r0,VW/2,VH/2,r1);
  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.55)');ctx.fillStyle=vg;ctx.fillRect(0,0,VW,VH);
  if(dang>.01){const dv=ctx.createRadialGradient(VW/2,VH/2,r0,VW/2,VH/2,r1);dv.addColorStop(0,'rgba(160,10,10,0)');dv.addColorStop(1,'rgba(160,10,10,'+dang*.55+')');ctx.fillStyle=dv;ctx.fillRect(0,0,VW,VH)}
 
- if(!ot&&S=='play'&&tLeft<30){const f=Math.sin(tm/90)*Math.sin(tm/37)*Math.sin(tm/13);if(f>.55){ctx.fillStyle='rgba(180,0,0,'+(.06+.14*(1-tLeft/30))+')';ctx.fillRect(0,0,VW,VH)}} // лампы мигают красным
+ if(!ot&&S=='play'&&tLeft<30){const f=Math.sin(tm/90)*Math.sin(tm/37)*Math.sin(tm/13);if(f>.55){ctx.fillStyle='rgba(180,0,0,'+(.06+.14*(1-tLeft/30))+')';ctx.fillRect(0,0,VW,VH)}}
  if(ot&&S=='play')drawOT(ox,oy);
- ctx.save();ctx.translate(Math.random()*128|0,Math.random()*128|0);ctx.globalAlpha=.07;ctx.fillStyle=grain();ctx.fillRect(-128,-128,VW+128,VH+128);ctx.restore(); // плёночное зерно
+ ctx.save();ctx.translate(Math.random()*128|0,Math.random()*128|0);ctx.globalAlpha=.07;ctx.fillStyle=grain();ctx.fillRect(-128,-128,VW+128,VH+128);ctx.restore();
  glitchFx();
- // интерфейс
  ctx.shadowColor='#000';ctx.shadowBlur=6;
  ctx.textAlign='left';ctx.font='18px Georgia';ctx.fillStyle='#eadfca';
  ctx.fillText(fn?'🟡 Смена охранника · Q — камеры':'Предохранители: у вас '+carried+' · в щитке '+stored+' из '+NF,16,28);
@@ -1080,19 +1071,19 @@ function drawTablet(tm){
  dc.globalCompositeOperation='source-over';dc.clearRect(0,0,VW,VH);dc.fillStyle='#000';dc.fillRect(0,0,VW,VH);
  dc.globalCompositeOperation='destination-out';poly(cast(0,Math.PI*2,72,330,X,Y),ox,oy,330,.9,1);
  ctx.drawImage(dk,0,0);
- if(cover){ // Зритель перекрыл камеру: пропадёт после переключения
+ if(cover){
   ctx.fillStyle='#030503';ctx.fillRect(x0,y0,w,h);
   const fx=x0+w/2,fy=y0+h/2,fr=h*.3;
   ctx.fillStyle='#d9d7cc';ctx.beginPath();ctx.ellipse(fx,fy,fr*.8,fr*1.15,0,0,7);ctx.fill();
   ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(fx-fr*.3,fy-fr*.25,fr*.13,fr*.28,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(fx+fr*.3,fy-fr*.25,fr*.13,fr*.28,0,0,7);ctx.fill();
   ctx.fillRect(fx-fr*.2,fy+fr*.5,fr*.4,3);
  }
- for(const e of ws)if(e.kind=='cedge'){ // Зритель заглядывает в угол кадра
+ for(const e of ws)if(e.kind=='cedge'){
   const k=Math.max(0,Math.min(1,e.t/.3,(e.life-e.t)/.3)),fr=h*.2,fx=e.sx<0?x0+fr*.6:x0+w-fr*.6,fy=e.sy<0?y0+fr*.9:y0+h-fr*.9,sl=(1-k)*fr*2.4,px=fx+(e.sx<0?-sl:sl),py=fy+(e.sy<0?-sl:sl);
   ctx.fillStyle='#d9d7cc';ctx.beginPath();ctx.ellipse(px,py,fr*.8,fr*1.15,e.sx*e.sy*.35,0,7);ctx.fill();
   ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(px-fr*.28,py-fr*.25,fr*.13,fr*.28,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(px+fr*.28,py-fr*.25,fr*.13,fr*.28,0,0,7);ctx.fill();
  }
- if(lureFx>0){ // вспышка и круг звука от камеры
+ if(lureFx>0){
   const k=1-lureFx/1.2;ctx.strokeStyle='rgba(220,255,230,'+(1-k)+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(VW/2,VH/2,20+k*180,0,7);ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,'+Math.max(0,.55*(1-k*3))+')';ctx.fillRect(x0,y0,w,h);
  }
@@ -1132,7 +1123,7 @@ const mb=btn(tb,'🔌 Режим: строительство',()=>{
 TOOLS.forEach(([k,t])=>{const b=btn(tb,t,()=>{TOOL=k;tb.querySelectorAll('button').forEach(c=>c.classList.remove('on'));b.classList.add('on')});b.classList.add('tl');if(k==TOOL)b.classList.add('on')});
 btn(tb,'▶ Проверить',()=>{const e=check();e?say(e):start(true)});
 btn(tb,'📋 Текст карты',()=>{ta.value=mapText();tp.style.top=tb.offsetHeight+8+'px';tp.classList.remove('off')});
-function resizeMap(side,n){ // n>0 — добавить n рядов с этой стороны, n<0 — убрать; рамка из стен остаётся
+function resizeMap(side,n){
  const a=Math.abs(n),hz=side=='l'||side=='r';
  if(n>0&&(hz?W+a>80:H+a>60))return say('Карта уже максимального размера.');
  if(n<0&&(hz?W-a<9:H-a<9))return say('Карта не может быть меньше 9 клеток.');
@@ -1259,7 +1250,7 @@ function fnAI(m,dt){
  if(m.gf[cy*W+cx]>=9999)return wander(m,sp*.7,dt);
  stepMonster(m,m.gf,sp,dt);
 }
-function fnArtist(m,dt){ // лезет в картину; если не ослепить вспышкой — окажется за спиной
+function fnArtist(m,dt){
  const ps=find('T');m.cd=m.cd==null?rnd(18,30):m.cd;
  if(m.tp>0){m.tp-=dt;if(m.tp<=0){m.tp=0;back=2.2;m.cd=rnd(30,45)}return}
  if(!ps.length)return wander(m,45,dt);
