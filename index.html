@@ -54,16 +54,25 @@ button{font:inherit;color:inherit;cursor:pointer}
 #splash h1{margin:0;font-size:clamp(40px,9vw,92px);font-weight:200;letter-spacing:.12em}
 #splash p{margin:0;color:var(--dim);font-weight:300;animation:pulse 1.8s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
-#troP{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(3,5,12,.82);backdrop-filter:blur(8px)}
-#troP.on{display:flex}
-#troBox{width:min(460px,92vw);max-height:84vh;overflow:auto;background:rgba(20,26,50,.92);border-radius:22px;padding:20px 22px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
-#troBox h3{margin:0 0 4px;font-weight:300;font-size:24px}
-#troBox small{color:var(--dim)}
+.pan{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(3,5,12,.82);backdrop-filter:blur(8px)}
+.pan.on{display:flex}
+.box{width:min(460px,92vw);max-height:84vh;overflow:auto;background:rgba(20,26,50,.92);border-radius:22px;padding:20px 22px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+.box h3{margin:0 0 4px;font-weight:300;font-size:24px}
+.box small{color:var(--dim)}
 .tr{display:flex;gap:14px;align-items:center;padding:11px 0;border-top:1px solid rgba(255,255,255,.08)}
 .tr:first-of-type{margin-top:12px}
 .tr i{font-style:normal;font-size:28px}
 .tr.lock{opacity:.4;filter:grayscale(1)}
 .tr b{display:block;font-weight:600;font-size:15px}.tr span{color:var(--dim);font-size:13px}
+.box h4{margin:16px 0 6px;font-size:13px;font-weight:600;color:var(--dim)}
+.box p{margin:8px 0;font-weight:300;line-height:1.5}
+.box ul{margin:0;padding-left:18px;font-weight:300;line-height:1.55;font-size:14px}
+.dh{height:92px;border-radius:16px;display:grid;place-items:center;font-size:48px;margin-bottom:12px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:3px 11px;border-radius:999px;background:rgba(255,255,255,.1);font-size:12.5px}
+.row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.st2{display:flex;gap:18px;flex-wrap:wrap;color:var(--dim);font-size:14px}
+.st2 b{color:var(--txt);font-weight:600}
 #toast{position:fixed;z-index:40;left:50%;top:calc(env(safe-area-inset-top) + 16px);transform:translate(-50%,-140%);display:flex;gap:12px;align-items:center;padding:12px 20px;border-radius:16px;background:rgba(18,24,46,.96);box-shadow:0 0 0 1px rgba(255,255,255,.18),0 12px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
 #toast.on{transform:translate(-50%,0)}
 #toast i{font-style:normal;font-size:30px}#toast b{display:block;font-size:15px}#toast span{font-size:13px;color:var(--dim)}
@@ -84,18 +93,21 @@ button{font:inherit;color:inherit;cursor:pointer}
 <path d="M0 200C200 120 400 280 600 200S1000 120 1200 200"/><path d="M0 240C200 160 400 320 600 240S1000 160 1200 240"/><path d="M0 280C200 200 400 360 600 280S1000 200 1200 280"/><path d="M0 320C200 240 400 400 600 320S1000 240 1200 320"/></g></svg>
 
 <div id="top"><div id="brand">RKC Studio</div>
-<div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="clock"></span></div></div>
+<div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="clock"></span></div></div>
 <nav id="tabs" aria-label="Разделы"></nav>
 
 <div id="stage">
 <div id="track" role="listbox" aria-label="Игры"></div>
 <div id="info"><h2 id="title"></h2><p id="desc"></p><div id="meta"></div>
-<div id="acts"><button class="pill" id="play">Играть</button><button class="pill" id="favb" aria-label="В избранное" title="В избранное (F)">☆</button></div></div>
+<div id="acts"><button class="pill" id="play">Играть</button><button class="pill" id="moreb">Подробнее</button><button class="pill" id="favb" aria-label="В избранное" title="В избранное (F)">☆</button></div></div>
 </div>
-<div id="hints"><span>◀ ▶ игра</span><span>▲ ▼ раздел</span><span>Enter играть</span><span>F избранное</span><span>R рулетка</span><span>T трофеи</span></div>
+<div id="hints"><span>◀ ▶ игра</span><span>▲ ▼ раздел</span><span>Enter играть</span><span>I подробнее</span><span>F избранное</span><span>R рулетка</span><span>T трофеи</span></div>
 <div id="count"></div>
 
-<div id="troP"><div id="troBox"></div></div>
+<div id="troP" class="pan"><div id="troBox" class="box"></div></div>
+<div id="detP" class="pan"><div id="detBox" class="box"></div></div>
+<div id="profP" class="pan"><div id="profBox" class="box"></div></div>
+<input type="file" id="pfile" accept="application/json,.json" hidden>
 <div id="toast"><i></i><div><b></b><span></span></div></div>
 <div id="splash"><h1>RKC Studio</h1><p>Нажми любую кнопку</p></div>
 
@@ -106,17 +118,32 @@ button{font:inherit;color:inherit;cursor:pointer}
 // ====== СПИСОК ИГР — добавляй сюда новые строки ======
 // cat: horror | arcade | strat | logic; new:true даёт значок NEW
 const GAMES=[
- {title:"Dead by Canvas",file:"games/dead-by-canvas.html",emoji:"🔦",desc:"Выживание от маньяка в тёмном лесу",cat:"horror",c:"#d0432f",c2:"#3a0d0d",new:true},
- {title:"Обломов: Беги, Илья Ильич!",file:"games/oblomov-run.html",emoji:"🛋️",desc:"Забег по мотивам романа",cat:"arcade",c:"#9bbf4c",c2:"#3b4a2a",new:true},
- {title:"Спагетти-Спидран",file:"games/spaghetti-speedrun.html",emoji:"🍝",desc:"Платформер-спидран",cat:"arcade",c:"#ff8a3d",c2:"#c2331f"},
- {title:"Отель «Закат»",file:"games/hotel-maze.html",emoji:"🏨",desc:"Хоррор, ночная смена",cat:"horror",c:"#8a3dff",c2:"#2a0f5e"},
- {title:"Казик «Блябуду Рояль»",file:"games/kazik-neo.html",emoji:"🎰",desc:"Слоты, шахматы, мины",cat:"logic",c:"#ffcf33",c2:"#b3260f"},
- {title:"Battle Simulator",file:"games/battle-simulator.html",emoji:"⚔️",desc:"Красные против Синих",cat:"strat",c:"#3d7bff",c2:"#d62f3f"},
- {title:"Мозаика",file:"games/mozaika-match3.html",emoji:"💎",desc:"Три в ряд",cat:"logic",c:"#2fd6c4",c2:"#2a56c9"},
- {title:"Мафия · ИИ за столом",file:"games/mafia-gm.html",emoji:"🕵️",desc:"Ведущий для игры с ИИ",cat:"logic",c:"#c23a5a",c2:"#25122a"},
- {title:"Симулятор электрощитка",file:"games/electric-panel.html",emoji:"⚡",desc:"Щёлкай автоматы",cat:"arcade",c:"#ffe033",c2:"#4a5a6e"},
- {title:"XIZUS: The Final Cut",file:"games/xizus.html",emoji:"🗄️",desc:"Проверка документов",cat:"logic",c:"#6b8cae",c2:"#1d2733"},
- {title:"Xizus vs Faerg",file:"games/xizus-vs-faerg-td.html",emoji:"🛡️",desc:"Tower defense (v5)",cat:"strat",c:"#43c466",c2:"#14502e"},
+ {title:"Dead by Canvas",file:"games/dead-by-canvas.html",emoji:"🔦",desc:"Выживание от маньяка в тёмном лесу",cat:"horror",c:"#d0432f",c2:"#3a0d0d",new:true,dev:["kb","touch"],
+  info:"Тёмный лес, маньяк и пять генераторов. Почини три из них и беги к воротам на востоке. Прячься в кустах, роняй палетки и не промахивайся мимо красной зоны.",
+  how:["WASD или стрелки — бег, Shift — красться","E — удерживай, чтобы чинить генератор, нажми, чтобы уронить палетку","Пробел или клик — попасть в красную зону проверки навыка","На телефоне: джойстик, кнопка действия и тап по экрану для проверки"]},
+ {title:"Обломов: Беги, Илья Ильич!",file:"games/oblomov-run.html",emoji:"🛋️",desc:"Забег по мотивам романа",cat:"arcade",c:"#9bbf4c",c2:"#3b4a2a",new:true,
+  info:"Забег по мотивам романа Гончарова."},
+ {title:"Спагетти-Спидран",file:"games/spaghetti-speedrun.html",emoji:"🍝",desc:"Платформер-спидран",cat:"arcade",c:"#ff8a3d",c2:"#c2331f",dev:["kb","touch"],
+  info:"Платформер на скорость. Таймер стартует с первого движения, так что успевай осмотреться.",
+  how:["A и D — бег, Shift — ускорение","Пробел — прыжок, удерживай, чтобы прыгнуть выше"]},
+ {title:"Отель «Закат»",file:"games/hotel-maze.html",emoji:"🏨",desc:"Хоррор, ночная смена",cat:"horror",c:"#8a3dff",c2:"#2a0f5e",dev:["kb"],
+  info:"Ночная смена в отеле. Свети фонариком, вставляй предохранители в щиток, закрывай и открывай железную дверь и отгоняй врагов крестом.",
+  how:["WASD — идти, мышь — направить фонарик","Левая кнопка мыши — взять предмет, вставить предохранитель или нажать кнопку","E — применить крест на видимого врага"]},
+ {title:"Казик «Блябуду Рояль»",file:"games/kazik-neo.html",emoji:"🎰",desc:"Слоты, шахматы, мины",cat:"logic",c:"#ffcf33",c2:"#b3260f",
+  info:"Слоты, шахматы и мины в одном казино.",how:["Поставь ставку и нажми «Играть»"]},
+ {title:"Battle Simulator",file:"games/battle-simulator.html",emoji:"⚔️",desc:"Красные против Синих",cat:"strat",c:"#3d7bff",c2:"#d62f3f",
+  info:"Эпичная битва двух армий: красные против синих."},
+ {title:"Мозаика",file:"games/mozaika-match3.html",emoji:"💎",desc:"Три в ряд",cat:"logic",c:"#2fd6c4",c2:"#2a56c9",dev:["kb","touch"],
+  info:"Классическое «три в ряд» с рекордом в меню.",how:["Меняй местами соседние камни, чтобы собрать три в ряд","Подробные правила — кнопка «Как играть» в меню игры"]},
+ {title:"Мафия · ИИ за столом",file:"games/mafia-gm.html",emoji:"🕵️",desc:"Ведущий для игры с ИИ",cat:"logic",c:"#c23a5a",c2:"#25122a",
+  info:"Ведущий для настольной мафии, где за столом сидят ИИ-игроки.",
+  how:["Роли: мирный житель, мафия и по желанию шериф","До 8 игроков, мафии не больше двух","Все правила и команды — в разделе внутри игры"]},
+ {title:"Симулятор электрощитка",file:"games/electric-panel.html",emoji:"⚡",desc:"Щёлкай автоматы",cat:"arcade",c:"#ffe033",c2:"#4a5a6e",
+  info:"Щёлкай рычажки щитка. Если захочется хаоса — есть кнопка «Авария!».",how:["Кликай по рычажкам и по кнопке T"]},
+ {title:"XIZUS: The Final Cut",file:"games/xizus.html",emoji:"🗄️",desc:"Проверка документов",cat:"logic",c:"#6b8cae",c2:"#1d2733",
+  info:"Проверка документов в терминале."},
+ {title:"Xizus vs Faerg",file:"games/xizus-vs-faerg-td.html",emoji:"🛡️",desc:"Tower defense (v5)",cat:"strat",c:"#43c466",c2:"#14502e",
+  info:"Tower defense. Перед боем башни нужно выбрать заранее.",how:["Перед миссией нажми «Инвентарь» вверху экрана и выбери 4 активные башни"]},
 ];
 const CATS=[['all','Все'],['recent','Недавние'],['fav','Избранное'],['horror','Хоррор'],['arcade','Аркады'],['strat','Стратегии'],['logic','Логика']];
 const EMPTY={recent:'Ты ещё ни во что не играл',fav:'Нажми ☆ или F, чтобы добавить игру сюда'};
@@ -149,6 +176,35 @@ function pump(){const n=q.shift();if(!n){showing=false;return}showing=true;const
 function award(id){if(ST.tro[id])return;ST.tro[id]=Date.now();save();const t=TRO.find(x=>x[0]===id);toast(t[1],'Трофей: '+t[2],t[3]);chime();
  if(id!=='plat'&&TRO.every(x=>x[0]==='plat'||ST.tro[x[0]]))setTimeout(()=>award('plat'),1500)}
 function check(){const n=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].n).length;if(n>=1)award('first');if(n>=3)award('three');if(n>=GAMES.length)award('all')}
+const pans=()=>[...document.querySelectorAll('.pan.on')];
+function closePans(){pans().forEach(p=>p.classList.remove('on'));snd(420,.1)}
+const dateRu=t=>new Date(t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[g.file],cat=CATS.find(c=>c[0]===g.cat);
+ const DV={kb:'Клавиатура',touch:'Касание'};
+ $('detBox').innerHTML=`<div class="dh" style="background:linear-gradient(150deg,${g.c},${g.c2})">${g.emoji}</div><h3>${g.title}</h3>
+ <div class="chips" style="margin-top:6px"><span class="chip">${cat?cat[1]:''}</span>${g.new?'<span class="chip">NEW</span>':''}</div>
+ <p>${g.info||g.desc}</p>
+ ${g.how?'<h4>Как играть</h4><ul>'+g.how.map(h=>'<li>'+h+'</li>').join('')+'</ul>':''}
+ ${g.dev?'<h4>Подходит для</h4><div class="chips">'+g.dev.map(d=>'<span class="chip">'+DV[d]+'</span>').join('')+'</div>':''}
+ <h4>Твоя статистика</h4><div class="st2">${st&&st.n?`<span>Запусков: <b>${st.n}</b></span><span>Время: <b>${fmt(st.t)}</b></span><span>Последний раз: <b>${dateRu(st.last)}</b></span>`:'<span>Ещё не запускалась</span>'}</div>
+ <div class="row"><button class="pill" id="dPlay">Играть</button><button class="pill" id="dClose">Закрыть</button></div>`;
+ $('dPlay').onclick=()=>{closePans();launch()};$('dClose').onclick=closePans;$('detP').classList.add('on');snd(600,.1)}
+function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),t=v.reduce((a,x)=>a+(x.t||0),0);
+ $('profBox').innerHTML=`<h3>Профиль</h3><small>Прогресс хранится в этом браузере. Сохрани его в файл, чтобы перенести на другое устройство.</small>
+ <h4>Итоги</h4><div class="st2"><span>Запусков: <b>${n}</b></span><span>Время в играх: <b>${fmt(t)}</b></span><span>Трофеев: <b>${TRO.filter(x=>ST.tro[x[0]]).length} из ${TRO.length}</b></span><span>В избранном: <b>${Object.keys(ST.fav).length}</b></span></div>
+ <div class="row"><button class="pill" id="pSave">Сохранить в файл</button><button class="pill" id="pLoad">Загрузить из файла</button></div>
+ <div class="row"><button class="pill" id="pClose">Закрыть</button></div>`;
+ $('pSave').onclick=exportProfile;$('pLoad').onclick=()=>$('pfile').click();$('pClose').onclick=closePans;$('profP').classList.add('on');snd(600,.1)}
+function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,tro:ST.tro}},a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='rkc-profile.json';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('💾','Профиль сохранён','Файл rkc-profile.json лежит в загрузках')}
+function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||!o.data)throw 0;d=o.data}catch(e){toast('⚠️','Не получилось','Это не файл профиля RKC');return}
+ const num=x=>Number.isFinite(x)&&x>=0?x:0,files=new Set(GAMES.map(g=>g.file)),ids=new Set(TRO.map(t=>t[0]));
+ for(const f in d.fav||{})if(files.has(f))ST.fav[f]=1;
+ for(const f in d.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=d.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
+ for(const id in d.tro||{})if(ids.has(id)){const v=num(d.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
+ save();closePans();setCat(S.cat);toast('✅','Профиль загружен','Данные объединены с текущими')}
+$('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfile);e.target.value=''};
 function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contains('on');
  if(on){const got=TRO.filter(t=>ST.tro[t[0]]).length;
   $('troBox').innerHTML=`<h3>Трофеи</h3><small>Получено ${got} из ${TRO.length}</small>`+TRO.map(t=>`<div class="tr ${ST.tro[t[0]]?'':'lock'}"><i>${t[1]}</i><div><b>${t[2]}</b><span>${t[3]}</span></div></div>`).join('')}
@@ -214,20 +270,20 @@ function dismissSplash(){const s=$('splash');if(s.classList.contains('off'))retu
 $('splash').onclick=dismissSplash;
 addEventListener('keydown',e=>{
  if(dismissSplash()){e.preventDefault();return}
- if(e.key==='Escape'){if($('troP').classList.contains('on'))troPanel(false);else if(inGame)history.back();return}
- if(inGame||e.ctrlKey||e.metaKey||e.altKey)return;
+ if(e.key==='Escape'){if(pans().length>0)closePans();else if(inGame)history.back();return}
+ if(inGame||pans().length>0||e.ctrlKey||e.metaKey||e.altKey)return;
  const k=e.key.toLowerCase(),ci=CATS.findIndex(c=>c[0]===S.cat);
  if(e.key==='ArrowRight')select(S.cur+1,true);else if(e.key==='ArrowLeft')select(S.cur-1,true);
  else if(e.key==='ArrowDown')setCat(CATS[(ci+1)%CATS.length][0],true);else if(e.key==='ArrowUp')setCat(CATS[(ci+CATS.length-1)%CATS.length][0],true);
  else if(e.key==='Enter'&&!document.activeElement.matches('button'))launch();
- else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='m'||k==='ь')mute();
+ else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();
  else return;e.preventDefault()});
-addEventListener('wheel',e=>{if(inGame||$('troP').classList.contains('on'))return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+addEventListener('wheel',e=>{if(inGame||pans().length>0)return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
  if(Math.abs(d)>12&&!wheel.l){select(S.cur+(d>0?1:-1),true);wheel.l=1;setTimeout(()=>wheel.l=0,180)}},{passive:true});
 const wheel={l:0};
 let sx0=null;addEventListener('touchstart',e=>{sx0=e.touches[0].clientX},{passive:true});
 addEventListener('touchend',e=>{if(sx0===null||inGame)return;const dx=e.changedTouches[0].clientX-sx0;sx0=null;if(Math.abs(dx)>45)select(S.cur+(dx<0?1:-1),true)},{passive:true});
-$('play').onclick=launch;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('troP').onclick=e=>{if(e.target.id==='troP')troPanel(false)};
+$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
 function mute(){ST.mute=!ST.mute;save();$('bMute').textContent=ST.mute?'🔇':'🔊';if(!ST.mute)sOk()}
 $('bMute').onclick=mute;$('bMute').textContent=ST.mute?'🔇':'🔊';
 if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();else $('bFs').style.display='none';
@@ -239,11 +295,11 @@ let gl=0;(function pad(){const p=(navigator.getGamepads?[...navigator.getGamepad
  if(p&&now>gl){const b=i=>p.buttons[i]&&p.buttons[i].pressed,ax=p.axes[0]||0,ay=p.axes[1]||0;let used=true;
   if(!$('splash').classList.contains('off')){if(p.buttons.some(x=>x.pressed))dismissSplash();else used=false}
   else if(inGame){if(b(1)||b(8)||b(16))history.back();else used=false}
-  else if($('troP').classList.contains('on')){if(b(1)||b(0))troPanel(false);else used=false}
+  else if(pans().length>0){if(b(1)||b(0))closePans();else used=false}
   else if(b(15)||ax>.6)select(S.cur+1,true);else if(b(14)||ax<-.6)select(S.cur-1,true);
   else if(b(13)||ay>.6)setCat(CATS[(CATS.findIndex(c=>c[0]===S.cat)+1)%CATS.length][0],true);
   else if(b(12)||ay<-.6)setCat(CATS[(CATS.findIndex(c=>c[0]===S.cat)+CATS.length-1)%CATS.length][0],true);
-  else if(b(0))launch();else if(b(3))toggleFav();else if(b(2))dice();else used=false;
+  else if(b(0))launch();else if(b(9))details();else if(b(3))toggleFav();else if(b(2))dice();else used=false;
   if(used)gl=now+230}
  requestAnimationFrame(pad)})();
 
