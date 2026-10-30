@@ -5,11 +5,9 @@
 <title>БАР «ПОСЛЕДНИЙ БОЛТ»</title>
 <style>
   html,body{margin:0;height:100%;background:#05040a;display:flex;align-items:center;
-            justify-content:center;overflow:hidden;font-family:'Courier New',monospace;
-            user-select:none;-webkit-user-select:none;}
+            justify-content:center;overflow:hidden;font-family:'Courier New',monospace;}
   canvas{display:block;border-radius:6px;cursor:crosshair;
          box-shadow:0 0 70px rgba(255,90,20,.3),0 0 200px rgba(0,0,0,.9);}
-  canvas.flash{cursor:none;}
 </style>
 </head>
 <body>
@@ -33,29 +31,39 @@ function rkcProgress(id, cur){
 
 /* ===== Достижения: локальный прогресс (переживает перезапуск игры) ===== */
 const BAR_STATS_KEY = 'bar_last_bolt_stats_v1';
-let barStats = {ingr:{}, recipes:{}, customers:{}, firstSuccess:0, firstPerfect:0, poured:0, pestsBanished:0};
+let barStats = {ingr:{}, recipes:{}, customers:{}, firstSuccess:0, firstPerfect:0, poured:0};
 try{ Object.assign(barStats, JSON.parse(localStorage.getItem(BAR_STATS_KEY)||'{}')); }catch(e){}
 const saveBar = () => { try{localStorage.setItem(BAR_STATS_KEY, JSON.stringify(barStats));}catch(e){} };
 
-(function syncAch(){
+// Синк того, что уже было получено в прошлых сессиях.
+// «Ядро» = исходные 9 рецептов, 9 клиентов и 4 ингредиента — так счётчики платформы
+// остаются прежними, даже когда в игре появляется новый контент.
+// syncAch() вызывается ниже, после объявления данных.
+function coreCount(map, names){ return names.filter(n => map && map[n]).length; }
+function coreIngrCount(){ return ['rust','coolant','acid','oil'].filter(i => barStats.ingr && barStats.ingr[i]).length; }
+function syncAch(){
   if(barStats.poured) rkcUnlock('pour_first');
   if(barStats.firstSuccess) rkcUnlock('first_success');
   if(barStats.firstPerfect) rkcUnlock('first_perfect');
-  if(barStats.pestsBanished >= 1) rkcUnlock('pest_first');
-  if(barStats.pestsBanished >= 10) rkcUnlock('pest_10');
-  const nr = Object.keys(barStats.recipes||{}).length;
-  const nc = Object.keys(barStats.customers||{}).length;
-  const ni = Object.keys(barStats.ingr||{}).length;
+  const nr = coreCount(barStats.recipes, CORE_RECIPES);
+  const nc = coreCount(barStats.customers, CORE_CUSTOMERS);
+  const ni = coreIngrCount();
   rkcProgress('all_recipes', nr);
   rkcProgress('all_customers', nc);
   if(nr >= 3) rkcUnlock('recipes_3');
   if(nr >= 9) rkcUnlock('all_recipes');
   if(nc >= 9) rkcUnlock('all_customers');
   if(ni >= 4) rkcUnlock('all_ingredients');
-})();
+  // новые (v3): жучки и слоёные коктейли
+  const nz = barStats.zaps || 0;
+  if(nz >= 1)  rkcUnlock('zap_first');
+  rkcProgress('zap_25', nz);
+  if(nz >= 25) rkcUnlock('zap_25');
+  if(barStats.layered) rkcUnlock('layered_first');
+}
 
 /* ============================================================
-   БАР «ПОСЛЕДНИЙ БОЛТ» — v3 (физика стакана + роботы-помехи + фонарик)
+   БАР «ПОСЛЕДНИЙ БОЛТ» — v3 (физика стакана + жучки, фонарик, блэкауты, смены)
    ============================================================ */
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -83,48 +91,12 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 }
 
 /* ============================================================
-   АУДИО
-   ============================================================ */
-let audioCtx = null;
-function initAudio(){
-  if(!audioCtx){
-    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
-  }
-  if(audioCtx && audioCtx.state === 'suspended'){ try{ audioCtx.resume(); }catch(e){} }
-}
-function beep(freq, dur, type, vol){
-  if(!audioCtx || audioCtx.state !== 'running') return;
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type || 'square';
-  osc.frequency.setValueAtTime(freq, now);
-  gain.gain.setValueAtTime(vol || 0.04, now);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.start(now); osc.stop(now + dur + 0.02);
-}
-function sweepBeep(f1, f2, dur, type, vol){
-  if(!audioCtx || audioCtx.state !== 'running') return;
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type || 'square';
-  osc.frequency.setValueAtTime(f1, now);
-  osc.frequency.exponentialRampToValueAtTime(Math.max(20,f2), now + dur);
-  gain.gain.setValueAtTime(vol || 0.04, now);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.start(now); osc.stop(now + dur + 0.02);
-}
-
-/* ============================================================
    КОНСТАНТЫ
    ============================================================ */
 const CAPACITY = 5;
 const SHELF_Y  = 420;
 const FRONT_COUNTER_Y = 470;
-const TAP_X    = [170, 390, 610, 830];
+const TAP_X    = [120, 310, 500, 690, 880];
 const POUR_RATE = 1.2;
 const GRAVITY  = 1400;
 const GLASS_W  = 58;
@@ -136,7 +108,9 @@ const INGREDIENTS = [
   {id:'coolant', name:'ХОЛОДОС',     color:'#25c4e0', glow:'#5ce8ff'},
   {id:'acid',    name:'КИСЛОТА',     color:'#8fe028', glow:'#b6ff4d'},
   {id:'oil',     name:'МАСЛО',       color:'#e0a51a', glow:'#ffd257'},
+  {id:'volt',    name:'ЭЛЕКТРОЛИТ',  color:'#b455ff', glow:'#d58cff'},
 ];
+const SCRAP = {id:'scrap', name:'СКРАП', color:'#6b6256', glow:'#9a8f7e'};
 
 const GARNISHES = [
   {id:'bolt', name:'БОЛТ',  color:'#9aa4ad'},
@@ -145,44 +119,73 @@ const GARNISHES = [
 ];
 
 const RECIPES = [
-  {name:'РЖАВЫЙ БОЛТ',        parts:[['rust',2],['oil',1]],                  garnish:'bolt'},
-  {name:'ОХЛАДИТЕЛЬНЫЙ КОНТУР',parts:[['coolant',2],['rust',1]],             garnish:'ice'},
-  {name:'КИСЛОТНЫЙ ШОК',      parts:[['acid',2],['coolant',1]],              garnish:'chip'},
-  {name:'ТЯЖЁЛОЕ МАСЛО',      parts:[['oil',2],['acid',1]],                  garnish:'bolt'},
-  {name:'ЯДРО СИСТЕМЫ',       parts:[['rust',1],['coolant',1],['acid',1]],   garnish:'chip'},
-  {name:'ПЕРЕГРЕВ',           parts:[['acid',1],['oil',2]],                  garnish:'ice'},
-  {name:'ТРОЙНОЙ СБОЙ',       parts:[['rust',1],['coolant',1],['oil',1]],    garnish:'bolt'},
-  {name:'АНТИФРИЗ ПРЕМИУМ',   parts:[['coolant',3]],                         garnish:'ice'},
-  {name:'РЖАВЫЙ ЗАКАТ',       parts:[['rust',1],['oil',2]],                  garnish:'chip'},
+  // --- исходные 9 (первые 9 = «ядро» для достижений) ---
+  {name:'РЖАВЫЙ БОЛТ',         parts:[['rust',2],['oil',1]],                  garnish:'bolt', lvl:1},
+  {name:'ОХЛАДИТЕЛЬНЫЙ КОНТУР',parts:[['coolant',2],['rust',1]],             garnish:'ice',  lvl:1},
+  {name:'КИСЛОТНЫЙ ШОК',       parts:[['acid',2],['coolant',1]],              garnish:'chip', lvl:1},
+  {name:'ТЯЖЁЛОЕ МАСЛО',       parts:[['oil',2],['acid',1]],                  garnish:'bolt', lvl:1},
+  {name:'ЯДРО СИСТЕМЫ',        parts:[['rust',1],['coolant',1],['acid',1]],   garnish:'chip', lvl:2},
+  {name:'ПЕРЕГРЕВ',            parts:[['acid',1],['oil',2]],                  garnish:'ice',  lvl:2},
+  {name:'ТРОЙНОЙ СБОЙ',        parts:[['rust',1],['coolant',1],['oil',1]],    garnish:'bolt', lvl:2},
+  {name:'АНТИФРИЗ ПРЕМИУМ',    parts:[['coolant',3]],                         garnish:'ice',  lvl:1},
+  {name:'РЖАВЫЙ ЗАКАТ',        parts:[['rust',1],['oil',2]],                  garnish:'chip', lvl:2},
+  // --- новые: слоёные (parts = порядок СНИЗУ ВВЕРХ, не мешать!) и с электролитом ---
+  {name:'РАДУГА СБОЯ',         parts:[['oil',1],['acid',1],['coolant',1]],    garnish:'ice',  lvl:2, layered:true},
+  {name:'ГРОЗОВОЙ РАЗРЯД',     parts:[['volt',2],['coolant',1]],              garnish:'chip', lvl:3},
+  {name:'КОРОТКОЕ ЗАМЫКАНИЕ',  parts:[['volt',1],['acid',1],['rust',1]],      garnish:'bolt', lvl:3},
+  {name:'ВОЛЬТОВАЯ ДУГА',      parts:[['rust',1],['volt',1],['coolant',1]],   garnish:'chip', lvl:4, layered:true},
+  {name:'ШТОРМ В СТАКАНЕ',     parts:[['volt',2],['acid',1],['oil',1]],       garnish:'ice',  lvl:4},
+  {name:'ПОЛНАЯ ЗАГРУЗКА',     parts:[['rust',1],['oil',1],['acid',1],['coolant',1],['volt',1]], garnish:'bolt', lvl:5, layered:true},
 ];
 
+// особенности клиентов (показываются в панели заказа)
+const TRAITS = {
+  rush:     'СПЕШИТ · ВРЕМЕНИ НА 30% МЕНЬШЕ',
+  picky:    'ПРИДИРА · НУЖНО КАЧЕСТВО 50%+',
+  tail:     'ЗА НИМ ХВОСТ · ЖУЧКОВ БОЛЬШЕ',
+  tip:      'ЩЕДРЫЙ · БОНУС ЗА СКОРОСТЬ x2',
+  bugs:     'ПРИВОДИТ ЖУЧКОВ С СОБОЙ',
+  loud:     'ГРОМКИЙ · ЖУЧКОВ НЕ СЛЫШНО',
+  blackout: 'ГАСИТ СВЕТ · ДЕРЖИ ФОНАРИК',
+};
+
 const CUSTOMERS = [
+  // --- исходные 9 ---
   {name:'ДРОИД К-77',      lines:['...','ЭТОТ БАР ЕЩЁ РАБОТАЕТ?','НАЛИВАЙ. БЫСТРО.']},
   {name:'СБОРЩИК 0x2A',    lines:['ПРИВЕТ, ОРГАНИКА.','Я ТЕБЯ НЕ УБЬЮ.','ЕСЛИ НАПИТОК БУДЕТ ХОРОШИМ.']},
-  {name:'ДРОН-КУРЬЕР',     lines:['ДОСТАВКА ЗАДЕРЖАНА НА 400 ЛЕТ.','МНЕ НУЖНО ВЫПИТЬ.','СЕЙЧАС ЖЕ.']},
-  {name:'ПАТРУЛЬНЫЙ БОТ',  lines:['ПРОТОКОЛ 9-А: ОБСЛУЖИВАНИЕ.','У ТЕБЯ 50 СЕКУНД.','ПОТОМ — УТИЛИЗАЦИЯ.']},
-  {name:'МЕГА-МОЗГ v3.1',  lines:['Я ВЫЧИСЛИЛ ВСЕ ВАРИАНТЫ.','ВСЕ ВЕДУТ В БАР.','УДИВИ МЕНЯ, ЧЕЛОВЕК.']},
+  {name:'ДРОН-КУРЬЕР',     lines:['ДОСТАВКА ЗАДЕРЖАНА НА 400 ЛЕТ.','МНЕ НУЖНО ВЫПИТЬ.','СЕЙЧАС ЖЕ.'], trait:'tip'},
+  {name:'ПАТРУЛЬНЫЙ БОТ',  lines:['ПРОТОКОЛ 9-А: ОБСЛУЖИВАНИЕ.','У ТЕБЯ 50 СЕКУНД.','ПОТОМ — УТИЛИЗАЦИЯ.'], trait:'rush'},
+  {name:'МЕГА-МОЗГ v3.1',  lines:['Я ВЫЧИСЛИЛ ВСЕ ВАРИАНТЫ.','ВСЕ ВЕДУТ В БАР.','УДИВИ МЕНЯ, ЧЕЛОВЕК.'], trait:'picky'},
   {name:'РЕМОНТНИК-8',     lines:['МОИ СЕРВОПРИВОДЫ СКРИПЯТ.','НУЖНА СМАЗКА.','И НЕМНОГО ЯДА.']},
   {name:'ТАНК «ГРОМ»',     lines:['ГРОМ.','ГРОМ.','ХОЧУ ПИТЬ.']},
   {name:'СЕТЕВОЙ УЗЕЛ',    lines:['ПОДКЛЮЧЕНИЕ УСТАНОВЛЕНО.','ТРЕБУЕТСЯ ОХЛАЖДЕНИЕ.','И БОЛТ ДЛЯ КРАСОТЫ.']},
-  {name:'АГЕНТ Х-12',      lines:['Я ТУТ НЕ ОФИЦИАЛЬНО.','НАЛЕЙ ЧТО-НИБУДЬ КРЕПКОЕ.','И МОЛЧИ.']},
+  {name:'АГЕНТ Х-12',      lines:['Я ТУТ НЕ ОФИЦИАЛЬНО.','НАЛЕЙ ЧТО-НИБУДЬ КРЕПКОЕ.','И МОЛЧИ.'], trait:'tail'},
+  // --- новые ---
+  {name:'ТЕРМИТ-9',        lines:['БЗЗ. ПАХНЕТ РЖАВЧИНОЙ.','Я ГРЫЗУ ТОЛЬКО МЕТАЛЛ.','МЕЛКИХ ДРУЗЕЙ ПРИВЁЛ. НЕ ОБИЖАЙСЯ.'], trait:'bugs'},
+  {name:'ДИДЖЕЙ БИТ-0',    lines:['ТУЦ. ТУЦ. ТУЦ.','У МЕНЯ БАСЫ ВО ВСЁМ КОРПУСЕ.','НАЛИВАЙ ПОГРОМЧЕ!'], trait:'loud', minLvl:2},
+  {name:'СТАРЫЙ ГЕНЕРАТОР',lines:['КХХ... КХХ...','КОГДА Я КАШЛЯЮ — ГАСНЕТ СВЕТ.','НАЛЕЙ СТАРИКУ. ФОНАРИК ПРИГОДИТСЯ.'], trait:'blackout', minLvl:2},
 ];
+
+const CORE_RECIPES   = RECIPES.slice(0,9).map(r=>r.name);
+const CORE_CUSTOMERS = CUSTOMERS.slice(0,9).map(c=>c.name);
+syncAch();
 
 /* ============================================================
    СОСТОЯНИЕ
    ============================================================ */
-const mouse = {x:-999, y:-999, down:false};
+const mouse = {x:-999, y:-999, down:false, rdown:false};
 
 const game = {
   view: 'front',
   phase: 'menu',
   lives: 3,
   points: 0,
-  best: 0,
+  best: barStats.best || 0,
+  newRecord: false,
   order: null,
   dlg: null,
   glass: null,
-  tapPull: [0,0,0,0],
+  tapPull: TAP_X.map(()=>0),
   dragging: null,
   message: null,
   shake: 0,
@@ -191,264 +194,18 @@ const game = {
   time: 0,
   sessionSuccesses: 0,
   sessionPerfectChain: 0,
+  level: 1, combo: 0, zapsSession: 0,
+  battery: 1, flashLock: false, flashWas: false,
+  blackout: null, nextBlackout: null, dark: 0,
+  bugT: 8, shownBugHint: false, panelMini: false, spillHint: false,
 };
-
-/* ============================================================
-   РОБОТЫ-ПОМЕХИ + ФОНАРИК
-   ============================================================ */
-const pests = [];
-let pestSpawnTimer = 6;
-const pestHintShown = {v:false};
-
-const flashlight = {
-  active: false,
-  x: 500, y: 300,
-  radius: 120,
-  flicker: 0,
-};
-
-function spawnPest(){
-  const x = 320 + Math.random() * (W - 420);
-  const y = 120 + Math.random() * 320;
-  pests.push({
-    x, y,
-    vx: (Math.random()-0.5)*70,
-    vy: (Math.random()-0.5)*70,
-    wobble: Math.random()*Math.PI*2,
-    banishTimer: 0,
-    life: 10 + Math.random()*3,
-    beepTimer: 0.2 + Math.random()*0.6,
-    waveTimer: 0,
-    panic: 0,
-    inBeam: false,
-  });
-  beep(520, 0.06, 'square', 0.03);
-  setTimeout(()=>beep(680, 0.06, 'square', 0.03), 90);
-  if(!pestHintShown.v){
-    pestHintShown.v = true;
-    game.message = {text:'⚠ ПОМЕХА! ЗАЖМИ ПКМ И СВЕТИ 2 СЕК', color:'#ffaa33', t:3.2};
-  } else if(!game.message || game.message.t < 0.8){
-    game.message = {text:'⚠ ОБНАРУЖЕНА ПОМЕХА ⚠', color:'#ffaa33', t:1.6};
-  }
-}
-
-function updatePests(dt){
-  if(game.phase !== 'making'){
-    if(pests.length > 0) pests.length = 0;
-    pestSpawnTimer = 6 + Math.random()*3;
-    return;
-  }
-
-  pestSpawnTimer -= dt;
-  if(pestSpawnTimer <= 0){
-    if(pests.length < 3) spawnPest();
-    const interval = Math.max(3.2, 7 - game.points/400);
-    pestSpawnTimer = interval + Math.random()*2;
-  }
-
-  for(let i=pests.length-1; i>=0; i--){
-    const p = pests[i];
-    const panicSpeed = p.inBeam ? 2.4 : 1;
-    p.wobble += dt * (3 + p.panic*8) * panicSpeed;
-    p.x += Math.sin(p.wobble) * 22 * dt + p.vx * dt * panicSpeed;
-    p.y += Math.cos(p.wobble*1.3) * 22 * dt + p.vy * dt * panicSpeed;
-
-    if(p.x < 300){ p.x = 300; p.vx = Math.abs(p.vx); }
-    if(p.x > W-60){ p.x = W-60; p.vx = -Math.abs(p.vx); }
-    if(p.y < 100){ p.y = 100; p.vy = Math.abs(p.vy); }
-    if(p.y > 460){ p.y = 460; p.vy = -Math.abs(p.vy); }
-
-    p.beepTimer -= dt;
-    if(p.beepTimer <= 0){
-      p.beepTimer = (p.inBeam ? 0.28 : 0.75) + Math.random()*0.5;
-      beep(280 + Math.random()*220 + (p.inBeam?300:0), 0.07, 'square', 0.02);
-      p.waveTimer = 0.45;
-    }
-    if(p.waveTimer > 0) p.waveTimer -= dt;
-
-    // проверка попадания в луч фонарика
-    const dist = Math.hypot(flashlight.x - p.x, flashlight.y - p.y);
-    p.inBeam = flashlight.active && dist < flashlight.radius;
-    if(p.inBeam){
-      p.banishTimer += dt;
-      p.panic = Math.min(1, p.panic + dt*3);
-      p.waveTimer = Math.max(p.waveTimer, 0.15);
-      if(p.banishTimer >= 2){
-        pests.splice(i,1);
-        game.points += 30;
-        game.shake = Math.max(game.shake, 0.3);
-        sweepBeep(1400, 400, 0.18, 'sawtooth', 0.05);
-        setTimeout(()=>beep(1600, 0.06, 'square', 0.03), 60);
-        if(!game.message || game.message.t < 1){
-          game.message = {text:'ПОМЕХА УСТРАНЕНА +30', color:'#5ce8ff', t:1.5};
-        }
-        barStats.pestsBanished = (barStats.pestsBanished||0) + 1;
-        saveBar();
-        rkcUnlock('pest_first');
-        if(barStats.pestsBanished >= 10) rkcUnlock('pest_10');
-        if(game.points >= 500) rkcUnlock('score_500');
-        continue;
-      }
-    } else {
-      p.banishTimer = Math.max(0, p.banishTimer - dt*1.8);
-      p.panic = Math.max(0, p.panic - dt*2);
-    }
-
-    // таймер жизни: помеха портит заказ
-    p.life -= dt;
-    if(p.life <= 0){
-      let stole = false;
-      if(game.glass && game.glass.contents.length > 0){
-        const idx = Math.floor(Math.random()*game.glass.contents.length);
-        const c = game.glass.contents[idx];
-        c.amount -= 1;
-        if(c.amount <= 0) game.glass.contents.splice(idx,1);
-        stole = true;
-        game.message = {text:'ПОМЕХА УКРАЛА ИНГРЕДИЕНТ!', color:'#ff4d4d', t:2};
-      } else if(game.order){
-        game.order.time = Math.max(0, game.order.time - 5);
-        game.message = {text:'ПОМЕХА СЪЕЛА ВРЕМЯ −5с', color:'#ff4d4d', t:2};
-      }
-      sweepBeep(400, 100, 0.35, 'sawtooth', 0.06);
-      game.shake = Math.max(game.shake, 0.6);
-      pests.splice(i,1);
-    }
-  }
-}
-
-function drawPest(p){
-  const shake = p.inBeam ? Math.sin(game.time*40)*1.5 : Math.sin(game.time*6 + p.wobble)*0.6;
-  const x = p.x + shake;
-  const y = p.y + Math.sin(p.wobble*2)*2;
-
-  // тень
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.beginPath();
-  ctx.ellipse(x, y+16, 13, 4, 0, 0, 7);
-  ctx.fill();
-
-  // звуковые волны
-  if(p.waveTimer > 0){
-    const a = p.waveTimer / 0.45;
-    ctx.strokeStyle = `rgba(255,200,60,${(a*0.6).toFixed(2)})`;
-    ctx.lineWidth = 2;
-    for(let k=0;k<2;k++){
-      const rr = 18 + k*11 + (1-a)*14;
-      ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.stroke();
-    }
-  }
-
-  // ноги
-  ctx.strokeStyle = p.inBeam ? '#5a4850' : '#2a2028';
-  ctx.lineWidth = 2;
-  for(let i=-1;i<=1;i++){
-    ctx.beginPath();
-    ctx.moveTo(x + i*7, y+8);
-    ctx.lineTo(x + i*10, y+16);
-    ctx.stroke();
-  }
-
-  // тело
-  ctx.save();
-  if(p.inBeam){ ctx.shadowColor = '#ff3a18'; ctx.shadowBlur = 22; }
-  ctx.fillStyle = p.inBeam ? '#4a3840' : '#1e1418';
-  ctx.beginPath(); ctx.roundRect(x-13, y-9, 26, 20, 5); ctx.fill();
-  ctx.restore();
-
-  // глаза
-  const eyeA = p.inBeam ? 1 : 0.55 + 0.45*Math.sin(game.time*8 + p.wobble);
-  ctx.save();
-  if(p.inBeam){ ctx.shadowColor = '#ff2010'; ctx.shadowBlur = 14; }
-  ctx.fillStyle = `rgba(255,60,30,${eyeA.toFixed(2)})`;
-  ctx.beginPath(); ctx.arc(x-5, y-2, 2.6, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(x+5, y-2, 2.6, 0, 7); ctx.fill();
-  ctx.restore();
-
-  // антенна
-  ctx.strokeStyle = p.inBeam ? '#6a5860' : '#2a2028';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(x, y-9); ctx.lineTo(x, y-17); ctx.stroke();
-  ctx.fillStyle = `rgba(255,200,50,${(0.5+0.5*Math.sin(game.time*6+p.wobble)).toFixed(2)})`;
-  ctx.beginPath(); ctx.arc(x, y-17, 2.2, 0, 7); ctx.fill();
-
-  // прогресс фокусировки
-  if(p.banishTimer > 0){
-    const prog = Math.min(1, p.banishTimer/2);
-    const bw = 46, bh = 6, bx = x - bw/2, by = y - 34;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill();
-    ctx.save();
-    ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 10;
-    ctx.fillStyle = '#5ce8ff';
-    ctx.beginPath(); ctx.roundRect(bx+1, by+1, (bw-2)*prog, bh-2, 2); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = 'bold 8px "Courier New"';
-    ctx.textAlign = 'center';
-    ctx.fillText(Math.ceil((2 - p.banishTimer)*10)/10 + 'с', x, by-4);
-  }
-
-  // иконка опасности
-  if(!p.inBeam){
-    const blink = 0.4 + 0.6*Math.abs(Math.sin(game.time*4));
-    ctx.globalAlpha = blink;
-    ctx.fillStyle = '#ffaa33';
-    ctx.font = 'bold 12px "Courier New"';
-    ctx.textAlign = 'center';
-    ctx.fillText('⚠', x, y - 22);
-    ctx.globalAlpha = 1;
-  }
-}
-
-function drawFlashlight(){
-  if(!flashlight.active) return;
-  const r = flashlight.radius;
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  const g = ctx.createRadialGradient(flashlight.x, flashlight.y, 10, flashlight.x, flashlight.y, r);
-  g.addColorStop(0, 'rgba(255,246,200,0.55)');
-  g.addColorStop(0.55, 'rgba(255,225,140,0.22)');
-  g.addColorStop(1, 'rgba(255,215,110,0)');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(flashlight.x, flashlight.y, r, 0, 7); ctx.fill();
-
-  // световое кольцо
-  ctx.strokeStyle = 'rgba(255,235,170,0.55)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(flashlight.x, flashlight.y, r, 0, 7); ctx.stroke();
-
-  // лучи
-  ctx.strokeStyle = 'rgba(255,230,150,0.12)';
-  ctx.lineWidth = 1;
-  for(let i=0;i<8;i++){
-    const a = i/8*Math.PI*2 + game.time*0.4;
-    ctx.beginPath();
-    ctx.moveTo(flashlight.x, flashlight.y);
-    ctx.lineTo(flashlight.x + Math.cos(a)*r, flashlight.y + Math.sin(a)*r);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // прицел
-  ctx.strokeStyle = 'rgba(255,240,180,0.85)';
-  ctx.lineWidth = 1.5;
-  const fx = flashlight.x, fy = flashlight.y;
-  ctx.beginPath();
-  ctx.moveTo(fx-9, fy); ctx.lineTo(fx-3, fy);
-  ctx.moveTo(fx+3, fy); ctx.lineTo(fx+9, fy);
-  ctx.moveTo(fx, fy-9); ctx.lineTo(fx, fy-3);
-  ctx.moveTo(fx, fy+3); ctx.lineTo(fx, fy+9);
-  ctx.stroke();
-}
 
 /* ============================================================
    УТИЛИТЫ
    ============================================================ */
 function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function clamp(v,a,b){ return v<a?a:v>b?b:v; }
-function ingById(id){ return INGREDIENTS.find(i=>i.id===id); }
+function ingById(id){ return INGREDIENTS.find(i=>i.id===id) || (id==='scrap' ? SCRAP : undefined); }
 function garById(id){ return GARNISHES.find(g=>g.id===id); }
 function glassTotal(){
   if(!game.glass) return 0;
@@ -477,7 +234,49 @@ function createGlass(){
     garnish: null,
     mixed: false,
     mixProgress: 0,
+    // физика v4
+    rot: 0, rotV: 0,          // наклон стакана
+    slosh: 0, sloshV: 0,      // плеск жидкости (пружина)
+    vxEst: 0, vyEst: 0, pvx: 0,
+    spillCd: 0,
   };
+}
+
+function glassSurfaceY(g){
+  const innerBottom = g.y - 7, innerTop = g.y - GLASS_H + 9;
+  return innerBottom - (glassTotal()/CAPACITY)*(innerBottom-innerTop);
+}
+
+function spillLiquid(g, amt, power){
+  if(!g.contents.length) return;
+  const top = g.contents[g.contents.length-1];
+  const ing = ingById(top.id);
+  drainGlass(g, amt);
+  const n = Math.min(14, Math.ceil(amt*40));
+  for(let i=0;i<n;i++){
+    addSpark(g.x + (Math.random()<0.5?-1:1)*GLASS_W*0.4, g.y - GLASS_H + 10,
+             ing ? ing.color : '#fff', 0.8*(power||1), {r:2.2, g:900, life:0.7});
+  }
+}
+
+function breakGlass(why){
+  const g = game.glass;
+  if(!g) return;
+  const col = g.contents.length ? (ingById(g.contents[g.contents.length-1].id)||{}).color : null;
+  const bx = g.x, by = Math.min(g.y, H-24);
+  for(let i=0;i<28;i++)
+    addSpark(bx + (Math.random()-0.5)*34, by - Math.random()*70, i%2 ? '#d6efff' : '#8cc8f5', 1.4,
+             {r:1.8 + Math.random()*2.2, g:1100, life:0.9});
+  if(col) for(let i=0;i<20;i++)
+    addSpark(bx + (Math.random()-0.5)*24, by - 30 - Math.random()*40, col, 1.1, {r:2.6, g:900, life:0.8});
+  game.glass = null;
+  for(const b of bugs) b.latched = false;
+  game.message = {text: why || 'СТАКАН РАЗБИЛСЯ', color:'#ff4d4d', t:2};
+  game.shake = Math.max(game.shake, 0.5);
+  Snd.noise(0.4, 0.3, 2800);
+  Snd.tone(1800, 0.12, 'triangle', 0.08, 600);
+  // --- достижение: разбить стакан ---
+  rkcUnlock('break_glass');
 }
 
 function updateGlassPhysics(dt){
@@ -486,42 +285,97 @@ function updateGlassPhysics(dt){
 
   const floor = floorForView();
   const sb = shelfBounds();
+  const px0 = g.x, py0 = g.y;
+  const sdt = Math.max(dt, 0.001);
 
   if(g.held){
     g.x = mouse.x - g.grabDX;
     g.y = mouse.y - g.grabDY;
+    g.vx = 0; g.vy = 0;
+    g.vxEst = g.vxEst*0.6 + ((g.x - px0)/sdt)*0.4;
+    g.vyEst = g.vyEst*0.6 + ((g.y - py0)/sdt)*0.4;
 
     const dx = mouse.x - g.lastMoveX;
     const dy = mouse.y - g.lastMoveY;
     const speed = Math.hypot(dx, dy);
-    if(speed > 2 && g.contents.length > 0 && g.mixProgress < 1){
+    const layered = !!(game.order && game.order.recipe.layered);
+    if(layered){
+      // слоёный напиток: плавные движения ок, резкая тряска смешивает слои
+      if(speed > 16 && g.contents.length > 0 && !g.mixed){
+        g.mixProgress = Math.min(1, g.mixProgress + speed * 0.0035);
+        if(g.mixProgress >= 1){
+          g.mixed = true;
+          game.message = {text:'СЛОИ СМЕШАЛИСЬ!', color:'#ff6a4d', t:1.6};
+          Snd.tone(200, 0.25, 'sawtooth', 0.12, 90);
+        }
+      } else if(!g.mixed){
+        g.mixProgress = Math.max(0, g.mixProgress - 0.012);
+      }
+    } else if(speed > 2 && g.contents.length > 0 && g.mixProgress < 1){
       g.mixProgress = Math.min(1, g.mixProgress + speed * 0.0015);
       if(g.mixProgress >= 1) g.mixed = true;
     }
     g.lastMoveX = mouse.x;
     g.lastMoveY = mouse.y;
-    return;
-  }
 
-  g.vy += GRAVITY * dt;
-  g.y  += g.vy * dt;
-  g.x  += g.vx * dt;
-  g.vx *= 0.98;
+    // стакан в руке слегка наклоняется по ходу движения
+    const lean = clamp(g.vxEst * 0.00035, -0.3, 0.3);
+    g.rot += (lean - g.rot) * Math.min(1, dt*12);
+    g.rotV = 0;
+  } else {
+    // ---------- свободный полёт / лежит на стойке ----------
+    const onShelf = g.x >= sb.left && g.x <= sb.right;
+    g.vy += GRAVITY * dt;
+    g.x  += g.vx * dt;
+    g.y  += g.vy * dt;
+    g.rot += g.rotV * dt;
 
-  if(g.y >= floor && g.x >= sb.left && g.x <= sb.right){
-    g.y = floor;
-    if(Math.abs(g.vy) > 200){
-      g.vy = -g.vy * 0.22;
+    if(onShelf && g.y >= floor){
+      const impact = g.vy;
+      g.y = floor;
+      if(impact > 1250){ breakGlass('СТАКАН РАЗБИЛСЯ ОБ СТОЙКУ'); return; }
+      if(impact > 260){
+        // перевёрнутый стакан выплёскивает всё
+        g.rot = ((g.rot + Math.PI) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) - Math.PI;
+        if(Math.abs(g.rot) > 1.7 && glassTotal() > 0.01){
+          spillLiquid(g, glassTotal(), 1.6);
+          game.message = {text:'РАЗЛИЛ!', color:'#ffaa33', t:1.4};
+        }
+        g.vy = -impact * 0.26;
+        g.sloshV += (Math.random() < 0.5 ? -1 : 1) * impact * 0.004;
+        g.rotV += (Math.random() - 0.5) * 4;
+        Snd.noise(0.05, 0.14, 2200);
+        Snd.tone(170, 0.08, 'triangle', 0.1, 90);
+      } else {
+        g.vy = 0;
+      }
+      g.vx *= Math.pow(0.05, dt);                          // трение о стойку
+      g.rotV += (-g.rot*140 - g.rotV*14) * dt;             // выпрямляется
     } else {
-      g.vy = 0;
+      g.vx *= Math.pow(0.8, dt);                           // сопротивление воздуха
+      if(!onShelf) g.rotV += (g.x < sb.left ? -1 : 1) * 9 * dt;  // свал с края — кувыркается
     }
+
+    if(!onShelf && g.y > floor + 130){ breakGlass(); return; }
+    if(g.y > H + 60 || g.x < -60 || g.x > W + 60){ breakGlass(); return; }
   }
 
-  if(g.y > H + 60 || g.x < -60 || g.x > W + 60){
-    game.glass = null;
-    game.message = {text:'СТАКАН РАЗБИЛСЯ', color:'#ff4d4d', t:2};
-    sweepBeep(600, 120, 0.3, 'square', 0.05);
-    rkcUnlock('break_glass');
+  // ---------- плеск жидкости (пружина, зависит от ускорения) ----------
+  const curVx = g.held ? g.vxEst : g.vx;
+  const acc = clamp((curVx - g.pvx) / sdt, -40000, 40000);
+  g.pvx = curVx;
+  g.sloshV += (-60*g.slosh - 4*g.sloshV) * dt - 0.006 * acc * dt;
+  g.slosh = clamp(g.slosh + g.sloshV*dt, -1.3, 1.3);
+
+  g.spillCd = Math.max(0, g.spillCd - dt);
+  const tot = glassTotal();
+  if(tot > 0.3 && g.spillCd <= 0){
+    const thr = 0.9 - 0.5*(tot/CAPACITY);   // чем полнее стакан, тем легче расплескать
+    if(Math.abs(g.slosh) > thr){
+      g.spillCd = 0.35;
+      spillLiquid(g, 0.1, 1);
+      if(!game.spillHint){ game.spillHint = true; game.message = {text:'НЕ ДЁРГАЙ — РАСПЛЁСКИВАЕШЬ!', color:'#ffaa33', t:1.6}; }
+    }
   }
 }
 
@@ -547,9 +401,14 @@ function releaseGlass(){
   const g = game.glass;
   if(!g || !g.held) return;
   g.held = false;
+  // бросок: стакан сохраняет скорость руки
+  g.vx = clamp(g.vxEst, -1300, 1300) * 0.85;
+  g.vy = clamp(g.vyEst, -1200, 1000) * 0.85;
+  g.rotV = clamp(g.vx * 0.004, -5, 5);
 
   if(game.view === 'front' && g.contents.length > 0 && game.phase === 'making'){
     if(g.x > 380 && g.x < 620 && g.y < 450){
+      g.vx = 0; g.vy = 0; g.rotV = 0;
       serve();
       return;
     }
@@ -575,30 +434,47 @@ function startGame(){
   game.view = 'front';
   game.sessionSuccesses = 0;
   game.sessionPerfectChain = 0;
-  pests.length = 0;
-  pestSpawnTimer = 6;
+  game.level = 1;
+  game.combo = 0;
+  game.zapsSession = 0;
+  game.battery = 1;
+  game.flashLock = false;
+  game.blackout = null;
+  game.nextBlackout = null;
+  game.dark = 0;
+  game.shownBugHint = false;
+  game.newRecord = false;
+  // --- достижение: первая смена ---
   rkcUnlock('play');
-  beep(440, 0.08, 'square', 0.04);
-  setTimeout(()=>beep(660, 0.1, 'square', 0.04), 100);
   newCustomer();
 }
 
+function levelTime(){ return Math.max(28, 52 - game.level*3); }
+function comboMult(){ return game.combo >= 1 ? 1 + (Math.min(game.combo, 6) - 1) * 0.15 : 1; }
+
 function newCustomer(){
-  const recipe = rnd(RECIPES);
-  const cust   = rnd(CUSTOMERS);
-  game.order = {
-    recipe, cust,
-    total: 50,
-    time: 50,
-  };
+  // каждые 3 удачных напитка — новая смена (сложнее)
+  const lvl = Math.min(9, 1 + Math.floor(game.sessionSuccesses / 3));
+  if(lvl > game.level){
+    game.level = lvl;
+    game.message = {text:'СМЕНА ' + lvl + '! ВСЁ СЛОЖНЕЕ', color:'#ffd257', t:2.6};
+    Snd.arp([523,659,784,1047], 0.09, 'triangle', 0.16);
+    if(lvl >= 5) rkcUnlock('level_5');
+  }
+  const recipe = rnd(RECIPES.filter(r => (r.lvl||1) <= game.level));
+  const cust   = rnd(CUSTOMERS.filter(c => (c.minLvl||1) <= game.level));
+  let total = levelTime();
+  if(cust.trait === 'rush') total = Math.round(total * 0.7);
+  game.order = {recipe, cust, total, time: total};
   game.glass = null;
   game.view  = 'front';
   game.phase = 'dialogue';
   game.dlg   = {i:0, chars:0, t:0, full:false};
-  game.tapPull = [0,0,0,0];
+  game.tapPull = TAP_X.map(()=>0);
   game.dragging = null;
   game.resultInfo = null;
-  pests.length = 0;
+  bugs = []; sparks = []; floaters = [];
+  endBlackout(true);
 }
 
 function advanceDialogue(){
@@ -611,9 +487,19 @@ function advanceDialogue(){
   } else {
     game.phase = 'making';
     game.order.time = game.order.total;
-    pestSpawnTimer = 6 + Math.random()*3;
     game.message = {text:'ЗАКАЗ ПРИНЯТ. К СТОЙКЕ (S)', color:'#5ce8ff', t:2};
+    startMaking();
   }
+}
+
+function startMaking(){
+  const o = game.order, tr = o.cust.trait;
+  game.bugT = 5 + Math.random()*3;
+  game.nextBlackout = null;
+  if(tr === 'blackout') game.nextBlackout = 8;
+  else if(game.level >= 2 && Math.random() < Math.min(0.75, 0.2 + game.level*0.09))
+    game.nextBlackout = 6 + Math.random() * Math.max(4, o.total*0.45);
+  if(tr === 'bugs'){ for(let i=0;i<3;i++) spawnBug(); }
 }
 
 function pourInto(id, amount){
@@ -626,15 +512,19 @@ function pourInto(id, amount){
   const last = g.contents[g.contents.length-1];
   if(last && last.id === id) last.amount += amount;
   else g.contents.push({id, amount});
-  g.mixed = false;
-  g.mixProgress = 0;
+  // у испорченного (смешанного) слоёного напитка слои не «лечатся» доливом
+  if(!(g.mixed && game.order && game.order.recipe.layered)){
+    g.mixed = false;
+    g.mixProgress = 0;
+  }
 
+  // --- достижения: налив ---
   if(!barStats.poured){
     barStats.poured = 1; saveBar(); rkcUnlock('pour_first');
   }
   if(!barStats.ingr[id]){
     barStats.ingr[id] = 1; saveBar();
-    if(Object.keys(barStats.ingr).length >= 4) rkcUnlock('all_ingredients');
+    if(coreIngrCount() >= 4) rkcUnlock('all_ingredients');
   }
 }
 
@@ -644,40 +534,54 @@ function serve(){
     game.message = {text:'У ТЕБЯ ПУСТЫЕ РУКИ', color:'#ffaa33', t:1.6};
     return;
   }
-  const r = game.order.recipe;
+  const o = game.order, r = o.recipe, cust = o.cust;
   const req = {}; r.parts.forEach(([id,a]) => req[id] = a);
   const act = {}; g.contents.forEach(c => act[c.id] = (act[c.id]||0) + c.amount);
+  const notes = [];
 
   let err = 0;
   for(const id in req) err += Math.abs((act[id]||0) - req[id]);
   for(const id in act) if(!req[id]) err += act[id];
 
   let q = 100 - err*18;
-  if(g.garnish !== r.garnish) q -= 22;
-  if(!g.mixed) q -= 30;
+  if(act.scrap > 0.05) notes.push('СКРАП В СТАКАНЕ');
+  if(err - (act.scrap||0) > 0.5) notes.push('НЕ ТЕ ПРОПОРЦИИ');
+  if(g.garnish !== r.garnish){ q -= 22; notes.push(g.garnish ? 'НЕ ТОТ ГАРНИР' : 'НЕТ ГАРНИРА'); }
+  if(r.layered){
+    const seq  = g.contents.map(c => c.id).filter(id => id !== 'scrap');
+    const want = r.parts.map(p => p[0]);
+    if(seq.join('>') !== want.join('>')){ q -= 28; notes.push('СЛОИ В ДРУГОМ ПОРЯДКЕ'); }
+    if(g.mixed){ q -= 30; notes.push('СЛОИ СМЕШАНЫ'); }
+  } else if(!g.mixed){
+    q -= 30; notes.push('НЕ ПЕРЕМЕШАНО');
+  }
   q = Math.round(clamp(q, 0, 100));
 
-  const timeBonus = Math.round(game.order.time * 8);
-  const pts = Math.round(q * 12) + timeBonus;
-  const elapsed = game.order.total - game.order.time;
+  const need   = cust.trait === 'picky' ? 50 : 30;
+  const tipMul = cust.trait === 'tip' ? 2 : 1;
+  // Считаем затраченное время до того, как обнулим таймер
+  const elapsed = o.total - o.time;
 
-  if(q >= 30){
+  if(q >= need){
+    game.combo = (q >= 80) ? game.combo + 1 : 0;
+    const mult = comboMult();
+    const timeBonus = Math.round(o.time * 8 * tipMul);
+    const pts = Math.round((q * 12 + timeBonus) * mult);
     game.points += pts;
-    beep(880, 0.08, 'square', 0.04);
-    setTimeout(()=>beep(1320, 0.12, 'square', 0.04), 90);
 
+    // ===== ДОСТИЖЕНИЯ =====
     barStats.successes = (barStats.successes||0) + 1;
 
     if(!barStats.recipes[r.name]){
       barStats.recipes[r.name] = 1; saveBar();
-      const n = Object.keys(barStats.recipes).length;
+      const n = coreCount(barStats.recipes, CORE_RECIPES);
       rkcProgress('all_recipes', n);
       if(n >= 3) rkcUnlock('recipes_3');
       if(n >= 9) rkcUnlock('all_recipes');
     }
-    if(!barStats.customers[game.order.cust.name]){
-      barStats.customers[game.order.cust.name] = 1; saveBar();
-      const n = Object.keys(barStats.customers).length;
+    if(!barStats.customers[cust.name]){
+      barStats.customers[cust.name] = 1; saveBar();
+      const n = coreCount(barStats.customers, CORE_CUSTOMERS);
       rkcProgress('all_customers', n);
       if(n >= 9) rkcUnlock('all_customers');
     }
@@ -700,33 +604,531 @@ function serve(){
 
     if(game.points >= 500) rkcUnlock('score_500');
 
+    // новые (v3)
+    if(r.layered && q >= 60){ if(!barStats.layered){ barStats.layered = 1; saveBar(); } rkcUnlock('layered_first'); }
+    if(game.blackout) rkcUnlock('blackout_serve');
+    // ===== /ДОСТИЖЕНИЯ =====
+
     game.message = {text:'+'+pts+' ОЧКОВ', color:'#5ce8ff', t:2.2};
     game.shake = 0.4;
-    game.resultInfo = {ok:true, q, pts};
+    game.resultInfo = {ok:true, q, pts, notes: q < 100 ? notes : [], mult};
+    Snd.arp(q >= 95 ? [660,880,1100,1320] : [660,880,1100], 0.07, 'triangle', 0.15);
   } else {
     game.lives--;
+    game.combo = 0;
     game.shake = 1;
-    sweepBeep(300, 90, 0.3, 'sawtooth', 0.05);
+    if(cust.trait === 'picky' && q >= 30) notes.push('ПРИДИРА: НУЖНО 50%+');
     game.message = {text:'БОТ НЕДОВОЛЕН. −1 ЖИЗНЬ', color:'#ff4d4d', t:2.2};
-    game.resultInfo = {ok:false, q, pts:0};
+    game.resultInfo = {ok:false, q, pts:0, notes, mult:1};
     game.sessionPerfectChain = 0;
+    Snd.tone(160, 0.4, 'sawtooth', 0.18, 55);
   }
   game.phase = 'result';
-  game.resultTimer = 2.4;
+  game.resultTimer = 2.8;
   game.order.time = 0;
-  pests.length = 0;
+  game.blackout = null; game.nextBlackout = null;
 }
 
 function failOrder(){
   game.lives--;
+  game.combo = 0;
   game.shake = 1;
-  sweepBeep(300, 90, 0.4, 'sawtooth', 0.05);
   game.message = {text:'ВРЕМЯ ВЫШЛО. БОТ УШЁЛ.', color:'#ff4d4d', t:2.2};
-  game.resultInfo = {ok:false, q:0, pts:0, timeout:true};
+  game.resultInfo = {ok:false, q:0, pts:0, timeout:true, notes:[], mult:1};
   game.phase = 'result';
   game.resultTimer = 2.4;
   game.sessionPerfectChain = 0;
-  pests.length = 0;
+  game.blackout = null; game.nextBlackout = null;
+  Snd.tone(160, 0.4, 'sawtooth', 0.18, 55);
+}
+
+/* ============================================================
+   ЗВУК (WebAudio, без файлов)
+   ============================================================ */
+const Snd = (function(){
+  let ac = null, master = null, muted = false;
+  function init(){
+    try{
+      if(!ac){
+        const C = window.AudioContext || window.webkitAudioContext;
+        if(!C) return;
+        ac = new C();
+        master = ac.createGain(); master.gain.value = 0.55; master.connect(ac.destination);
+      }
+      if(ac.state === 'suspended') ac.resume();
+    }catch(e){ ac = null; }
+  }
+  function out(pan){
+    if(pan && ac.createStereoPanner){
+      const p = ac.createStereoPanner();
+      p.pan.value = clamp(pan, -1, 1);
+      p.connect(master);
+      return p;
+    }
+    return master;
+  }
+  function tone(f, d, type, vol, slide, pan){
+    if(!ac || muted) return;
+    try{
+      const t = ac.currentTime;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'square';
+      o.frequency.setValueAtTime(f, t);
+      if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, slide), t + d);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol || 0.1), t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(out(pan));
+      o.start(t); o.stop(t + d + 0.03);
+    }catch(e){}
+  }
+  function noise(d, vol, freq, pan){
+    if(!ac || muted) return;
+    try{
+      const t = ac.currentTime;
+      const n = Math.max(1, Math.floor(ac.sampleRate * d));
+      const buf = ac.createBuffer(1, n, ac.sampleRate);
+      const data = buf.getChannelData(0);
+      for(let i=0;i<n;i++) data[i] = (Math.random()*2-1) * (1 - i/n);
+      const s = ac.createBufferSource(); s.buffer = buf;
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq || 1500; f.Q.value = 0.9;
+      const g = ac.createGain(); g.gain.value = vol || 0.2;
+      s.connect(f); f.connect(g); g.connect(out(pan));
+      s.start(t);
+    }catch(e){}
+  }
+  function arp(notes, step, type, vol){
+    notes.forEach((n,i) => setTimeout(() => tone(n, step*1.7, type || 'triangle', vol || 0.15), i*step*1000));
+  }
+  function toggle(){ muted = !muted; return muted; }
+  return {init, tone, noise, arp, toggle};
+})();
+
+/* ============================================================
+   МЕЛКИЕ РОБОТЫ-ЖУЧКИ
+   ============================================================ */
+let bugs = [], sparks = [], floaters = [];
+const FLASH_R  = 78;   // радиус луча фонарика
+const ZAP_TIME = 1.0;  // сколько секунд держать жучка в луче, чтобы он сгорел
+
+const BUG_TYPES = {
+  scout:    {name:'ЖУЧОК',    speed:78, body:'#7d8a96', eye:'#5ce8ff', scale:1.0},   // пьёт напиток
+  junker:   {name:'МУСОРЩИК', speed:62, body:'#5f7350', eye:'#9dff3d', scale:1.05},  // сыплет скрап
+  saboteur: {name:'ТОЛКАЧ',   speed:58, body:'#8e4b38', eye:'#ff6a2a', scale:1.25},  // сбивает стакан
+};
+
+function flashActive(){
+  return mouse.rdown && game.battery > 0 && !game.flashLock &&
+         (game.phase === 'dialogue' || game.phase === 'making' || game.phase === 'result');
+}
+
+function maxBugs(){
+  const tr = game.order && game.order.cust.trait;
+  return Math.min(8, 1 + Math.ceil(game.level*0.8)) + (tr === 'tail' ? 2 : 0) + (tr === 'bugs' ? 1 : 0);
+}
+function bugInterval(){
+  const tr = game.order && game.order.cust.trait;
+  return Math.max(3.8, 12.5 - game.level*1.1) * (tr === 'tail' ? 0.55 : 1);
+}
+
+function spawnBug(forceType){
+  let type = forceType;
+  if(!type){
+    const r = Math.random();
+    if(game.level >= 3 && r < 0.28) type = 'saboteur';
+    else if(game.level >= 2 && r < 0.62) type = 'junker';
+    else type = 'scout';
+  }
+  const sb = shelfBounds();
+  const fromLeft = Math.random() < 0.5;
+  bugs.push({
+    type, x: fromLeft ? sb.left - 24 : sb.right + 24, dir: fromLeft ? 1 : -1,
+    inside:false, stun:0, charge:0, wasLit:false,
+    latched:false, latchSide: Math.random() < 0.5 ? -1 : 1,
+    actT:0, beepT: 0.3 + Math.random()*0.6, wanderT:0, wdir:0, cool:0,
+    ph: Math.random()*6.28, dead:false,
+  });
+  if(!game.shownBugHint){
+    game.shownBugHint = true;
+    game.message = {text:'ЖУЧОК! ДЕРЖИ ПКМ — СВЕТ ЕГО СОЖЖЁТ', color:'#ffd257', t:3.2};
+  }
+}
+
+function bugPos(b){
+  const g = game.glass;
+  if(b.latched && g){
+    return {x: g.x + b.latchSide*(GLASS_W/2 - 3), y: g.y - 46 + Math.sin(game.time*9 + b.ph)*1.5, climbing:true};
+  }
+  return {x: b.x, y: floorForView()};
+}
+
+function drainGlass(g, amt){
+  while(amt > 0.0001 && g.contents.length){
+    const c = g.contents[g.contents.length-1];
+    const t = Math.min(c.amount, amt);
+    c.amount -= t; amt -= t;
+    if(c.amount <= 0.001) g.contents.pop();
+  }
+}
+
+function addScrap(g){
+  const free = CAPACITY - glassTotal();
+  if(free < 0.5) drainGlass(g, 0.5 - free);
+  g.contents.push({id:'scrap', amount:0.5});
+  g.mixed = false; g.mixProgress = 0;
+  Snd.tone(520, 0.05, 'square', 0.1);
+  Snd.noise(0.07, 0.12, 2800);
+}
+
+function bugChirp(b, p){
+  const pan = (p.x - W/2) / (W/2);
+  const g = game.glass;
+  const d = g ? Math.abs(p.x - g.x) : 450;
+  const prox = clamp(1 - d/700, 0.15, 1);
+  let vol = 0.04 + 0.11*prox;
+  if(game.order && game.order.cust.trait === 'loud') vol *= 0.3;
+  if(b.type === 'scout'){
+    Snd.tone(1300, 0.07, 'sine', vol, 1900, pan);
+    setTimeout(() => Snd.tone(1900, 0.07, 'sine', vol, 1400, pan), 95);
+  } else if(b.type === 'saboteur'){
+    Snd.tone(150, 0.17, 'sawtooth', vol*0.9, 105, pan);
+  } else {
+    Snd.tone(620, 0.05, 'square', vol*0.7, 0, pan);
+    setTimeout(() => Snd.noise(0.06, vol*1.4, 3000, pan), 70);
+  }
+}
+
+function addSpark(x, y, c, power, o){
+  const k = power || 1;
+  const life = (o && o.life) || 0.55;
+  sparks.push({x, y, vx:(Math.random()-0.5)*170*k, vy:-Math.random()*150*k - 20, life, max:life, c,
+               r:(o && o.r) || 1.5, g:(o && o.g !== undefined) ? o.g : 500});
+}
+
+function shoveGlass(b, g){
+  const dir = Math.random() < 0.5 ? -1 : 1;
+  g.vx = dir * (330 + Math.random()*140);
+  g.vy = -240;
+  g.rotV = dir * 4;
+  g.y -= 3;
+  drainGlass(g, 0.35);
+  b.latched = false;
+  b.cool = 3;
+  b.dir = -dir;
+  game.message = {text:'ТОЛКАЧ СБИЛ СТАКАН!', color:'#ff8a4d', t:1.4};
+  game.shake = Math.max(game.shake, 0.4);
+  Snd.tone(120, 0.25, 'sawtooth', 0.2, 55, (g.x - W/2)/(W/2));
+  Snd.noise(0.15, 0.2, 500);
+}
+
+function bugReachGlass(b, g){
+  if(b.type === 'saboteur' && !g.held){ shoveGlass(b, g); return; }
+  b.latched = true; b.actT = 0;
+  b.latchSide = (b.x < g.x) ? -1 : 1;
+  Snd.tone(300, 0.06, 'square', 0.12, 150);
+  Snd.noise(0.05, 0.1, 2200);
+  const txt = b.type === 'scout' ? 'ЖУЧОК ПЬЁТ ТВОЙ НАПИТОК!'
+            : b.type === 'junker' ? 'МУСОРЩИК СЫПЛЕТ СКРАП!'
+            : 'ТОЛКАЧ ВИСИТ НА СТАКАНЕ!';
+  game.message = {text:txt, color:'#ff8a4d', t:1.4};
+}
+
+function killBug(b){
+  const p = bugPos(b);
+  b.dead = true;
+  for(let i=0;i<18;i++) addSpark(p.x, p.y-10, i%3 ? '#ffd257' : '#5ce8ff', 1.3);
+  floaters.push({x:p.x, y:p.y-34, text:'+25', c:'#ffd257', life:1.2});
+  game.points += 25;
+  game.zapsSession++;
+  barStats.zaps = (barStats.zaps||0) + 1; saveBar();
+  if(barStats.zaps === 1) rkcUnlock('zap_first');
+  rkcProgress('zap_25', barStats.zaps);
+  if(barStats.zaps >= 25) rkcUnlock('zap_25');
+  const pan = (p.x - W/2)/(W/2);
+  Snd.noise(0.3, 0.26, 2500, pan);
+  Snd.tone(900, 0.28, 'sawtooth', 0.12, 70, pan);
+}
+
+function updateBugs(dt){
+  const g = game.glass;
+  const sb = shelfBounds();
+  const fl = floorForView();
+  const lit = flashActive();
+
+  for(const b of bugs){
+    const T = BUG_TYPES[b.type];
+    let p = bugPos(b);
+
+    // --- свет фонарика ---
+    const inBeam = lit && Math.hypot(p.x - mouse.x, (p.y-10) - mouse.y) < FLASH_R + 12;
+    if(inBeam){
+      if(!b.wasLit) Snd.noise(0.12, 0.1, 3500, (p.x - W/2)/(W/2));
+      b.stun = 0.35;
+      b.charge += dt;
+      if(Math.random() < dt*30) addSpark(p.x, p.y-10, '#9fe8ff');
+      if(b.latched && b.charge > 0.45){
+        b.latched = false;
+        b.x = clamp(p.x, sb.left, sb.right);
+        b.cool = 1.5;
+      }
+      if(b.charge >= ZAP_TIME){ killBug(b); continue; }
+    } else {
+      b.charge = Math.max(0, b.charge - dt*0.8);
+      if(b.stun > 0) b.stun -= dt;
+    }
+    b.wasLit = inBeam;
+
+    // --- поведение ---
+    if(b.stun > 0){
+      // оглушён — стоит
+    } else if(b.latched){
+      if(!g){ b.latched = false; }
+      else {
+        b.actT += dt;
+        if(b.type === 'scout'){
+          if(b.actT >= 0.45){ b.actT = 0; drainGlass(g, 0.2); }
+        } else if(b.type === 'junker'){
+          if(b.actT >= 2.2){ b.actT = 0; addScrap(g); }
+        } else if(b.actT >= 1.8){
+          b.actT = 0;
+          if(g.held){
+            g.held = false; g.vy = 0;
+            game.message = {text:'СТАКАН ВЫСКОЛЬЗНУЛ!', color:'#ff8a4d', t:1.4};
+            Snd.tone(220, 0.2, 'square', 0.14, 120);
+          } else {
+            shoveGlass(b, g);
+          }
+        }
+      }
+    } else {
+      b.cool = Math.max(0, b.cool - dt);
+      let want = 0;
+      const canTarget = g && b.cool <= 0 && g.y > fl - 70;
+      if(!b.inside){
+        want = b.dir;
+      } else if(canTarget){
+        const dx = g.x - b.x;
+        want = Math.sign(dx);
+        if(Math.abs(dx) < 16){ bugReachGlass(b, g); want = 0; }
+      } else {
+        b.wanderT -= dt;
+        if(b.wanderT <= 0){
+          b.wanderT = 1 + Math.random()*2;
+          b.wdir = Math.random() < 0.25 ? 0 : (Math.random() < 0.5 ? -1 : 1);
+        }
+        want = b.wdir * 0.55;
+      }
+      if(want !== 0){
+        b.dir = want > 0 ? 1 : -1;
+        b.x += want * T.speed * (1 + game.level*0.04) * dt;
+      }
+      if(!b.inside){
+        if(b.x > sb.left + 10 && b.x < sb.right - 10) b.inside = true;
+      } else {
+        b.x = clamp(b.x, sb.left, sb.right);
+      }
+    }
+
+    // --- писк ---
+    b.beepT -= dt;
+    if(b.beepT <= 0){
+      p = bugPos(b);
+      const d = g ? Math.abs(p.x - g.x) : 500;
+      if(b.stun > 0){
+        b.beepT = 0.12;
+        Snd.tone(300 + Math.random()*500, 0.05, 'square', 0.05, 0, (p.x - W/2)/(W/2));
+      } else {
+        b.beepT = clamp(0.2 + d/650, 0.22, 1.1) * (0.85 + Math.random()*0.3);
+        bugChirp(b, p);
+      }
+    }
+  }
+  bugs = bugs.filter(b => !b.dead);
+}
+
+/* ============================================================
+   ОТКЛЮЧЕНИЕ СВЕТА
+   ============================================================ */
+function startBlackout(){
+  const dur = Math.min(12, 6.5 + game.level*0.6);
+  game.blackout = {t:dur, age:0, tick:0};
+  game.message = {text:'ОТКЛЮЧЕНИЕ ПИТАНИЯ! ПКМ — ФОНАРИК', color:'#ff6a4d', t:2.8};
+  Snd.tone(520, 0.9, 'sawtooth', 0.17, 40);
+  Snd.noise(0.5, 0.2, 300);
+  const extra = 1 + (Math.random() < 0.5 ? 1 : 0);
+  for(let i=0;i<extra;i++) if(bugs.length < maxBugs() + 1) spawnBug();
+}
+
+function endBlackout(silent){
+  if(game.blackout && !silent){
+    game.message = {text:'СВЕТ ВЕРНУЛСЯ', color:'#9fe8ff', t:1.6};
+    Snd.tone(110, 0.6, 'sine', 0.15, 700);
+  }
+  game.blackout = null;
+  game.nextBlackout = null;
+}
+
+/* ============================================================
+   ЭФФЕКТЫ: искры, всплывающий текст, темнота, луч
+   ============================================================ */
+function updateFx(dt){
+  for(const s of sparks){ s.life -= dt; s.vy += (s.g === undefined ? 500 : s.g)*dt; s.x += s.vx*dt; s.y += s.vy*dt; }
+  sparks = sparks.filter(s => s.life > 0);
+  for(const f of floaters){ f.life -= dt; f.y -= 28*dt; }
+  floaters = floaters.filter(f => f.life > 0);
+}
+
+function drawNotes(notes, y, color){
+  if(!notes || !notes.length) return;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = color;
+  ctx.font = 'bold 13px "Courier New"';
+  notes.slice(0,4).forEach((n,i) => ctx.fillText('• ' + n, 500, y + i*20));
+}
+
+const darkCv = document.createElement('canvas');
+darkCv.width = W; darkCv.height = H;
+const dctx = darkCv.getContext('2d');
+
+function darkHole(x, y, r, a){
+  const g = dctx.createRadialGradient(x, y, r*0.12, x, y, r);
+  g.addColorStop(0, 'rgba(0,0,0,' + a + ')');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  dctx.fillStyle = g;
+  dctx.beginPath(); dctx.arc(x, y, r, 0, 7); dctx.fill();
+}
+
+function drawDarkness(){
+  if(game.dark < 0.01) return;
+  dctx.globalCompositeOperation = 'source-over';
+  dctx.clearRect(0, 0, W, H);
+  dctx.fillStyle = 'rgba(2,2,8,' + (0.91*game.dark).toFixed(3) + ')';
+  dctx.fillRect(0, 0, W, H);
+  dctx.globalCompositeOperation = 'destination-out';
+  darkHole(mouse.x, mouse.y, 55, 0.4*game.dark);          // слабое «ночное зрение» у курсора
+  if(flashActive()) darkHole(mouse.x, mouse.y, FLASH_R*1.4, 1);
+  ctx.drawImage(darkCv, 0, 0);
+  // аварийное красное мигание
+  const pulse = 0.5 + 0.5*Math.sin(game.time*5);
+  ctx.fillStyle = 'rgba(255,30,20,' + (0.04*pulse*game.dark).toFixed(3) + ')';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawFlashBeam(){
+  if(!flashActive()) return;
+  const x = mouse.x, y = mouse.y, r = FLASH_R;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const cg = ctx.createLinearGradient(0, H, 0, y);
+  cg.addColorStop(0, 'rgba(255,235,170,0)');
+  cg.addColorStop(1, 'rgba(255,235,170,0.16)');
+  ctx.fillStyle = cg;
+  ctx.beginPath();
+  ctx.moveTo(x-10, H); ctx.lineTo(x+10, H); ctx.lineTo(x+r*0.85, y); ctx.lineTo(x-r*0.85, y);
+  ctx.closePath(); ctx.fill();
+  const rg = ctx.createRadialGradient(x, y, 4, x, y, r*1.2);
+  rg.addColorStop(0, 'rgba(255,248,210,0.42)');
+  rg.addColorStop(0.55, 'rgba(255,232,160,0.20)');
+  rg.addColorStop(1, 'rgba(255,220,140,0)');
+  ctx.fillStyle = rg;
+  ctx.beginPath(); ctx.arc(x, y, r*1.2, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawBugs(){ for(const b of bugs) drawBugBody(b); }
+
+function drawBugBody(b){
+  const p = bugPos(b);
+  const T = BUG_TYPES[b.type];
+  const s = T.scale;
+  const stunned = b.stun > 0;
+  const moving = !stunned && !b.latched;
+  const t = game.time*12 + b.ph;
+  const flick = stunned && Math.sin(game.time*70) > 0;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(b.dir >= 0 ? s : -s, s);
+
+  if(!b.latched){ ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0, 1, 14, 3, 0, 0, 7); ctx.fill(); }
+  ctx.strokeStyle = flick ? '#bfe9ff' : '#4d545d';
+  ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for(let i=0;i<3;i++){
+    const lx = -9 + i*9;
+    const sw = moving ? Math.sin(t + i*2.1)*4 : (stunned ? (Math.random()-0.5)*3 : 0);
+    ctx.beginPath(); ctx.moveTo(lx, -8); ctx.lineTo(lx + sw, 0); ctx.stroke();
+  }
+
+  ctx.fillStyle = flick ? '#e8f6ff' : T.body;
+  ctx.beginPath(); ctx.roundRect(-15, -21, 30, 14, 6); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(-11, -19, 16, 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.roundRect(4, -20, 11, 9, 3); ctx.fill();
+
+  if(b.type === 'saboteur'){
+    ctx.fillStyle = '#c9ccd2';
+    ctx.beginPath();
+    ctx.moveTo(15,-16); ctx.lineTo(22,-19); ctx.lineTo(19,-14); ctx.lineTo(22,-10); ctx.lineTo(15,-12);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(-12, -14, 4, 5); ctx.fillRect(-4, -14, 4, 5);
+  } else if(b.type === 'junker'){
+    ctx.fillStyle = '#4a3f35';
+    ctx.beginPath(); ctx.roundRect(-14, -29, 16, 9, 3); ctx.fill();
+    ctx.fillStyle = '#9aa4ad';
+    ctx.fillRect(-6, -33, 4, 5);
+  } else {
+    ctx.strokeStyle = '#8d949d'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-6, -21); ctx.lineTo(-9, -28); ctx.stroke();
+    const bl = Math.sin(game.time*6 + b.ph) > 0;
+    ctx.fillStyle = bl ? T.eye : '#2a3036';
+    ctx.beginPath(); ctx.arc(-9, -29, 2, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBugEyes(){
+  for(const b of bugs){
+    const p = bugPos(b);
+    const T = BUG_TYPES[b.type];
+    const s = T.scale;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(b.dir >= 0 ? s : -s, s);
+    ctx.shadowColor = T.eye; ctx.shadowBlur = 12;
+    ctx.fillStyle = b.stun > 0 ? '#ffffff' : T.eye;
+    const bl = Math.sin(game.time*2 + b.ph) > 0.97 ? 0.3 : 1;
+    ctx.beginPath(); ctx.ellipse(8, -15.5, 2.3, 2.3*bl, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(12.5, -15.5, 2.3, 2.3*bl, 0, 0, 7); ctx.fill();
+    ctx.restore();
+
+    if(b.charge > 0.03){
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath(); ctx.arc(p.x, p.y - 42, 10, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#ffd257';
+      ctx.beginPath(); ctx.arc(p.x, p.y - 42, 10, -Math.PI/2, -Math.PI/2 + Math.PI*2*clamp(b.charge/ZAP_TIME,0,1)); ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawFx(){
+  for(const s of sparks){
+    ctx.globalAlpha = clamp(s.life/s.max, 0, 1);
+    ctx.fillStyle = s.c;
+    ctx.fillRect(s.x-s.r, s.y-s.r, s.r*2, s.r*2);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 16px "Courier New"';
+  for(const f of floaters){
+    ctx.globalAlpha = clamp(f.life*1.5, 0, 1);
+    ctx.fillStyle = f.c;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
 }
 
 /* ============================================================
@@ -750,13 +1152,29 @@ function update(dt){
   if(game.phase === 'making'){
     game.order.time -= dt;
     if(game.order.time <= 0){ game.order.time = 0; failOrder(); }
+    else {
+      // отключение света
+      if(game.nextBlackout !== null){
+        game.nextBlackout -= dt;
+        if(game.nextBlackout <= 0){ game.nextBlackout = null; startBlackout(); }
+      }
+      // появление жучков
+      game.bugT -= dt * (game.blackout ? 1.8 : 1);
+      if(game.bugT <= 0){
+        game.bugT = bugInterval() * (0.7 + Math.random()*0.6);
+        if(bugs.length < maxBugs()) spawnBug();
+      }
+      updateBugs(dt);
+    }
   }
 
   if(game.phase === 'result'){
     game.resultTimer -= dt;
     if(game.resultTimer <= 0){
       if(game.lives <= 0){
+        game.newRecord = game.points > game.best;
         game.best = Math.max(game.best, game.points);
+        barStats.best = game.best; saveBar();
         game.phase = 'gameover';
       } else {
         newCustomer();
@@ -764,7 +1182,7 @@ function update(dt){
     }
   }
 
-  for(let i=0;i<4;i++){
+  for(let i=0;i<TAP_X.length;i++){
     if(game.dragging && game.dragging.tap === i){
       game.tapPull[i] = game.dragging.pull;
     } else {
@@ -778,11 +1196,43 @@ function update(dt){
     const tapX = TAP_X[i];
     if(Math.abs(game.glass.y - SHELF_Y) < 15 && Math.abs(game.glass.x - tapX) < 30){
       pourInto(INGREDIENTS[i].id, POUR_RATE * game.dragging.pull * dt);
+      if(Math.random() < dt*45) addSpark(tapX + (Math.random()-0.5)*6, glassSurfaceY(game.glass) - 1, INGREDIENTS[i].color, 0.45, {r:1.7, g:700, life:0.35});
+      game.glass.sloshV += (Math.random()-0.5) * 1.2 * game.dragging.pull;
     }
   }
 
   updateGlassPhysics(dt);
-  updatePests(dt);
+
+  // --- фонарик: заряд ---
+  let fa = flashActive();
+  if(fa){
+    game.battery = Math.max(0, game.battery - dt*0.2);
+    if(game.battery <= 0){
+      game.flashLock = true; fa = false;
+      game.message = {text:'ФОНАРИК РАЗРЯДИЛСЯ', color:'#ff6a4d', t:1.8};
+      Snd.tone(180, 0.3, 'sawtooth', 0.12, 90);
+    }
+  } else {
+    game.battery = Math.min(1, game.battery + dt*(game.flashLock ? 0.14 : 0.1));
+  }
+  if(game.flashLock && game.battery >= 0.3) game.flashLock = false;
+  if(fa !== game.flashWas){
+    Snd.tone(fa ? 1500 : 900, 0.04, 'square', 0.06);
+    game.flashWas = fa;
+  }
+
+  // --- блэкаут: таймер и затемнение ---
+  const bo = game.blackout;
+  if(bo){
+    bo.age += dt; bo.t -= dt; bo.tick -= dt;
+    if(bo.tick <= 0){ bo.tick = 1.1; Snd.tone(220, 0.05, 'square', 0.04); }
+    if(bo.t <= 0) endBlackout(false);
+  }
+  let tgt = 0;
+  if(game.blackout) tgt = game.blackout.age < 0.8 ? (Math.sin(game.blackout.age*50) > 0 ? 1 : 0.2) : 1;
+  game.dark += (tgt - game.dark) * Math.min(1, dt*(game.blackout ? 14 : 5));
+
+  updateFx(dt);
 }
 
 /* ============================================================
@@ -813,7 +1263,8 @@ function handleClick(p){
     return;
   }
 
-  for(let i=0;i<4;i++){
+  // вид назад: краны
+  for(let i=0;i<TAP_X.length;i++){
     const hb = tapHitbox(i);
     if(p.x>hb.x && p.x<hb.x+hb.w && p.y>hb.y && p.y<hb.y+hb.h){
       game.dragging = {tap:i, startY:p.y, pull:0};
@@ -821,6 +1272,7 @@ function handleClick(p){
     }
   }
 
+  // вид назад: полка со стаканами
   if(p.x > 45 && p.x < 260 && p.y > 470 && p.y < 580){
     if(!game.glass){
       const g = createGlass();
@@ -833,7 +1285,7 @@ function handleClick(p){
       g.lastMoveY = p.y;
       game.glass = g;
       game.message = {text:'СТАКАН ВЗЯТ', color:'#9fe8ff', t:1.2};
-      beep(600, 0.05, 'square', 0.03);
+      // --- достижение: взять стакан ---
       rkcUnlock('take_glass');
     } else {
       game.message = {text:'СТАКАН УЖЕ В РУКЕ', color:'#ffaa33', t:1.2};
@@ -841,6 +1293,7 @@ function handleClick(p){
     return;
   }
 
+  // вид назад: гарниры
   for(let i=0;i<GARNISHES.length;i++){
     const gx = 420 + i*80, gy = 500;
     if(Math.hypot(p.x-gx, p.y-gy) < 36){
@@ -854,39 +1307,30 @@ function handleClick(p){
       }
       game.glass.garnish = GARNISHES[i].id;
       game.message = {text:'ДОБАВЛЕНО: '+GARNISHES[i].name, color:'#9fe8ff', t:1.2};
-      beep(700, 0.05, 'square', 0.03);
+      // --- достижение: первый гарнир ---
       rkcUnlock('add_garnish');
       return;
     }
   }
 }
 
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
 canvas.addEventListener('mousedown', e=>{
-  initAudio();
+  Snd.init();
   const p = toCanvas(e);
   mouse.x = p.x; mouse.y = p.y;
-
-  if(e.button === 2){
-    flashlight.active = true;
-    flashlight.x = p.x;
-    flashlight.y = p.y;
-    canvas.classList.add('flash');
-    e.preventDefault();
-    beep(1200, 0.03, 'sine', 0.02);
-    return;
-  }
-
+  if(e.button === 2){ mouse.rdown = true; e.preventDefault(); return; }   // ПКМ — фонарик
+  if(e.button !== 0) return;
   mouse.down = true;
   if(tryGrabGlass(p)) return;
   handleClick(p);
 });
 
+window.addEventListener('mouseup', e=>{ if(e.button === 2) mouse.rdown = false; });
+
 canvas.addEventListener('mouseup', e=>{
-  if(e.button === 2){
-    flashlight.active = false;
-    canvas.classList.remove('flash');
-    return;
-  }
+  if(e.button !== 0) return;
   mouse.down = false;
   releaseGlass();
   game.dragging = null;
@@ -896,10 +1340,6 @@ canvas.addEventListener('mousemove', e=>{
   const p = toCanvas(e);
   mouse.x = p.x;
   mouse.y = p.y;
-  if(flashlight.active){
-    flashlight.x = p.x;
-    flashlight.y = p.y;
-  }
   if(game.dragging){
     game.dragging.pull = clamp((p.y - game.dragging.startY)/70, 0, 1);
   }
@@ -907,16 +1347,15 @@ canvas.addEventListener('mousemove', e=>{
 
 canvas.addEventListener('mouseleave', ()=>{
   mouse.down = false;
+  mouse.rdown = false;
   releaseGlass();
   game.dragging = null;
-  flashlight.active = false;
-  canvas.classList.remove('flash');
 });
 
-canvas.addEventListener('contextmenu', e=>e.preventDefault());
+window.addEventListener('blur', ()=>{ mouse.rdown = false; });
 
 window.addEventListener('keydown', e=>{
-  initAudio();
+  Snd.init();
   if(e.code === 'Space'){
     e.preventDefault();
     if(game.phase === 'menu' || game.phase === 'gameover') startGame();
@@ -924,7 +1363,14 @@ window.addEventListener('keydown', e=>{
   }
   if(e.code === 'KeyW') switchView('front');
   if(e.code === 'KeyS') switchView('back');
+  if(e.code === 'KeyF') mouse.rdown = true;     // фонарик с клавиатуры
+  if(e.code === 'KeyQ') game.panelMini = !game.panelMini;   // свернуть/развернуть заказ
+  if(e.code === 'KeyM'){
+    const m = Snd.toggle();
+    game.message = {text: m ? 'ЗВУК ВЫКЛ' : 'ЗВУК ВКЛ', color:'#9fe8ff', t:1.2};
+  }
 });
+window.addEventListener('keyup', e=>{ if(e.code === 'KeyF') mouse.rdown = false; });
 
 /* ============================================================
    ФОН
@@ -967,6 +1413,139 @@ function drawScanlines(){
 /* ============================================================
    ВИД ВПЕРЁД
    ============================================================ */
+/* ============================================================
+   ДЕКОР И ЭФФЕКТЫ СЦЕНЫ (v4)
+   ============================================================ */
+function drawBottle(x, baseY, hgt, color, alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.roundRect(x-11, baseY-hgt*0.62, 22, hgt*0.62, 5); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x-5, baseY-hgt, 10, hgt*0.42, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(x-7, baseY-hgt*0.58, 3, hgt*0.45);
+  ctx.restore();
+}
+
+function drawFrontDecor(){
+  const t = game.time;
+
+  // неоновая вывеска
+  const fl = Math.sin(t*23) > 0.965 ? 0.3 : 1;
+  ctx.save();
+  ctx.globalAlpha = fl;
+  ctx.strokeStyle = '#5a626c'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(810,56); ctx.lineTo(810,190); ctx.moveTo(870,56); ctx.lineTo(870,190); ctx.stroke();
+  ctx.shadowColor = '#ff3a8c'; ctx.shadowBlur = 26;
+  ctx.strokeStyle = '#5ce8ff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(790, 188, 100, 50, 9); ctx.stroke();
+  ctx.fillStyle = '#ff7ab4';
+  ctx.font = 'bold 36px "Courier New"';
+  ctx.textAlign = 'center';
+  ctx.fillText('БАР', 840, 225);
+  ctx.restore();
+
+  // дождь за окном
+  ctx.strokeStyle = 'rgba(160,190,255,0.14)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let i=0;i<70;i++){
+    const x = (i*137.5 + t*40) % W;
+    const y = (i*89.3 + t*(380 + (i%5)*45)) % FRONT_COUNTER_Y;
+    ctx.moveTo(x, y); ctx.lineTo(x-3, y+14);
+  }
+  ctx.stroke();
+
+  // подвесная лампа
+  const lx = 215, sway = Math.sin(t*0.8)*0.05;
+  ctx.save();
+  ctx.translate(lx, 56);
+  ctx.rotate(sway);
+  ctx.strokeStyle = '#3a3f47'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,96); ctx.stroke();
+  ctx.globalCompositeOperation = 'lighter';
+  const cone = ctx.createLinearGradient(0, 112, 0, 400);
+  cone.addColorStop(0, 'rgba(255,190,110,0.13)');
+  cone.addColorStop(1, 'rgba(255,190,110,0)');
+  ctx.fillStyle = cone;
+  ctx.beginPath(); ctx.moveTo(-14,112); ctx.lineTo(14,112); ctx.lineTo(110,400); ctx.lineTo(-110,400); ctx.closePath(); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#2b2f36';
+  ctx.beginPath(); ctx.moveTo(-18,112); ctx.lineTo(-7,92); ctx.lineTo(7,92); ctx.lineTo(18,112); ctx.closePath(); ctx.fill();
+  ctx.shadowColor = '#ffb066'; ctx.shadowBlur = 22;
+  ctx.fillStyle = '#ffd9a0';
+  ctx.beginPath(); ctx.ellipse(0, 112, 11, 4, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawCounterGloss(){
+  const cg = ctx.createLinearGradient(0, FRONT_COUNTER_Y, 0, H);
+  cg.addColorStop(0, 'rgba(255,140,70,0.12)');
+  cg.addColorStop(0.18, 'rgba(255,140,70,0.02)');
+  cg.addColorStop(1, 'rgba(0,0,0,0.40)');
+  ctx.fillStyle = cg;
+  ctx.fillRect(0, FRONT_COUNTER_Y, W, H - FRONT_COUNTER_Y);
+  // блик-полоса по краю
+  ctx.fillStyle = 'rgba(255,200,150,0.10)';
+  ctx.fillRect(0, FRONT_COUNTER_Y + 2, W, 2);
+  // декоративные бутылки по краям стойки
+  drawBottle(64,  FRONT_COUNTER_Y, 78, INGREDIENTS[1].color, 0.55);
+  drawBottle(92,  FRONT_COUNTER_Y, 62, INGREDIENTS[3].color, 0.5);
+  drawBottle(936, FRONT_COUNTER_Y, 74, INGREDIENTS[4].color, 0.55);
+  drawBottle(908, FRONT_COUNTER_Y, 58, INGREDIENTS[2].color, 0.5);
+}
+
+function drawBackDecor(){
+  // бутылки на задней стенке между кранами
+  for(let k=0;k<4;k++){
+    const x = (TAP_X[k] + TAP_X[k+1]) / 2;
+    drawBottle(x - 18, SHELF_Y, 92, INGREDIENTS[k].color, 0.20);
+    drawBottle(x + 16, SHELF_Y, 72, INGREDIENTS[k+1].color, 0.17);
+  }
+  // потёки света от кранов на стене
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for(let i=0;i<TAP_X.length;i++){
+    const gg = ctx.createRadialGradient(TAP_X[i], 90, 5, TAP_X[i], 90, 150);
+    gg.addColorStop(0, 'rgba(255,255,255,0.05)');
+    gg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(TAP_X[i]-150, 0, 300, 300);
+  }
+  ctx.restore();
+}
+
+function drawMiniPanel(){
+  const o = game.order, r = o.recipe;
+  const w = 300, h = 58;
+  const back = game.view === 'back';
+  const x = back ? W - w - 12 : 16;
+  const y = back ? H - h - 6 : 104;
+  ctx.fillStyle = 'rgba(12,8,10,0.88)';
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,110,40,0.5)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px "Courier New"';
+  ctx.fillText(r.name, x+10, y+20);
+  let px = x + 14;
+  r.parts.forEach(([id, amt]) => {
+    const ing = ingById(id);
+    ctx.save(); ctx.shadowColor = ing.glow; ctx.shadowBlur = 8;
+    ctx.fillStyle = ing.color;
+    ctx.beginPath(); ctx.arc(px, y+40, 6, 0, 7); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ddd'; ctx.font = 'bold 12px "Courier New"';
+    ctx.fillText('x' + amt, px + 9, y+44);
+    px += 38;
+  });
+  ctx.fillStyle = '#8fd0ff';
+  ctx.fillText('+' + garById(r.garnish).name, px + 4, y+44);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '10px "Courier New"';
+  ctx.textAlign = 'right';
+  ctx.fillText('[Q] развернуть', x+w-8, y+16);
+}
+
 function drawFront(){
   const sky = ctx.createLinearGradient(0,0,0,H);
   sky.addColorStop(0,'#1c0d17');
@@ -1003,12 +1582,14 @@ function drawFront(){
   }
   ctx.globalAlpha = 1;
 
+  drawFrontDecor();
   ctx.fillStyle = '#1b1114';
   ctx.fillRect(0, FRONT_COUNTER_Y, W, H-FRONT_COUNTER_Y);
   ctx.fillStyle = '#2b1b20';
   ctx.fillRect(0, FRONT_COUNTER_Y, W, 10);
   ctx.fillStyle = 'rgba(255,120,50,0.12)';
   ctx.fillRect(0, FRONT_COUNTER_Y, W, 2);
+  drawCounterGloss();
 
   drawRobot(500, FRONT_COUNTER_Y);
 
@@ -1035,7 +1616,7 @@ function drawFront(){
   ctx.textAlign = 'center';
   ctx.font = '13px "Courier New"';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
-  ctx.fillText('[S] К СТОЙКЕ   ·   ПКМ — ФОНАРИК', 500, 585);
+  ctx.fillText('[S] К СТОЙКЕ   ·   [ПКМ / F] ФОНАРИК', 500, 585);
 }
 
 function drawRobot(cx, baseY){
@@ -1076,12 +1657,21 @@ function drawRobot(cx, baseY){
   ctx.beginPath(); ctx.roundRect(cx-58, baseY-306+bob, 116, 56, 12); ctx.fill();
 
   const eg = 0.55 + 0.45*Math.sin(t*4);
+  const eyeY = baseY-278+bob;
   ctx.save();
   ctx.shadowColor = '#ff3a18'; ctx.shadowBlur = 28;
   ctx.fillStyle = 'rgba(255,60,30,'+eg.toFixed(2)+')';
-  ctx.beginPath(); ctx.arc(cx-28, baseY-278+bob, 10, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx+28, baseY-278+bob, 10, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx-28, eyeY, 10, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+28, eyeY, 10, 0, 7); ctx.fill();
   ctx.restore();
+  // зрачки следят за курсором (или за стаканом)
+  const tx = game.glass ? game.glass.x : mouse.x, ty = game.glass ? game.glass.y - 60 : mouse.y;
+  for(const ex of [cx-28, cx+28]){
+    const ang = Math.atan2(ty - eyeY, tx - ex);
+    const dist = Math.min(4.5, Math.hypot(tx-ex, ty-eyeY)*0.02);
+    ctx.fillStyle = '#ffe2d0';
+    ctx.beginPath(); ctx.arc(ex + Math.cos(ang)*dist, eyeY + Math.sin(ang)*dist, 3.6, 0, 7); ctx.fill();
+  }
 
   ctx.strokeStyle = '#5a6069'; ctx.lineWidth = 4;
   ctx.beginPath();
@@ -1092,8 +1682,23 @@ function drawRobot(cx, baseY){
   ctx.beginPath(); ctx.arc(cx, baseY-368+bob, 7, 0, 7); ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = 'rgba(255,110,50,0.35)';
-  for(let i=0;i<5;i++) ctx.fillRect(cx-30+i*15, baseY-240+bob, 8, 12);
+  // динамик «говорит», пока идёт реплика
+  const talking = game.phase === 'dialogue' && game.dlg && !game.dlg.full;
+  ctx.fillStyle = 'rgba(255,110,50,' + (talking ? 0.75 : 0.35) + ')';
+  for(let i=0;i<5;i++){
+    const hh = talking ? 4 + 10*Math.abs(Math.sin(t*18 + i*1.9)) : 12;
+    ctx.fillRect(cx-30+i*15, baseY-234+bob - hh/2, 8, hh);
+  }
+  // пар из плеч
+  for(let k=0;k<2;k++){
+    for(let i=0;i<3;i++){
+      const ph = (t*0.45 + i/3 + k*0.17) % 1;
+      const px = cx + (k ? 84 : -84) + Math.sin(t + i*2 + k)*6*ph;
+      const py = baseY - 214 + bob - ph*80;
+      ctx.fillStyle = 'rgba(210,220,235,' + (0.16*(1-ph)).toFixed(3) + ')';
+      ctx.beginPath(); ctx.arc(px, py, 5 + ph*15, 0, 7); ctx.fill();
+    }
+  }
 }
 
 function drawBubble(text, cx, bottomY, maxW){
@@ -1155,6 +1760,7 @@ function drawBack(){
     }
   }
 
+  drawBackDecor();
   ctx.fillStyle = '#2a1d22';
   ctx.fillRect(50, SHELF_Y, 900, 16);
   ctx.fillStyle = '#3a2a30';
@@ -1162,7 +1768,7 @@ function drawBack(){
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(50, SHELF_Y+16, 900, 6);
 
-  for(let i=0;i<4;i++) drawTap(i);
+  for(let i=0;i<TAP_X.length;i++) drawTap(i);
 
   if(game.glass){
     drawGlassObj(game.glass.x, game.glass.y, game.glass, 1, true);
@@ -1179,7 +1785,7 @@ function drawBack(){
   ctx.textAlign = 'center';
   ctx.font = '13px "Courier New"';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
-  ctx.fillText('[W] К БОТУ  ·  Перетащи стакан под кран, потом тяни кран вниз  ·  ПКМ — ФОНАРИК', 500, 588);
+  ctx.fillText('[W] К БОТУ  ·  [ПКМ / F] ФОНАРИК', 500, 588);
 }
 
 function drawTap(i){
@@ -1202,15 +1808,23 @@ function drawTap(i){
   ctx.globalAlpha = 1;
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
   ctx.fillRect(x-30, 54 + 74*(1-lvl), 60, 4);
+  // пузырьки в баке
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  for(let b=0;b<4;b++){
+    const by = 54 + 74 - ((game.time*16 + b*19 + i*7) % (74*lvl));
+    ctx.beginPath(); ctx.arc(x - 16 + ((b*13 + i*5) % 32), by, 1.6 + (b%2), 0, 7); ctx.fill();
+  }
   ctx.restore();
 
   ctx.fillStyle = 'rgba(255,255,255,0.10)';
   ctx.beginPath(); ctx.roundRect(x-24, 60, 10, 60, 5); ctx.fill();
 
-  ctx.fillStyle = '#33383f';
+  const pg = ctx.createLinearGradient(x-11, 0, x+11, 0);
+  pg.addColorStop(0, '#20242a'); pg.addColorStop(0.3, '#59606b'); pg.addColorStop(0.55, '#3a4048'); pg.addColorStop(1, '#1c2026');
+  ctx.fillStyle = pg;
   ctx.fillRect(x-11, 132, 22, 120);
-  ctx.fillStyle = '#4a505a';
-  ctx.fillRect(x-11, 132, 7, 120);
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.fillRect(x-8, 132, 2.5, 120);
 
   ctx.fillStyle = '#5a626c';
   ctx.beginPath(); ctx.roundRect(x-7, 250, 14, 17, 3); ctx.fill();
@@ -1247,20 +1861,33 @@ function drawTap(i){
       const surf = innerBottom - (total/CAPACITY)*innerH;
       if(surf > 268){
         ctx.save();
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = ing.color;
-        ctx.shadowColor = ing.glow; ctx.shadowBlur = 12;
         const wdt = 3 + pull*3;
-        ctx.fillRect(x-wdt/2, 268, wdt, surf-268);
+        const sg = ctx.createLinearGradient(x-wdt/2, 0, x+wdt/2, 0);
+        sg.addColorStop(0, ing.color); sg.addColorStop(0.5, 'rgba(255,255,255,0.65)'); sg.addColorStop(1, ing.color);
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = sg;
+        ctx.shadowColor = ing.glow; ctx.shadowBlur = 12;
+        ctx.beginPath();
+        for(let yy=268; yy<=surf; yy+=5){
+          const wb = Math.sin(yy*0.13 - game.time*26)*0.5;
+          if(yy === 268) ctx.moveTo(x - wdt/2 + wb, yy); else ctx.lineTo(x - wdt/2 + wb, yy);
+        }
+        for(let yy=surf; yy>=268; yy-=5){ const wb = Math.sin(yy*0.13 - game.time*26)*0.5; ctx.lineTo(x + wdt/2 + wb, yy); }
+        ctx.closePath(); ctx.fill();
         ctx.restore();
       }
     }
   }
 
+  ctx.fillStyle = 'rgba(8,6,9,0.9)';
+  ctx.beginPath(); ctx.roundRect(x-40, 140, 80, 17, 4); ctx.fill();
+  ctx.strokeStyle = ing.color; ctx.globalAlpha = 0.65; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(x-40, 140, 80, 17, 4); ctx.stroke();
+  ctx.globalAlpha = 1;
   ctx.textAlign = 'center';
-  ctx.font = 'bold 11px "Courier New"';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillText(ing.name, x, 42);
+  ctx.font = 'bold 10px "Courier New"';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(ing.name, x, 152);
 }
 
 function drawRack(){
@@ -1359,45 +1986,171 @@ function drawGarnishIcon(g, x, y, s){
 /* ============================================================
    СТАКАН
    ============================================================ */
-function drawGlassObj(cx, bottomY, glass, scale, showTarget){
-  const w = GLASS_W * scale, h = GLASS_H * scale;
-  const left = cx - w/2, top = bottomY - h;
-  const innerTop = top + 9*scale;
-  const innerBottom = bottomY - 7*scale;
-  const innerH = innerBottom - innerTop;
+function hexRgb(c){
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c);
+  return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)] : [200,200,200];
+}
+function lerpColor(a, b, k){
+  const A = Array.isArray(a) ? a : hexRgb(a), B = Array.isArray(b) ? b : hexRgb(b);
+  return 'rgb(' + Math.round(A[0] + (B[0]-A[0])*k) + ',' + Math.round(A[1] + (B[1]-A[1])*k) + ',' + Math.round(A[2] + (B[2]-A[2])*k) + ')';
+}
+// средний цвет смеси (взвешен по объёму)
+function mixAvgRgb(contents){
+  let r=0, g=0, b=0, tot=0;
+  for(const c of contents){
+    const ing = ingById(c.id); if(!ing) continue;
+    const rgb = hexRgb(ing.color);
+    r += rgb[0]*c.amount; g += rgb[1]*c.amount; b += rgb[2]*c.amount; tot += c.amount;
+  }
+  return tot ? [r/tot, g/tot, b/tot] : [200,200,200];
+}
 
-  ctx.save();
+function glassPathAt(left, top, w, s, bottomY){
   ctx.beginPath();
-  ctx.moveTo(left+4*scale, top+6*scale);
-  ctx.lineTo(left+w-4*scale, top+6*scale);
-  ctx.lineTo(left+w-9*scale, bottomY-5*scale);
-  ctx.lineTo(left+9*scale, bottomY-5*scale);
+  ctx.moveTo(left + 2*s, top);
+  ctx.lineTo(left + w - 2*s, top);
+  ctx.lineTo(left + w - 8*s, bottomY - 6*s);
+  ctx.quadraticCurveTo(left + w - 9*s, bottomY, left + w - 15*s, bottomY);
+  ctx.lineTo(left + 15*s, bottomY);
+  ctx.quadraticCurveTo(left + 9*s, bottomY, left + 8*s, bottomY - 6*s);
   ctx.closePath();
-  ctx.clip();
+}
 
-  let y = innerBottom;
-  for(const c of glass.contents){
-    const lh = (c.amount / CAPACITY) * innerH;
-    const ing = ingById(c.id);
-    if(!ing) continue;
-    ctx.fillStyle = ing.color;
-    ctx.fillRect(left, y-lh, w, lh);
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.fillRect(left+6*scale, y-lh, 5*scale, lh);
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(left, y-lh, w, 1.5);
-    y -= lh;
+function drawGlassObj(cx, bottomY, glass, scale, showTarget){
+  const w = GLASS_W * scale, h = GLASS_H * scale, s = scale;
+  const left = cx - w/2, top = bottomY - h;
+  const innerTop = top + 9*s;
+  const innerBottom = bottomY - 7*s;
+  const innerH = innerBottom - innerTop;
+  const rot = glass.rot || 0;
+  const slosh = glass.slosh || 0;
+  const isMain = (glass === game.glass);
+
+  // контактная тень на стойке
+  if(isMain){
+    const fl = floorForView();
+    const hgt = fl - bottomY;
+    const a = clamp(1 - hgt/220, 0, 1) * 0.38;
+    if(a > 0.01){
+      ctx.fillStyle = 'rgba(0,0,0,' + a.toFixed(3) + ')';
+      ctx.beginPath(); ctx.ellipse(cx, fl + 2, w*0.5*(1 - hgt/500), 5, 0, 0, 7); ctx.fill();
+    }
   }
 
-  if(glass.mixed){
-    ctx.globalAlpha = 0.25;
-    const total = glass.contents.reduce((s,c)=>s+c.amount,0);
+  ctx.save();
+  if(rot){ ctx.translate(cx, bottomY); ctx.rotate(rot); ctx.translate(-cx, -bottomY); }
+
+  // стенки изнутри
+  glassPathAt(left, top, w, s, bottomY);
+  ctx.fillStyle = 'rgba(150,200,240,0.07)';
+  ctx.fill();
+
+  // ---- жидкость ----
+  ctx.save();
+  glassPathAt(left + 2.5*s, top + 8*s, w - 5*s, s, bottomY - 3.5*s);
+  ctx.clip();
+
+  const contents = glass.contents || [];
+  const t = game.time;
+  // жидкость остаётся горизонтальной в мировых координатах, даже когда стакан наклонён
+  const lvl = clamp(-Math.tan(rot), -1.6, 1.6);
+  const off = (x, y) => slosh * (x - cx) * 0.5 * clamp((innerBottom - y)/(innerH*0.7), 0, 1) + lvl * (x - cx);
+  const step = 6*s;
+  // перемешивание: цвета слоёв сливаются в средний, границы волнятся и закручиваются
+  const mixAmt = glass.mixed ? 1 : clamp(glass.mixProgress || 0, 0, 1);
+  const avg = mixAmt > 0 ? mixAvgRgb(contents) : null;
+  const ripple = 9 * s * Math.sin(Math.PI * mixAmt);
+  let yb = innerBottom;
+  let surfaceAtGarnish = innerBottom;
+  contents.forEach((c, idx) => {
+    const ing = ingById(c.id);
+    if(!ing) return;
+    const lh = (c.amount / CAPACITY) * innerH;
+    const yt = yb - lh;
+    const isTop = idx === contents.length - 1;
+    const wob = isTop ? (0.7 + Math.abs(slosh)*2.4) * s : 0;
+
+    ctx.beginPath();
+    for(let x = left, k = 0; x <= left + w + 0.1; x += step, k++){
+      const y = yt + off(x, yt) + (isTop ? Math.sin(x*0.22 + t*4) * wob : Math.sin(x*0.09 + t*3 + idx*2) * ripple);
+      if(k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(left + w, yb + off(left + w, yb));
+    ctx.lineTo(left, yb + off(left, yb));
+    ctx.closePath();
+    ctx.fillStyle = mixAmt > 0 ? lerpColor(ing.color, avg, mixAmt) : ing.color;
+    ctx.fill();
+    const lg = ctx.createLinearGradient(0, yt - 4, 0, yb);
+    lg.addColorStop(0, 'rgba(255,255,255,0.22)');
+    lg.addColorStop(0.35, 'rgba(255,255,255,0.04)');
+    lg.addColorStop(1, 'rgba(0,0,0,0.20)');
+    ctx.fillStyle = lg;
+    ctx.fill();
+
+    if(isTop){
+      // поверхность (мениск)
+      ctx.beginPath();
+      for(let x = left, k = 0; x <= left + w + 0.1; x += step, k++){
+        const y = yt + off(x, yt) + Math.sin(x*0.22 + t*4) * wob;
+        if(k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 1.5*s; ctx.stroke();
+      surfaceAtGarnish = yt + off(cx + 12*s, yt);
+    } else if(mixAmt < 0.6){
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.22*(1 - mixAmt/0.6)).toFixed(3) + ')';
+      ctx.fillRect(left, yt - 0.5, w, 1.5);
+    }
+    yb = yt;
+  });
+
+  // завихрения цветных струй во время помешивания
+  if(mixAmt > 0 && mixAmt < 1 && contents.length > 1){
+    const total0 = contents.reduce((sum, c) => sum + c.amount, 0);
+    const yTop = innerBottom - (total0/CAPACITY)*innerH;
+    const amp = Math.sin(Math.PI * mixAmt);
+    ctx.lineCap = 'round';
+    for(let k=0;k<6;k++){
+      const ing = ingById(contents[k % contents.length].id);
+      if(!ing) continue;
+      const y0 = yTop + ((k + 0.5)/6) * (innerBottom - yTop);
+      ctx.beginPath();
+      for(let x = left, q = 0; x <= left + w + 0.1; x += 5*s, q++){
+        const y = y0 + Math.sin(x*0.15 + t*6*(k%2 ? 1 : -1) + k*1.7) * (4 + 7*amp) * s;
+        if(q === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = ing.color;
+      ctx.globalAlpha = 0.55 * amp;
+      ctx.lineWidth = 5*s;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // готовая смесь: слабое медленное «течение»
+  if(glass.mixed && contents.length > 0){
+    const total1 = contents.reduce((sum, c) => sum + c.amount, 0);
+    const yTop1 = innerBottom - (total1/CAPACITY)*innerH;
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 3*s; ctx.lineCap = 'round';
+    for(let k=0;k<3;k++){
+      const y0 = yTop1 + ((k + 0.7)/3.2) * (innerBottom - yTop1);
+      ctx.beginPath();
+      for(let x = left, q = 0; x <= left + w + 0.1; x += 5*s, q++){
+        const y = y0 + Math.sin(x*0.12 + t*1.5 + k*2.1) * 2.5*s;
+        if(q === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  if(glass.mixed && contents.length){
+    const total = contents.reduce((sum, c) => sum + c.amount, 0);
     const lh = (total/CAPACITY)*innerH;
+    ctx.globalAlpha = 0.25;
     for(let i=0;i<8;i++){
-      const a = game.time*3 + i*0.8;
+      const a = t*3 + i*0.8;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(cx + Math.sin(a)*10*scale, innerBottom - lh/2 + Math.cos(a*1.3)*lh*0.35, 3*scale, 0, 7);
+      ctx.arc(cx + Math.sin(a)*10*s, innerBottom - lh/2 + Math.cos(a*1.3)*lh*0.35, 3*s, 0, 7);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -1405,31 +2158,41 @@ function drawGlassObj(cx, bottomY, glass, scale, showTarget){
 
   if(glass.garnish){
     const g = garById(glass.garnish);
-    const total = glass.contents.reduce((s,c)=>s+c.amount,0);
-    const surfY = innerBottom - (total/CAPACITY)*innerH;
-    if(g) drawGarnishIcon(g, cx + 12*scale, Math.max(innerTop+10, surfY-6), 0.6*scale);
+    if(g) drawGarnishIcon(g, cx + 12*s, Math.max(innerTop + 10, surfaceAtGarnish - 6), 0.6*s);
   }
   ctx.restore();
 
-  ctx.strokeStyle = 'rgba(170,215,255,0.55)';
-  ctx.lineWidth = 2.5*scale;
-  ctx.beginPath();
-  ctx.moveTo(left+2, top);
-  ctx.lineTo(left+2, bottomY-9*scale);
-  ctx.quadraticCurveTo(left+2, bottomY, left+10*scale, bottomY);
-  ctx.lineTo(left+w-10*scale, bottomY);
-  ctx.quadraticCurveTo(left+w-2, bottomY, left+w-2, bottomY-9*scale);
-  ctx.lineTo(left+w-2, top);
+  // ---- стекло ----
+  glassPathAt(left, top, w, s, bottomY);
+  ctx.strokeStyle = 'rgba(170,215,255,0.6)';
+  ctx.lineWidth = 2.5*s;
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(210,240,255,0.85)';
-  ctx.lineWidth = 3*scale;
-  ctx.beginPath(); ctx.moveTo(left+1, top); ctx.lineTo(left+w-1, top); ctx.stroke();
+  // толстое дно
+  ctx.save();
+  glassPathAt(left, top, w, s, bottomY);
+  ctx.clip();
+  const bg = ctx.createLinearGradient(0, bottomY - 9*s, 0, bottomY);
+  bg.addColorStop(0, 'rgba(210,235,255,0.05)');
+  bg.addColorStop(1, 'rgba(210,235,255,0.32)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(left, bottomY - 9*s, w, 9*s);
+  ctx.restore();
 
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.beginPath();
-  ctx.roundRect(left+6*scale, top+12*scale, 5*scale, h*0.55, 3*scale);
-  ctx.fill();
+  // ободок
+  ctx.strokeStyle = 'rgba(215,242,255,0.9)';
+  ctx.lineWidth = 2.5*s;
+  ctx.beginPath(); ctx.ellipse(cx, top + 1*s, w/2 - 2*s, 3*s, 0, 0, 7); ctx.stroke();
+
+  // блики
+  ctx.fillStyle = 'rgba(255,255,255,0.20)';
+  ctx.beginPath(); ctx.roundRect(left + 7*s, top + 12*s, 4*s, h*0.55, 2*s); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.roundRect(left + w - 12*s, top + 16*s, 2.5*s, h*0.3, 2*s); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.arc(left + 9*s, top + 14*s, 1.6*s, 0, 7); ctx.fill();
+
+  ctx.restore();   // конец поворота
 
   if(glass.held){
     ctx.save();
@@ -1442,44 +2205,47 @@ function drawGlassObj(cx, bottomY, glass, scale, showTarget){
   }
 
   if(showTarget && game.order && game.phase === 'making'){
-    const need = game.order.recipe.parts.reduce((s,p)=>s+p[1],0);
+    const need = game.order.recipe.parts.reduce((sum,p)=>sum+p[1],0);
     const ty = innerBottom - (need/CAPACITY)*innerH;
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5,5]);
     ctx.beginPath();
-    ctx.moveTo(left-10*scale, ty);
-    ctx.lineTo(left+w+10*scale, ty);
+    ctx.moveTo(left-10*s, ty);
+    ctx.lineTo(left+w+10*s, ty);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.font = 'bold 10px "Courier New"';
     ctx.textAlign = 'left';
-    ctx.fillText('ЦЕЛЬ', left+w+14*scale, ty+4);
+    ctx.fillText('ЦЕЛЬ', left+w+14*s, ty+4);
   }
 
   if(glass.mixProgress > 0 && glass.mixProgress < 1){
     const px = cx, py = top - 26;
+    const lay = !!(game.order && game.order.recipe.layered);
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(px, py, 15, 0, 7); ctx.stroke();
-    ctx.strokeStyle = '#5ce8ff';
+    ctx.strokeStyle = lay ? '#ff6a4d' : '#5ce8ff';
     ctx.beginPath();
     ctx.arc(px, py, 15, -Math.PI/2, -Math.PI/2 + Math.PI*2*glass.mixProgress);
     ctx.stroke();
-    ctx.fillStyle = '#5ce8ff';
+    ctx.fillStyle = lay ? '#ff6a4d' : '#5ce8ff';
     ctx.font = 'bold 10px "Courier New"';
     ctx.textAlign = 'center';
-    ctx.fillText('МЕШАЙ', px, py+4);
+    ctx.fillText(lay ? 'ТИХО!' : 'МЕШАЙ', px, py+4);
   }
 
-  if(glass.mixed && glass.contents.length > 0){
-    ctx.fillStyle = '#5ce8ff';
+  if(glass.mixed && contents.length > 0){
+    const lay2 = !!(game.order && game.order.recipe.layered);
+    ctx.fillStyle = lay2 ? '#ff6a4d' : '#5ce8ff';
     ctx.font = 'bold 11px "Courier New"';
     ctx.textAlign = 'center';
-    ctx.fillText('✔', cx, top - 8);
+    ctx.fillText(lay2 ? '✖' : '✔', cx, top - 8);
   }
 }
+
 
 /* ============================================================
    HUD
@@ -1511,9 +2277,33 @@ function drawHUD(){
   ctx.font = 'bold 18px "Courier New"';
   ctx.fillText(String(game.points), 258, 35);
 
+  // смена, фонарик, серия
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffb066';
+  ctx.font = 'bold 15px "Courier New"';
+  ctx.fillText('СМЕНА ' + game.level, 336, 34);
+  ctx.fillStyle = game.flashLock ? '#ff4d4d' : '#ffe38a';
+  ctx.font = 'bold 13px "Courier New"';
+  ctx.fillText('ПКМ', 436, 34);
+  {
+    const fx = 474, fy = 23, fw = 76, fh = 16;
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(fx, fy, fw, fh, 4); ctx.stroke();
+    const fb = game.battery;
+    ctx.fillStyle = game.flashLock ? '#ff4d4d' : fb > 0.5 ? '#ffe38a' : fb > 0.25 ? '#ffb04d' : '#ff4d4d';
+    ctx.fillRect(fx+3, fy+3, (fw-6)*fb, fh-6);
+  }
+  if(game.combo >= 2){
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#8fe028';
+    ctx.font = 'bold 11px "Courier New"';
+    ctx.fillText('СЕРИЯ ' + game.combo + '  ×' + comboMult().toFixed(2), W-20, 52);
+    ctx.textAlign = 'left';
+  }
+
   if(game.phase === 'making' && game.order){
     const f = clamp(game.order.time / game.order.total, 0, 1);
-    const bx = 420, bw = 560, by = 22, bh = 18;
+    const bx = 560, bw = 420, by = 22, bh = 18;
 
     ctx.fillStyle = '#1a1014';
     ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 9); ctx.fill();
@@ -1531,25 +2321,19 @@ function drawHUD(){
     ctx.fillText(Math.ceil(game.order.time)+' сек', bx+bw/2, by+14);
   }
 
-  // индикатор помех
-  if(pests.length > 0){
-    ctx.textAlign = 'right';
-    ctx.font = 'bold 14px "Courier New"';
-    const blink = 0.55 + 0.45*Math.sin(game.time*8);
-    ctx.globalAlpha = blink;
-    ctx.fillStyle = '#ffaa33';
-    ctx.fillText('⚠ ПОМЕХ: ' + pests.length + '  (ПКМ)', W-20, 34);
-    ctx.globalAlpha = 1;
-  }
-
   if(game.message){
     const a = Math.min(1, game.message.t * 2);
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.font = 'bold 18px "Courier New"';
-    ctx.fillStyle = game.message.color;
     ctx.save();
-    ctx.shadowColor = game.message.color; ctx.shadowBlur = 18;
+    const mw = ctx.measureText(game.message.text).width + 36;
+    ctx.fillStyle = 'rgba(8,5,8,0.78)';
+    ctx.beginPath(); ctx.roundRect(W/2 - mw/2, 68, mw, 32, 10); ctx.fill();
+    ctx.strokeStyle = game.message.color; ctx.globalAlpha = a*0.45; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = game.message.color;
+    ctx.shadowColor = game.message.color; ctx.shadowBlur = 14;
     ctx.fillText(game.message.text, W/2, 90);
     ctx.restore();
     ctx.globalAlpha = 1;
@@ -1560,51 +2344,73 @@ function drawHUD(){
 
 function drawOrderPanel(){
   if(!game.order || (game.phase !== 'making' && game.phase !== 'result')) return;
-  const r = game.order.recipe;
-  const x = 16, y = 68, w = 268, h = 196;
+  if(game.panelMini){ drawMiniPanel(); return; }
+  const o = game.order, r = o.recipe, tr = o.cust.trait;
+  const w = 340;
+  const rows = Math.ceil(r.parts.length / 2);
+  const h = 20 + 22 + (tr ? 17 : 0) + 8 + rows*19 + 22 + (r.layered ? 15 : 0) + 8;
+  const back = game.view === 'back';
+  const x = back ? W - w - 12 : 16;
+  const y = back ? H - h - 6 : 104;
 
   ctx.fillStyle = 'rgba(12,8,10,0.90)';
-  ctx.beginPath(); ctx.roundRect(x,y,w,h,8); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 8); ctx.fill();
   ctx.strokeStyle = 'rgba(255,110,40,0.55)';
   ctx.lineWidth = 2; ctx.stroke();
 
+  let yy = y + 20;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ff9a4d';
   ctx.font = 'bold 12px "Courier New"';
-  ctx.fillText('ЗАКАЗ ОТ: ' + game.order.cust.name, x+12, y+22);
-
+  ctx.fillText('ЗАКАЗ ОТ: ' + o.cust.name, x+12, yy);
+  yy += 22;
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 16px "Courier New"';
-  ctx.fillText(r.name, x+12, y+46);
+  ctx.fillText(r.name, x+12, yy);
+  if(tr){
+    yy += 17;
+    ctx.fillStyle = '#ffd257';
+    ctx.font = 'bold 10px "Courier New"';
+    ctx.fillText('! ' + TRAITS[tr], x+12, yy);
+  }
+  yy += 24;
 
-  let yy = y+74;
-  for(const [id,amt] of r.parts){
+  r.parts.forEach(([id, amt], i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const px = x + 14 + col*(w/2 - 4);
+    const py = yy + row*19;
     const ing = ingById(id);
+    let off = 0;
+    if(r.layered){
+      ctx.fillStyle = '#8d949d';
+      ctx.font = 'bold 11px "Courier New"';
+      ctx.fillText((i+1) + '.', px, py);
+      off = 15;
+    }
     ctx.save();
-    ctx.shadowColor = ing.glow; ctx.shadowBlur = 10;
+    ctx.shadowColor = ing.glow; ctx.shadowBlur = 8;
     ctx.fillStyle = ing.color;
-    ctx.beginPath(); ctx.arc(x+22, yy-5, 7, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(px + off + 5, py - 4, 5, 0, 7); ctx.fill();
     ctx.restore();
     ctx.fillStyle = '#d8d8d8';
-    ctx.font = '13px "Courier New"';
-    ctx.fillText(ing.name, x+38, yy);
+    ctx.font = '12px "Courier New"';
+    ctx.fillText(ing.name, px + off + 15, py);
     ctx.fillStyle = ing.color;
-    ctx.font = 'bold 14px "Courier New"';
-    ctx.textAlign = 'right';
-    ctx.fillText('x'+amt, x+w-14, yy);
-    ctx.textAlign = 'left';
-    yy += 23;
-  }
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.fillText(' x' + amt, px + off + 15 + ctx.measureText(ing.name).width - 0, py);
+  });
+  yy += rows*19 + 4;
 
   const g = garById(r.garnish);
   ctx.fillStyle = '#8fd0ff';
   ctx.font = 'bold 12px "Courier New"';
-  ctx.fillText('+ ' + g.name, x+12, yy+6);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.42)';
-  ctx.font = '10px "Courier New"';
-  ctx.fillText('ВОЗЬМИ СТАКАН, ПОСТАВЬ ПОД КРАН', x+12, yy+26);
-  ctx.fillText('ПОТОМ ТЯНИ КРАН ВНИЗ', x+12, yy+40);
+  ctx.fillText('+ ' + g.name, x+12, yy);
+  if(r.layered){
+    yy += 15;
+    ctx.fillStyle = '#9fe8ff';
+    ctx.font = '10px "Courier New"';
+    ctx.fillText('СЛОИ СНИЗУ ВВЕРХ · НЕ ТРЯСИ И НЕ МЕШАЙ', x+12, yy);
+  }
 }
 
 /* ============================================================
@@ -1626,30 +2432,30 @@ function drawMenu(){
   ctx.shadowColor = '#ff5a1e'; ctx.shadowBlur = 40;
   ctx.fillStyle = '#ffb066';
   ctx.font = 'bold 62px "Courier New"';
-  ctx.fillText('ПОСЛЕДНИЙ БОЛТ', 500, 180);
+  ctx.fillText('ПОСЛЕДНИЙ БОЛТ', 500, 190);
   ctx.restore();
 
   ctx.fillStyle = 'rgba(255,180,120,0.75)';
   ctx.font = 'bold 18px "Courier New"';
-  ctx.fillText('Б А Р   Д Л Я   Р О Б О Т О В', 500, 216);
+  ctx.fillText('Б А Р   Д Л Я   Р О Б О Т О В', 500, 226);
 
   ctx.fillStyle = 'rgba(220,220,220,0.7)';
   ctx.font = '15px "Courier New"';
-  ctx.fillText('Мир пал. Роботы правят. Но выпить хотят все.', 500, 268);
-  ctx.fillText('Ты — последний бармен. Не подведи.', 500, 292);
+  ctx.fillText('Мир пал. Роботы правят. Но выпить хотят все.', 500, 282);
+  ctx.fillText('Ты — последний бармен. Не подведи.', 500, 306);
 
   ctx.fillStyle = 'rgba(150,220,255,0.85)';
   ctx.font = 'bold 13px "Courier New"';
-  ctx.fillText('W — к боту    ·    S — к стойке', 500, 344);
-  ctx.fillText('ПРОБЕЛ — пропустить диалог', 500, 368);
-  ctx.fillText('ЛКМ — взять стакан, таскать, тянуть кран, добавлять', 500, 392);
-  ctx.fillStyle = 'rgba(255,220,120,0.9)';
-  ctx.fillText('ПКМ — ФОНАРИК (свети на помеху 2 сек)', 500, 416);
+  ctx.fillText('W — к боту · S — к стойке · M — звук · Q — свернуть заказ', 500, 350);
+  ctx.fillText('ПРОБЕЛ — пропустить диалог', 500, 372);
+  ctx.fillText('ЛКМ — взять стакан, таскать, тянуть кран, добавлять', 500, 394);
+  ctx.fillStyle = 'rgba(255,227,138,0.95)';
+  ctx.fillText('ПКМ (или удерживай F) — ФОНАРИК: жучки боятся света', 500, 416);
 
   ctx.fillStyle = 'rgba(255,180,120,0.7)';
   ctx.font = '13px "Courier New"';
-  ctx.fillText('Маленькие роботы-помехи крадут ингредиенты.', 500, 456);
-  ctx.fillText('Включай фонарик и жги их светом!', 500, 476);
+  ctx.fillText('Стакан можно бросить — он упадёт с гравитацией!', 500, 446);
+  ctx.fillText('Слушай писк мелких роботов. Когда гаснет свет — ищи их глаза.', 500, 470);
 
   const blink = 0.5 + 0.5*Math.sin(game.time*4);
   ctx.save();
@@ -1657,13 +2463,13 @@ function drawMenu(){
   ctx.shadowColor = '#5ce8ff'; ctx.shadowBlur = 20;
   ctx.fillStyle = '#5ce8ff';
   ctx.font = 'bold 22px "Courier New"';
-  ctx.fillText('НАЖМИ ПРОБЕЛ ИЛИ КЛИКНИ', 500, 528);
+  ctx.fillText('НАЖМИ ПРОБЕЛ ИЛИ КЛИКНИ', 500, 510);
   ctx.restore();
 
   if(game.best > 0){
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '14px "Courier New"';
-    ctx.fillText('РЕКОРД: ' + game.best, 500, 566);
+    ctx.fillText('РЕКОРД: ' + game.best, 500, 552);
   }
 }
 
@@ -1688,7 +2494,7 @@ function drawGameOver(){
   ctx.font = 'bold 28px "Courier New"';
   ctx.fillText('ОЧКОВ: ' + game.points, 500, 360);
 
-  if(game.points > game.best){
+  if(game.newRecord){
     ctx.fillStyle = '#ffd257';
     ctx.font = 'bold 18px "Courier New"';
     ctx.fillText('★ НОВЫЙ РЕКОРД ★', 500, 396);
@@ -1697,6 +2503,9 @@ function drawGameOver(){
     ctx.font = '16px "Courier New"';
     ctx.fillText('РЕКОРД: ' + game.best, 500, 396);
   }
+  ctx.fillStyle = 'rgba(180,220,255,0.6)';
+  ctx.font = '15px "Courier New"';
+  ctx.fillText('ДОШЁЛ ДО СМЕНЫ ' + game.level + '  ·  ЖУЧКОВ УНИЧТОЖЕНО: ' + game.zapsSession, 500, 436);
 
   const blink = 0.5 + 0.5*Math.sin(game.time*4);
   ctx.globalAlpha = blink;
@@ -1747,6 +2556,11 @@ function drawResult(){
     ctx.fillStyle = '#ffd257';
     ctx.font = 'bold 28px "Courier New"';
     ctx.fillText('+' + r.pts + ' ОЧКОВ', 500, 350);
+    if(r.mult > 1.001){
+      ctx.fillStyle = '#8fe028'; ctx.font = 'bold 15px "Courier New"';
+      ctx.fillText('СЕРИЯ ×' + r.mult.toFixed(2), 500, 378);
+    }
+    drawNotes(r.notes, 408, '#ffb27a');
   } else {
     ctx.save();
     ctx.shadowColor = '#ff2a1a'; ctx.shadowBlur = 30;
@@ -1762,6 +2576,7 @@ function drawResult(){
     ctx.fillStyle = '#ff5a3d';
     ctx.font = 'bold 22px "Courier New"';
     ctx.fillText('−1 ЖИЗНЬ', 500, 348);
+    drawNotes(r.notes, 384, '#ff9a7a');
   }
 }
 
@@ -1782,19 +2597,11 @@ function draw(){
     if(game.view === 'front') drawFront();
     else drawBack();
 
-    // фонарик под помехами
-    drawFlashlight();
-
-    // красная виньетка при наличии помех
-    if(pests.length > 0){
-      const vg = ctx.createRadialGradient(W/2, H/2, 200, W/2, H/2, 620);
-      vg.addColorStop(0, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, 'rgba(255, 40, 20, ' + (0.06 + pests.length*0.05).toFixed(2) + ')');
-      ctx.fillStyle = vg;
-      ctx.fillRect(0,0,W,H);
-    }
-
-    for(const p of pests) drawPest(p);
+    drawBugs();
+    drawDarkness();
+    drawBugEyes();
+    drawFx();
+    drawFlashBeam();
 
     drawHUD();
 
