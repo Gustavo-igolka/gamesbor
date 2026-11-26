@@ -183,6 +183,20 @@ body.rm #season span{display:none}
 .pr-main small,.pr-date{font-size:11px;color:var(--dim)}
 .pr-date{white-space:nowrap}
 .pr-empty{font-size:13px;color:var(--dim);padding:10px 0}
+.q-list{display:grid;gap:10px;margin-top:14px}
+.q-card{padding:13px;border:1px solid rgba(255,255,255,.1);border-radius:15px;background:rgba(255,255,255,.045)}
+.q-top{display:flex;align-items:center;gap:10px}
+.q-ico{width:40px;height:40px;display:grid;place-items:center;flex:none;border-radius:12px;background:rgba(255,255,255,.08);font-size:22px}
+.q-main{flex:1;min-width:0}
+.q-main b{display:block;font-size:14px}
+.q-main small{display:block;color:var(--dim);font-size:12px;margin-top:2px}
+.q-reward{font-size:12px;white-space:nowrap;color:#ffd76a}
+.q-progress{height:6px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:12px}
+.q-progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#55c9ff,#8b7bff)}
+.q-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:11px;color:var(--dim)}
+.q-done{color:#75dfa7}
+.q-claim{padding:7px 12px;border:0;border-radius:9px;background:#f2c94c;color:#241b00;font-weight:700;font-size:12px}
+.q-claimed{font-size:11px;color:#75dfa7;font-weight:600}
 </style>
 </head>
 <body>
@@ -209,6 +223,7 @@ body.rm #season span{display:none}
 <div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
 <div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
+<div id="questP" class="pan"><div id="questBox" class="box"></div></div>
 <div id="detP" class="pan"><div id="detBox" class="box"></div></div>
 <div id="profP" class="pan"><div id="profBox" class="box"></div></div>
 <div id="shopP" class="pan"><div id="shopBox" class="box"></div></div>
@@ -522,6 +537,13 @@ const CATS=[['all','Все'],['popular','Часто запускаешь'],['new
 const EMPTY={recent:'Ты ещё ни во что не играл',fav:'Нажми ☆ или F, чтобы добавить игру сюда',popular:'Запусти несколько игр — здесь появятся те, в которые ты играешь чаще всего.',new:'Новых игр пока нет'};
 const TRO=[['first','🥉','Первый шаг','Запусти любую игру'],['fav','🥉','Любимчик','Добавь игру в избранное'],['dice','🥉','Рисковый','Выбери игру рулеткой'],
  ['three','🥈','Любопытный','Запусти три разные игры'],['long','🥈','Не оторваться','Играй 10 минут подряд'],['all','🥇','Коллекционер','Запусти все игры'],['plat','🏆','Платина','Получи все остальные трофеи']];
+const QUESTS=[
+ {id:'q_games',ico:'🧭',name:'Исследователь',desc:'Запусти 5 разных игр',goal:5,reward:40,progress:()=>GAMES.filter(g=>ST.stats[g.file]?.n>0).length},
+ {id:'q_time',ico:'⏱️',name:'Долгая смена',desc:'Проведи в играх 60 минут',goal:3600000,reward:50,progress:()=>Object.values(ST.stats).reduce((n,x)=>n+(x.t||0),0),format:v=>fmt(v)},
+ {id:'q_favs',ico:'❤️',name:'Фанат',desc:'Добавь в избранное 3 игры',goal:3,reward:30,progress:()=>GAMES.filter(g=>ST.fav[g.file]).length},
+ {id:'q_trophies',ico:'🏆',name:'Охотник за трофеями',desc:'Получи 3 трофея сайта',goal:3,reward:40,progress:()=>TRO.filter(t=>ST.tro[t[0]]).length},
+ {id:'q_ach',ico:'✨',name:'Мастер достижений',desc:'Открой 5 достижений в играх',goal:5,reward:60,progress:()=>Object.values(ST.ach).reduce((n,x)=>n+Object.keys(x||{}).filter(k=>k!=='__plat').length,0)}
+];
 const TTYPE={bronze:{ico:'🥉',label:'Бронза'},silver:{ico:'🥈',label:'Серебро'},gold:{ico:'🥇',label:'Золото'},plat:{ico:'🏆',label:'Платина'}};
 // =====================================================
 
@@ -695,7 +717,7 @@ function exportProfile(){const o={app:'rkc',v:1,data:{fav:ST.fav,stats:ST.stats,
  a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'}));a.download='rkc-profile.json';document.body.appendChild(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(a.href),3000);toast('💾','Профиль сохранён','Файл rkc-profile.json лежит в загрузках')}
 function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||!o.data)throw 0;d=o.data}catch(e){toast('⚠️','Не получилось','Это не файл профиля RKC');return}
- const num=x=>Number.isFinite(x)&&x>=0?x:0,files=new Set(GAMES.map(g=>g.file)),ids=new Set(TRO.map(t=>t[0]));
+ const num=x=>Number.isFinite(x)&&x>=0?x:0,files=new Set(GAMES.map(g=>g.file)),ids=new Set([...TRO.map(t=>t[0]),...QUESTS.map(q=>q.id)]);
  for(const f in d.fav||{})if(files.has(f))ST.fav[f]=1;
  for(const f in d.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=d.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
  for(const id in d.tro||{})if(ids.has(id)){const v=num(d.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}
@@ -704,6 +726,16 @@ function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||
  ST.xp=Math.max(ST.xp,num(d.xp));ST.coins=Math.max(ST.coins,num(d.coins));if(Array.isArray(d.owned))ST.owned=[...new Set([...ST.owned,...d.owned.filter(x=>typeof x==='string')])];
  save();closePans();setCat(S.cat);toast('✅','Профиль загружен','Данные объединены с текущими')}
 $('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfile);e.target.value=''};
+function questPanel(){
+ const done=QUESTS.filter(q=>ST.tro[q.id]).length;
+ $('questBox').innerHTML=`<h3>🎯 Общие испытания</h3><small>Выполняй задания в любых играх RKCPlay и забирай монеты. Получено ${done} из ${QUESTS.length}</small><div class="q-list">`+QUESTS.map(q=>{
+  const raw=Math.max(0,q.progress()),v=Math.min(q.goal,raw),complete=raw>=q.goal,claimed=!!ST.tro[q.id],shown=q.format?q.format(v):v;
+  const target=q.format?q.format(q.goal):q.goal;
+  return `<div class="q-card"><div class="q-top"><span class="q-ico">${q.ico}</span><span class="q-main"><b>${q.name}</b><small>${q.desc}</small></span><span class="q-reward">🪙 +${q.reward}</span></div><div class="q-progress"><i style="width:${Math.round(v/q.goal*100)}%"></i></div><div class="q-foot"><span class="${complete?'q-done':''}">${shown} / ${target}</span>${claimed?'<span class="q-claimed">✓ Награда получена</span>':complete?`<button class="q-claim" data-claim="${q.id}">Забрать</button>`:'<span>В процессе</span>'}</div></div>`;
+ }).join('')+`</div><div class="row"><button class="pill" id="qClose">Закрыть</button></div>`;
+ $('questBox').querySelectorAll('[data-claim]').forEach(b=>b.onclick=()=>{const q=QUESTS.find(x=>x.id===b.dataset.claim);if(!q||ST.tro[q.id]||q.progress()<q.goal)return;ST.tro[q.id]=Date.now();earn(q.reward);toast('🎯','Испытание выполнено',q.name+' · +'+q.reward+' монет');questPanel()});
+ $('qClose').onclick=closePans;$('questP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)
+}
 function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contains('on');
  if(on){const got=TRO.filter(t=>ST.tro[t[0]]).length;
   $('troBox').innerHTML=`<h3>Трофеи сайта</h3><small>Получено ${got} из ${TRO.length} · достижения по играм — в «Подробнее»</small>`+TRO.map(t=>`<div class="tr ${ST.tro[t[0]]?'':'lock'}"><i>${t[1]}</i><div><b>${t[2]}</b><span>${t[3]}</span></div></div>`).join('')}
@@ -950,7 +982,7 @@ function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains(
  const opt=(k,items,cur)=>items.map(x=>`<button class="pill${String(cur)===String(x[0])?' sel':''}" data-set="${k}:${x[0]}">${x[1]}</button>`).join('');
  const afk=ST.afkSec===undefined?60:ST.afkSec;
  $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры, профиль и настройки</small>
- <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи сайта</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
+ <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи сайта</button><button class="mi" data-go="quest"><i>🎯</i>Общие испытания</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
  <h4>Настройки</h4>
  <div class="mset"><span>Звук</span><div class="row">${opt('snd',[[1,'Вкл'],[0,'Выкл']],ST.mute?0:1)}</div></div>
  <div class="mset"><span>Размер плиток</span><div class="row">${opt('tile',[['s','Мелкие'],['m','Средние'],['l','Крупные']],ST.tileSz||'m')}</div></div>
@@ -961,7 +993,7 @@ function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains(
  <div class="row"><button class="pill" id="mClose">Закрыть</button></div>
  <div class="mft"><b>RKC Studio</b>Студия-разработчик RKCPlay<br><button id="mTos">Пользовательское соглашение</button></div>`;
  const B=$('menuBox');
- B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();setTimeout(()=>({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),lb}[g])(),60)});
+ B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();setTimeout(()=>({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),quest:questPanel,lb}[g])(),60)});
  B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
   if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
   save();applyPrefs();menu(true);if(k==='snd'&&!ST.mute)sOk()});
