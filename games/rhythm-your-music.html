@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>Ритм по твоей музыке</title>
+<style>
+html,body{margin:0;height:100%;background:#07060d;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;color:#eee}
+canvas{display:block}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(7,6,13,.9);text-align:center;padding:20px;box-sizing:border-box}
+h1{margin:0;font-size:48px;color:#ff5fa2;text-shadow:0 0 26px #ff5fa288}
+p{margin:0;color:#aab;max-width:560px;line-height:1.5}
+.row{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;color:#ccd}
+select,input[type=range]{accent-color:#ff5fa2}
+select{background:#1a1830;color:#eee;border:1px solid #445;padding:6px;border-radius:5px}
+button,label.b{background:#ff5fa2;color:#fff;border:0;padding:13px 26px;font-size:18px;border-radius:6px;cursor:pointer;font-weight:600}
+label.b{background:#22d3ee;color:#04141a}
+button.g{background:#3b3a58}
+button:hover,label.b:hover{filter:brightness(1.15)}
+#res{font-size:20px;color:#ffd75e;min-height:26px;line-height:1.5}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="menu">
+  <h1>РИТМ ПО ТВОЕЙ МУЗЫКЕ</h1>
+  <div id="res"></div>
+  <p>Загрузи любой трек — игра сама найдёт в нём биты и построит из них ноты. Жми <b>D F J K</b>, когда нота доходит до линии. <b>Esc</b> — пауза.</p>
+  <div class="row">
+    <span>Сложность: <select id="diff"><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option></select></span>
+    <span>Скорость нот: <input id="speed" type="range" min="1" max="10" value="6"></span>
+  </div>
+  <div class="row">
+    <span>Сдвиг (мс): <input id="off" type="range" min="-200" max="200" value="0" step="5"> <b id="offv">0</b></span>
+    <label><input id="nofail" type="checkbox"> без проигрыша</label>
+  </div>
+  <div class="row">
+    <button id="demo">Играть демо-трек</button>
+    <label class="b">Загрузить свой трек<input id="file" type="file" accept="audio/*" hidden></label>
+    <button id="again" class="g" style="display:none">Ещё раз этот трек</button>
+  </div>
+  <p style="font-size:14px">Если жмёшь стабильно поздно или рано — подвинь «Сдвиг»: влево, если жмёшь поздно.</p>
+</div>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),$=id=>document.getElementById(id);
+const menu=$('menu'),res=$('res');
+let W,H,LW,X0,hitY;
+function geo(){W=cv.width=innerWidth;H=cv.height=innerHeight;LW=Math.min(110,W/6);X0=(W-LW*4)/2;hitY=H*.84}
+geo();addEventListener('resize',geo);
+
+const KEYS=['KeyD','KeyF','KeyJ','KeyK'],LAB=['D','F','J','K'],HUE=[330,190,50,130];
+const JN=['PERFECT','GOOD','OK'],JC=['#ffd75e','#5eead4','#a5b4fc'],JS=[300,150,50],WIN=[.045,.09,.13];
+let AC,an,freq,src,t0=0,dur=0,notes=[],first=0,state='menu',paused=false,lastBuf=null;
+let score,combo,maxCombo,hp,cnt,down=[0,0,0,0],flash=[0,0,0,0],parts=[],pop=null,comboPulse=0,shake=0,fall=1.3,off=0,nofail=false;
+const mapCache=new Map();
+
+try{const s=JSON.parse(localStorage.getItem('rg')||'{}');if(s.speed)$('speed').value=s.speed;if(s.off!=null)$('off').value=s.off;if(s.diff)$('diff').value=s.diff}catch(e){}
+$('off').oninput=()=>$('offv').textContent=$('off').value;$('offv').textContent=$('off').value;
+function save(){try{localStorage.setItem('rg',JSON.stringify({speed:$('speed').value,off:$('off').value,diff:$('diff').value}))}catch(e){}}
+function status(t){res.textContent=t}
+
+function initAC(){
+  if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();an=AC.createAnalyser();an.fftSize=1024;an.smoothingTimeConstant=.6;freq=new Uint8Array(an.frequencyBinCount);an.connect(AC.destination)}
+  return AC.resume();
+}
+function stopSrc(){if(src){try{src.onended=null;src.stop()}catch(e){}try{src.disconnect()}catch(e){}src=null}}
+
+/* ---------- демо-трек ---------- */
+function renderDemo(){
+  const sr=44100,dur=52,oc=new OfflineAudioContext(2,sr*dur,sr),m=oc.createGain();m.gain.value=.8;m.connect(oc.destination);
+  const nb=oc.createBuffer(1,sr,sr),nd=nb.getChannelData(0);for(let i=0;i<sr;i++)nd[i]=Math.random()*2-1;
+  const spb=60/128,s16=spb/4;
+  const kick=t=>{const o=oc.createOscillator(),g=oc.createGain();o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.15);g.gain.setValueAtTime(1,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(g).connect(m);o.start(t);o.stop(t+.3)};
+  const noise=(t,d,f,v)=>{const s=oc.createBufferSource(),fl=oc.createBiquadFilter(),g=oc.createGain();s.buffer=nb;fl.type='highpass';fl.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(fl).connect(g).connect(m);s.start(t);s.stop(t+d)};
+  const bass=(t,f)=>{const o=oc.createOscillator(),fl=oc.createBiquadFilter(),g=oc.createGain();o.type='sawtooth';o.frequency.value=f;fl.type='lowpass';fl.frequency.value=400;g.gain.setValueAtTime(.35,t);g.gain.exponentialRampToValueAtTime(.001,t+spb*.45);o.connect(fl).connect(g).connect(m);o.start(t);o.stop(t+spb*.5)};
+  const lead=(t,f,v)=>{const o=oc.createOscillator(),fl=oc.createBiquadFilter(),g=oc.createGain();o.type='square';o.frequency.value=f;fl.type='lowpass';fl.frequency.value=3200;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+.18);o.connect(fl).connect(g).connect(m);o.start(t);o.stop(t+.2)};
+  const bn=[55,55,65.41,49,55,55,73.42,65.41],sc=[440,523.25,587.33,659.25,783.99,880,783.99,659.25];
+  for(let step=0;step*s16<dur-.5;step++){
+    const t=step*s16+.05,s=step%16,bar=Math.floor(step/16);
+    if(s%4==0)kick(t);
+    if(bar>=2&&(s==4||s==12))noise(t,.16,1600,.5);
+    if(bar>=1&&s%4==2)noise(t,.06,7000,.28);
+    if(bar>=12&&s%2==1)noise(t,.03,9000,.15);
+    if(bar>=4&&s%2==0)bass(t,bn[(step>>1)%8]);
+    if(bar>=8&&(s%2==0||(bar>=16&&s%4==3)))lead(t,sc[(step*3+bar)%8]*(bar%8>=4?1.5:1),.1);
+  }
+  return oc.startRendering();
+}
+
+/* ---------- анализ трека -> ноты ---------- */
+function fft(re,im){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}
+  for(let len=2;len<=n;len<<=1){
+    const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a),h=len>>1;
+    for(let i=0;i<n;i+=len){let cr=1,ci=0;
+      for(let j=0;j<h;j++){const p=i+j,q=p+h,vr=re[q]*cr-im[q]*ci,vi=re[q]*ci+im[q]*cr;re[q]=re[p]-vr;im[q]=im[p]-vi;re[p]+=vr;im[p]+=vi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}
+  }
+}
+const tick=()=>new Promise(r=>setTimeout(r));
+async function makeMap(buf,diff){
+  const key=diff;if(mapCache.get(buf)?.[key])return mapCache.get(buf)[key];
+  const sr=buf.sampleRate,ch=buf.numberOfChannels,len=buf.length,N=1024,Hp=512;
+  const mono=new Float32Array(len);
+  for(let c=0;c<ch;c++){const d=buf.getChannelData(c);for(let i=0;i<len;i++)mono[i]+=d[i]/ch}
+  const frames=Math.floor((len-N)/Hp),hann=new Float32Array(N);
+  for(let i=0;i<N;i++)hann[i]=.5-.5*Math.cos(2*Math.PI*i/(N-1));
+  const bh=sr/N,b1=Math.max(2,Math.floor(300/bh)),b2=Math.floor(2000/bh),b3=Math.min(N/2-1,Math.floor(9000/bh));
+  const fl=[new Float32Array(frames),new Float32Array(frames),new Float32Array(frames)];
+  const re=new Float32Array(N),im=new Float32Array(N),prev=new Float32Array(N/2);
+  for(let f=0;f<frames;f++){
+    const o=f*Hp;for(let i=0;i<N;i++){re[i]=mono[o+i]*hann[i];im[i]=0}
+    fft(re,im);
+    for(let k=1;k<=b3;k++){const m=Math.log(1+Math.hypot(re[k],im[k])*8),d=m-prev[k];prev[k]=m;if(d>0)fl[k<=b1?0:k<=b2?1:2][f]+=d}
+    if(f%400===0){status('Анализ трека… '+Math.round(f/frames*100)+'%');await tick()}
+  }
+  const thr={easy:2.1,normal:1.7,hard:1.4}[diff],gap={easy:.34,normal:.22,hard:.14}[diff];
+  const ons=[];
+  for(let b=0;b<3;b++){
+    const a=fl[b];let g=0;for(let i=0;i<frames;i++)g+=a[i];g/=frames;
+    const pre=new Float64Array(frames+1);for(let i=0;i<frames;i++)pre[i+1]=pre[i]+a[i];
+    let lastT=-1;
+    for(let f=2;f<frames-2;f++){
+      const lo=Math.max(0,f-43),hi=Math.min(frames,f+44),m=(pre[hi]-pre[lo])/(hi-lo),v=a[f];
+      if(v>m*thr+g*.5&&v>=a[f-1]&&v>=a[f-2]&&v>a[f+1]&&v>=a[f+2]){
+        const t=(f*Hp+N*.6)/sr;
+        if(t-lastT>.08){ons.push({t,b,s:(v-m)/(g+1e-6)});lastT=t}
+      }
+    }
+  }
+  ons.sort((x,y)=>x.t-y.t);
+  let seed=len>>>0;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+  const out=[];let last=-9,pl=-1;
+  for(const o of ons){
+    if(o.t<1||o.t-last<gap)continue;
+    const opts=[[0,1],[1,2],[2,3]][o.b],ord=rnd()<.5?opts:[opts[1],opts[0]];
+    let lane=ord.find(l=>l!==pl);
+    if(diff!=='easy'&&opts.includes(pl)&&rnd()<.2)lane=pl;
+    out.push({t:o.t,lane,done:false});last=o.t;pl=lane;
+    if(diff==='hard'&&o.s>4)out.push({t:o.t,lane:(lane+2)%4,done:false});
+  }
+  out.sort((a,b)=>a.t-b.t);
+  if(!mapCache.has(buf))mapCache.set(buf,{});mapCache.get(buf)[key]=out;
+  return out;
+}
+
+/* ---------- игра ---------- */
+async function begin(buf){
+  lastBuf=buf;save();
+  const diff=$('diff').value;
+  const map=await makeMap(buf,diff);
+  if(map.length<8){status('В этом треке не нашлось ритма. Попробуй другой.');return}
+  notes=map.map(n=>({t:n.t,lane:n.lane,done:false}));first=0;
+  fall=2.2-.16*(+$('speed').value);off=+$('off').value;nofail=$('nofail').checked;
+  score=0;combo=0;maxCombo=0;hp=100;cnt=[0,0,0,0];parts=[];pop=null;paused=false;
+  stopSrc();await initAC();
+  src=AC.createBufferSource();src.buffer=buf;src.connect(an);
+  t0=AC.currentTime+2.2;src.start(t0);dur=buf.duration;
+  state='play';menu.style.display='none';
+}
+function songTime(){return AC.currentTime-t0-(AC.outputLatency||AC.baseLatency||0)+off/1000}
+function finish(failed){
+  if(state!=='play')return;state='menu';stopSrc();paused=false;
+  const n=cnt[0]+cnt[1]+cnt[2]+cnt[3],acc=n?(300*cnt[0]+150*cnt[1]+50*cnt[2])/(300*n)*100:0;
+  const g=acc>=95?'S':acc>=88?'A':acc>=78?'B':acc>=65?'C':'D';
+  res.innerHTML=(failed?'Провал. ':'Трек пройден! ')+'Оценка <b>'+g+'</b> · точность '+acc.toFixed(1)+'%<br>Счёт '+score+' · макс. комбо '+maxCombo+'<br>Perfect '+cnt[0]+' · Good '+cnt[1]+' · OK '+cnt[2]+' · Miss '+cnt[3];
+  $('again').style.display='inline-block';menu.style.display='flex';
+}
+function popup(txt,col,sub){pop={txt,col,sub,t:0}}
+function burst(l,hue,n){for(let i=0;i<n;i++){const a=-Math.PI*Math.random(),v=80+Math.random()*260;parts.push({x:X0+l*LW+LW/2,y:hitY,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.5+Math.random()*.3,hue})}}
+function registerMiss(l){
+  cnt[3]++;combo=0;hp-=7;popup('MISS','#ff5470','');shake=8;flash[l]=-1;
+  if(hp<=0&&!nofail)finish(true);
+}
+function press(l){
+  down[l]=1;flash[l]=1;
+  const ts=songTime();
+  for(let i=first;i<notes.length;i++){
+    const n=notes[i];if(n.t>ts+WIN[2])break;
+    if(n.done||n.lane!==l)continue;
+    const dt=ts-n.t,a=Math.abs(dt);if(a>WIN[2])continue;
+    const j=a<=WIN[0]?0:a<=WIN[1]?1:2;
+    n.done=true;cnt[j]++;combo++;maxCombo=Math.max(maxCombo,combo);comboPulse=1;
+    score+=Math.round(JS[j]*(1+Math.min(2,Math.floor(combo/25)*.25)));
+    hp=Math.min(100,hp+[1.5,.5,-1.5][j]);
+    popup(JN[j],JC[j],j===0?'':(dt>0?'ПОЗДНО':'РАНО'));burst(l,HUE[l],j===0?18:9);
+    return;
+  }
+}
+addEventListener('keydown',e=>{
+  if(state!=='play')return;
+  if(e.code==='Escape'){paused=!paused;paused?AC.suspend():AC.resume();return}
+  if(paused){if(e.code==='KeyQ'){paused=false;AC.resume();stopSrc();state='menu';status('');menu.style.display='flex'}return}
+  const l=KEYS.indexOf(e.code);if(l>=0&&!e.repeat){e.preventDefault();press(l)}
+});
+addEventListener('keyup',e=>{const l=KEYS.indexOf(e.code);if(l>=0)down[l]=0});
+$('demo').onclick=async()=>{await initAC();status('Готовлю демо-трек…');await begin(await renderDemo())};
+$('file').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  await initAC();status('Читаю файл…');
+  let b;try{b=await AC.decodeAudioData(await f.arrayBuffer())}catch(err){status('Не удалось прочитать этот файл.');return}
+  await begin(b);
+};
+$('again').onclick=()=>{if(lastBuf)begin(lastBuf)};
+
+function update(dt){
+  const ts=songTime();
+  while(first<notes.length&&(notes[first].done||notes[first].t<ts-WIN[2])){
+    const n=notes[first];if(!n.done){n.done=true;registerMiss(n.lane);if(state!=='play')return}first++;
+  }
+  if(ts>dur+.8){finish(false);return}
+  for(let i=0;i<4;i++)flash[i]*=Math.pow(.02,dt);
+  for(const p of parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=500*dt;p.life-=dt}
+  parts=parts.filter(p=>p.life>0);
+  if(pop)pop.t+=dt;comboPulse=Math.max(0,comboPulse-dt*6);shake=Math.max(0,shake-dt*30);
+}
+
+function draw(){
+  const ts=state==='play'?songTime():0;
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#07060d';ctx.fillRect(0,0,W,H);
+  let bass=0;
+  if(an){an.getByteFrequencyData(freq);for(let i=1;i<7;i++)bass+=freq[i];bass/=6*255}
+  const bg=(performance.now()/60)%360;
+  const gr=ctx.createRadialGradient(W/2,hitY,0,W/2,hitY,H);gr.addColorStop(0,`hsla(${bg},80%,50%,${.06+bass*.3})`);gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,W,H);
+  if(an){const bw=W/128;for(let i=0;i<128;i++){const h=freq[i]/255*H*.22;ctx.fillStyle=`hsla(${i*3+bg},80%,60%,.22)`;ctx.fillRect(i*bw,H-h,bw-1,h)}}
+  if(state!=='play'){return}
+  if(shake>0)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+  // дорожки
+  for(let l=0;l<4;l++){
+    const x=X0+l*LW;
+    ctx.fillStyle='rgba(8,7,16,.62)';ctx.fillRect(x,0,LW,H);
+    ctx.strokeStyle='rgba(255,255,255,.08)';ctx.strokeRect(x,-2,LW,H+4);
+    const f=flash[l];
+    if(f>0||down[l]){const a=down[l]?.28:f*.3;const g=ctx.createLinearGradient(0,hitY-260,0,hitY);g.addColorStop(0,`hsla(${HUE[l]},90%,60%,0)`);g.addColorStop(1,`hsla(${HUE[l]},90%,60%,${a})`);ctx.fillStyle=g;ctx.fillRect(x,hitY-260,LW,260)}
+    else if(f<-.05){ctx.fillStyle=`rgba(255,60,80,${-f*.25})`;ctx.fillRect(x,0,LW,H)}
+  }
+  // линия попадания
+  ctx.lineWidth=3;
+  for(let l=0;l<4;l++){
+    const x=X0+l*LW+7,w=LW-14;
+    ctx.strokeStyle=`hsl(${HUE[l]},90%,${down[l]?75:55}%)`;ctx.fillStyle=down[l]?`hsla(${HUE[l]},90%,60%,.5)`:'rgba(255,255,255,.04)';
+    ctx.beginPath();ctx.roundRect(x,hitY-14,w,28,8);ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.font='bold 16px Segoe UI';ctx.textAlign='center';ctx.fillText(LAB[l],x+w/2,hitY+42);
+  }
+  // ноты
+  for(let i=first;i<notes.length;i++){
+    const n=notes[i],d=n.t-ts;if(d>fall+.05)break;if(n.done)continue;
+    const y=hitY-d/fall*(hitY+30),x=X0+n.lane*LW+7;
+    ctx.fillStyle=`hsl(${HUE[n.lane]},90%,62%)`;ctx.shadowColor=`hsl(${HUE[n.lane]},95%,60%)`;ctx.shadowBlur=16;
+    ctx.beginPath();ctx.roundRect(x,y-13,LW-14,26,8);ctx.fill();
+  }
+  ctx.shadowBlur=0;
+  for(const p of parts){ctx.fillStyle=`hsla(${p.hue},90%,65%,${Math.min(1,p.life*2.5)})`;ctx.fillRect(p.x,p.y,4,4)}
+  ctx.setTransform(1,0,0,1,0,0);
+  // всплывающая оценка и комбо
+  ctx.textAlign='center';
+  if(pop&&pop.t<.6){const k=1-pop.t/.6;ctx.globalAlpha=k;ctx.fillStyle=pop.col;ctx.font=`bold ${30+12*k}px Segoe UI`;ctx.fillText(pop.txt,W/2,hitY-120);
+    if(pop.sub){ctx.font='bold 15px Segoe UI';ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillText(pop.sub,W/2,hitY-96)}ctx.globalAlpha=1}
+  if(combo>=2){ctx.fillStyle='rgba(255,255,255,.85)';ctx.font=`bold ${54+comboPulse*14}px Segoe UI`;ctx.fillText(combo,W/2,H*.32);ctx.font='bold 16px Segoe UI';ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillText('КОМБО',W/2,H*.32+24)}
+  // HUD
+  ctx.textAlign='left';ctx.fillStyle='#fff';ctx.font='bold 28px Segoe UI';ctx.fillText(String(score).padStart(7,'0'),24,44);
+  const n=cnt[0]+cnt[1]+cnt[2]+cnt[3],acc=n?(300*cnt[0]+150*cnt[1]+50*cnt[2])/(300*n)*100:100;
+  ctx.textAlign='right';ctx.font='bold 22px Segoe UI';ctx.fillStyle='#ffd75e';ctx.fillText(acc.toFixed(1)+'%',W-24,42);
+  ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(24,60,200,10);
+  ctx.fillStyle=hp>35?'#5eead4':'#ff5470';ctx.fillRect(24,60,200*Math.max(0,hp)/100,10);
+  ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(0,0,W*Math.max(0,Math.min(1,ts/dur)),4);
+  if(ts<-.3){ctx.textAlign='center';ctx.fillStyle='rgba(255,255,255,.8)';ctx.font='bold 30px Segoe UI';ctx.fillText('Готовься…',W/2,H*.45)}
+  if(paused){ctx.fillStyle='rgba(7,6,13,.8)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 44px Segoe UI';ctx.fillText('Пауза',W/2,H*.45);ctx.font='20px Segoe UI';ctx.fillStyle='#aab';ctx.fillText('Esc — продолжить, Q — выйти в меню',W/2,H*.45+40)}
+}
+
+let lastF=performance.now();
+function frame(){
+  requestAnimationFrame(frame);
+  const t=performance.now(),dt=Math.min(.05,(t-lastF)/1000);lastF=t;
+  if(state==='play'&&!paused)update(dt);
+  draw();
+}
+frame();
+</script></body></html>
