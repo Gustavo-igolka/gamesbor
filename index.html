@@ -580,7 +580,12 @@ function mergeDaily(remote){
  if(!remote||typeof remote!=='object'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(remote.date||''))return;
  const local=ST.daily||{},rd=remote.date,ld=local.date||'';
  if(!ld||rd>ld){ST.daily={...remote,games:{...(remote.games||{})},claimed:[...(remote.claimed||[])]};return}
- if(rd<ld)return;
+ if(rd<ld){
+  if(local.lastVisit===dayKey()&&(+local.streak||0)===1&&!(+local.launches||0)&&!(+local.playMs||0)&&!Object.keys(local.games||{}).length&&!(local.claimed||[]).length){
+   local.lastVisit=remote.lastVisit||rd;local.streak=Math.max(1,+remote.streak||1)
+  }
+  return
+ }
  local.launches=Math.max(+local.launches||0,+remote.launches||0);
  local.playMs=Math.max(+local.playMs||0,+remote.playMs||0);
  local.games={...(local.games||{}),...(remote.games||{})};
@@ -984,7 +989,7 @@ async function pull(){const{data}=await sb.from('rkc_profiles').select('*').eq('
  ST.xp=Math.max(ST.xp,num(data.xp));ST.owned=[...new Set([...ST.owned,...(data.owned||[]).filter(x=>typeof x==='string')])];
  for(const f in data.fav||{})if(files.has(f))ST.fav[f]=1;
  for(const f in data.stats||{})if(files.has(f)){const a=ST.stats[f]||(ST.stats[f]={n:0,t:0,last:0}),b=data.stats[f]||{};a.n=Math.max(a.n,num(b.n));a.t=Math.max(a.t,num(b.t));a.last=Math.max(a.last,num(b.last))}
- for(const id in data.tro||{}){const v=num(data.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}mergeDaily(data.tro?.__daily);
+ for(const id in data.tro||{}){const v=num(data.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}mergeDaily(data.tro?.__daily);dailyEnsure();
  if(data.ach)for(const f in data.ach){if(!files.has(f))continue;ST.ach[f]=ST.ach[f]||{};for(const id in data.ach[f])if(!ST.ach[f][id])ST.ach[f][id]=data.ach[f][id]}
  if(data.achp)for(const f in data.achp){if(!files.has(f))continue;ST.achp[f]=ST.achp[f]||{};for(const id in data.achp[f])ST.achp[f][id]=Math.max(ST.achp[f][id]||0,num(data.achp[f][id]))}
  save();await push();setCat(S.cat)}
