@@ -128,6 +128,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 #brand{background:none;border:0;padding:6px 12px;margin-left:-12px;border-radius:999px;font-size:16px;font-weight:400;letter-spacing:.04em;color:var(--txt);transition:background .2s}
 #brand:hover,#brand:focus-visible{background:rgba(255,255,255,.14);outline:none}
+.search-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.search-tools select{min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#202945;color:#fff;font:inherit}.search-results{display:flex;flex-direction:column;gap:6px;margin-top:12px;max-height:58vh;overflow:auto}.search-result{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.055);text-align:left}.search-result:hover,.search-result:focus-visible{background:rgba(255,255,255,.13);outline:1px solid rgba(255,255,255,.3)}.search-result .sr-ico{width:38px;height:38px;display:grid;place-items:center;flex:none;border-radius:11px;font-size:23px}.search-result b{display:block;font-size:14px}.search-result small{display:block;margin-top:2px;color:var(--dim);font-size:12px}.search-empty{padding:18px 4px;color:var(--dim);text-align:center}
 #hints{display:none!important}
 .mi{display:flex;gap:14px;align-items:center;width:100%;padding:12px 4px;border:0;border-top:1px solid rgba(255,255,255,.08);background:none;text-align:left;font-size:16px}
 .mi:first-of-type{border-top:0}.mi:hover,.mi:focus-visible{background:rgba(255,255,255,.07);outline:none}.mi i{font-style:normal;font-size:24px;width:30px;text-align:center}
@@ -181,7 +182,7 @@ body.rm #season span{display:none}
 
 <div id="season" aria-hidden="true"></div>
 <div id="top"><button id="brand" aria-label="Меню RKCPlay">RKCPlay ▾</button>
-<div id="tools"><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
+<div id="tools"><button id="bSearch" aria-label="Поиск игр" title="Поиск игр (/)">🔎</button><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
 <nav id="tabs" aria-label="Разделы"></nav>
 
 <div id="stage">
@@ -194,6 +195,7 @@ body.rm #season span{display:none}
 
 <button id="panClose" aria-label="Закрыть">✕</button>
 
+<div id="searchP" class="pan"><div id="searchBox" class="box"></div></div>
 <div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
 <div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
@@ -708,6 +710,25 @@ const fmt=ms=>ms<6e4?'меньше минуты':ms<36e5?Math.round(ms/6e4)+' м
 function buildTabs(){const t=$('tabs');t.innerHTML='';CATS.forEach(([id,name])=>{const b=document.createElement('button');b.textContent=name;b.dataset.id=id;b.onclick=()=>setCat(id,true);t.appendChild(b)})}
 function setCat(c,s){S.cat=c;[...$('tabs').children].forEach(b=>{const on=b.dataset.id===c;b.classList.toggle('on',on);if(on)b.scrollIntoView({inline:'center',block:'nearest'})});
  S.list=getList();S.cur=0;build();select(0);if(s)snd(400,.06,'triangle')}
+function searchPanel(on){const p=$('searchP');if(on===false){closePans();return}
+ $('searchBox').innerHTML=`<h3>Поиск игр</h3><small>Ищи по названию, жанру и описанию</small>
+ <input id="gameSearchInput" type="search" placeholder="Например: стратегия, музыка..." autocomplete="off">
+ <div class="search-tools"><select id="searchCat" aria-label="Категория"><option value="all">Все категории</option>${CATS.filter(c=>!['recent','fav','all'].includes(c[0])).map(c=>`<option value="${c[0]}">${esc(c[1])}</option>`).join('')}</select>
+ <select id="searchSort" aria-label="Сортировка"><option value="default">По умолчанию</option><option value="name">По названию</option><option value="popular">По популярности</option><option value="recent">Недавно запускались</option></select></div>
+ <small id="searchCount"></small><div class="search-results" id="searchResults"></div>
+ <div class="row"><button class="pill" id="searchClose">Закрыть</button></div>`;
+ const input=$('gameSearchInput'),cat=$('searchCat'),sort=$('searchSort'),results=$('searchResults');
+ function render(){const q=input.value.trim().toLocaleLowerCase('ru'),c=cat.value,st=ST.stats;
+  let list=GAMES.filter(g=>(c==='all'||g.cat===c)&&(!ST.devOnly||!g.dev||g.dev.includes(DEV))&&(!q||[g.title,g.desc,g.info,g.cat,CATS.find(x=>x[0]===g.cat)?.[1]||''].join(' ').toLocaleLowerCase('ru').includes(q)));
+  if(sort.value==='name')list.sort((a,b)=>a.title.localeCompare(b.title,'ru'));
+  else if(sort.value==='popular')list.sort((a,b)=>(st[b.file]?.n||0)-(st[a.file]?.n||0));
+  else if(sort.value==='recent')list.sort((a,b)=>(st[b.file]?.last||0)-(st[a.file]?.last||0));
+  $('searchCount').textContent='Найдено: '+list.length;
+  results.innerHTML=list.length?list.map(g=>{const c0=CATS.find(x=>x[0]===g.cat)?.[1]||'Игра';return `<button class="search-result" data-file="${esc(g.file)}"><span class="sr-ico" style="background:linear-gradient(145deg,${g.c},${g.c2})">${g.emoji}</span><span><b>${esc(g.title)}${g.new?' · NEW':''}</b><small>${esc(c0)} · ${esc(g.desc||'')}</small></span></button>`}).join(''):'<div class="search-empty">Ничего не найдено. Попробуй другое название или категорию.</div>';
+  results.querySelectorAll('[data-file]').forEach(b=>b.onclick=()=>{const file=b.dataset.file;closePans();setCat('all');const i=S.list.findIndex(g=>g.file===file);if(i>=0)select(i,true);});
+ }
+ input.addEventListener('input',render);cat.addEventListener('change',render);sort.addEventListener('change',render);$('searchClose').onclick=closePans;
+ render();p.classList.add('on');$('panClose').classList.add('on');setTimeout(()=>input.focus(),80);snd(600,.1)}
 function build(){track.innerHTML='';tiles=S.list.map((g,i)=>{const t=document.createElement('div');t.className='tile'+(ST.fav[g.file]?' isfav':'')+(g.dev&&!g.dev.includes(DEV)?' nodev':'');t.setAttribute('role','option');
  t.style.background=`linear-gradient(150deg,${g.c},${g.c2})`;
  t.innerHTML=`<span class="ico">${g.emoji}</span>${g.new?'<span class="nw">NEW</span>':''}${g.auth?'<span class="lk">🔒</span>':''}${platDone(g.file)?'<span class="plat">🏆</span>':''}<span class="st">★</span>`;
@@ -785,7 +806,8 @@ addEventListener('keydown',e=>{
  if(e.key==='ArrowRight')select(S.cur+1,true);else if(e.key==='ArrowLeft')select(S.cur-1,true);
  else if(e.key==='ArrowDown')setCat(CATS[(ci+1)%CATS.length][0],true);else if(e.key==='ArrowUp')setCat(CATS[(ci+CATS.length-1)%CATS.length][0],true);
  else if(e.key==='Enter'&&!document.activeElement.matches('button'))launch();
- else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();else if(k==='s'||k==='ы')shop();else if(k==='q'||k==='й')menu();
+ else if(e.key==='/'){searchPanel();}
+  else if(k==='f'||k==='а')toggleFav();else if(k==='r'||k==='к')dice();else if(k==='t'||k==='е')troPanel();else if(k==='i'||k==='ш')details();else if(k==='p'||k==='з')profile();else if(k==='m'||k==='ь')mute();else if(k==='s'||k==='ы')shop();else if(k==='q'||k==='й')menu();
  else return;e.preventDefault()});
 addEventListener('wheel',e=>{if(inGame||pans().length>0)return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
  if(Math.abs(d)>12&&!wheel.l){select(S.cur+(d>0?1:-1),true);wheel.l=1;setTimeout(()=>wheel.l=0,180)}},{passive:true});
@@ -794,7 +816,7 @@ let sx0=null,sy0=0;addEventListener('touchstart',e=>{sx0=e.touches[0].clientX;sy
 addEventListener('touchend',e=>{if(sx0===null||inGame||pans().length)return;const dx=e.changedTouches[0].clientX-sx0,dy=e.changedTouches[0].clientY-sy0;sx0=null;
  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy))select(S.cur+(dx<0?1:-1),true);
  else if(Math.abs(dy)>70&&Math.abs(dy)>Math.abs(dx)*1.5){const ci=CATS.findIndex(c=>c[0]===S.cat);setCat(CATS[(ci+(dy<0?1:CATS.length-1))%CATS.length][0],true)}},{passive:true});
-$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('bShop').onclick=()=>shop();$('bDev').onclick=()=>{ST.devOnly=!ST.devOnly;save();devBtn();setCat(S.cat);toast(DEV==='touch'?'📱':'💻',ST.devOnly?'Только игры для этого устройства':'Показаны все игры','')};document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
+$('bSearch').onclick=()=>searchPanel();$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('bShop').onclick=()=>shop();$('bDev').onclick=()=>{ST.devOnly=!ST.devOnly;save();devBtn();setCat(S.cat);toast(DEV==='touch'?'📱':'💻',ST.devOnly?'Только игры для этого устройства':'Показаны все игры','')};document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
 function mute(){ST.mute=!ST.mute;save();$('bMute').textContent=ST.mute?'🔇':'🔊';if(!ST.mute)sOk()}
 $('bMute').onclick=mute;$('bMute').textContent=ST.mute?'🔇':'🔊';
 if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();else $('bFs').style.display='none';
