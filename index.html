@@ -878,7 +878,7 @@ let sb=null,user=null,pt=0;
 try{if(window.supabase)sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
 function schedPush(){if(!user)return;clearTimeout(pt);pt=setTimeout(push,3000)}
 async function push(){if(!sb||!user)return;const P=ST.prof;
- const{error}=await sb.from('rkc_profiles').upsert({id:user.id,nickname:P.name,avatar:P.avatar,frame:P.frame,title:P.title,coins:ST.coins,xp:ST.xp,owned:ST.owned,fav:ST.fav,stats:ST.stats,tro:ST.tro,updated_at:new Date(ST.ts||Date.now()).toISOString()});
+ const{error}=await sb.from('rkc_profiles').upsert({id:user.id,nickname:P.name,avatar:P.avatar,frame:P.frame,title:P.title,coins:ST.coins,xp:ST.xp,owned:ST.owned,fav:ST.fav,stats:ST.stats,tro:ST.tro,ach:ST.ach,achp:ST.achp,updated_at:new Date(ST.ts||Date.now()).toISOString()});
  if(error)toast('⚠️','Облако',error.code==='23505'?'Этот ник занят — смени его в профиле':error.message)}
 async function pull(){const{data}=await sb.from('rkc_profiles').select('*').eq('id',user.id).maybeSingle();
  if(!data){await push();return}
