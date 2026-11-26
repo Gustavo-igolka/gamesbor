@@ -173,6 +173,16 @@ body.rm #season span{display:none}
 #achtrophy .at-name{font-size:16px;font-weight:600;margin-top:1px}
 #achtrophy .at-desc{font-size:12.5px;color:var(--dim);margin-top:1px}
 @media(max-width:700px){#achtrophy{right:10px;left:10px;max-width:none;bottom:calc(env(safe-area-inset-bottom) + 66px)}}
+
+.pr-list{display:grid;gap:7px;margin-top:9px}
+.pr-item{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.055);text-align:left;transition:background .18s,border-color .18s}
+.pr-item:hover,.pr-item:focus-visible{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);outline:none}
+.pr-ico{width:38px;height:38px;display:grid;place-items:center;flex:none;border-radius:11px;font-size:21px}
+.pr-main{display:grid;gap:2px;flex:1;min-width:0}
+.pr-main b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-main small,.pr-date{font-size:11px;color:var(--dim)}
+.pr-date{white-space:nowrap}
+.pr-empty{font-size:13px;color:var(--dim);padding:10px 0}
 </style>
 </head>
 <body>
@@ -665,13 +675,15 @@ function details(){const g=S.list[S.cur];if(!g||inGame)return;const st=ST.stats[
 
 function profile(){const v=Object.values(ST.stats),n=v.reduce((a,x)=>a+(x.n||0),0),tm=v.reduce((a,x)=>a+(x.t||0),0),P=ST.prof,L=lvl(ST.xp),c0=15*(L-1)**2,c1=15*L*L;
  const A=achTotalGlobal();
+ const recent=GAMES.filter(g=>ST.stats[g.file]&&ST.stats[g.file].last).sort((a,b)=>ST.stats[b.file].last-ST.stats[a.file].last).slice(0,5);
  $('profBox').innerHTML=`<div style="display:flex;gap:14px;align-items:center">${avh(P.avatar,P.frame)}<div style="flex:1;min-width:0"><b style="font-size:20px">${esc(P.name)}</b><div style="color:var(--dim);font-size:13px">${esc(P.title)||'Без титула'} · Ур. ${L}</div><div class="bar" style="margin-top:6px"><i style="width:${(ST.xp-c0)/(c1-c0)*100}%"></i></div></div></div>
  <div class="st2" style="margin-top:12px"><span>🪙 <b>${ST.coins}</b></span><span>Запусков: <b>${n}</b></span><span>В играх: <b>${fmt(tm)}</b></span></div>
  <div class="st2" style="margin-top:6px"><span>🏅 Трофеи сайта: <b>${TRO.filter(x=>ST.tro[x[0]]).length}/${TRO.length}</b></span><span>🏆 Достижения игр: <b>${A.done}/${A.total}</b>${A.plats?' · 🏆 '+A.plats:''}</span></div>
- <h4>Ник</h4><input id="pName" maxlength="20" value="${esc(P.name)}">
+ <h4 style="margin-top:18px">Недавно запускал</h4><small>Последний запуск каждой игры · до 5 игр</small>${recent.length?'<div class="pr-list">'+recent.map(g=>{const st=ST.stats[g.file];return `<button type="button" class="pr-item" data-recent="${esc(g.file)}"><span class="pr-ico" style="background:linear-gradient(145deg,${g.c},${g.c2})">${g.emoji}</span><span class="pr-main"><b>${esc(g.title)}</b><small>${st.n||0} запусков · ${fmt(st.t||0)}</small></span><span class="pr-date">${dateRu(st.last)}</span></button>`}).join('')+'</div>':'<p class="pr-empty">Здесь появятся игры после первого запуска.</p>'}<h4>Ник</h4><input id="pName" maxlength="20" value="${esc(P.name)}">
  <h4>Облако</h4>${user?`<small>Вход: ${esc(user.email)}</small><div class="row"><button class="pill" id="pSync">Синхронизировать</button><button class="pill" id="pOut">Выйти</button></div>`:sb?`<small>Войди, чтобы профиль жил на всех устройствах</small><input id="pMail" type="email" placeholder="Почта"><input id="pPass" type="password" placeholder="Пароль (от 8 символов)"><div class="row" style="margin-top:8px"><button class="pill" id="pIn">Войти</button><button class="pill" id="pUp">Регистрация</button></div>`:'<small>Облако недоступно</small>'}
  <div class="row"><button class="pill" id="pShop">🛒 Магазин</button><button class="pill" id="pLb" ${sb?'':'hidden'}>🏅 Рейтинг</button></div>
  <div class="row"><button class="pill" id="pSave">В файл</button><button class="pill" id="pLoad">Из файла</button><button class="pill" id="pClose">Закрыть</button></div>`;
+ $('profBox').querySelectorAll('[data-recent]').forEach(b=>b.onclick=()=>{const file=b.dataset.recent;closePans();setCat('all');const i=S.list.findIndex(g=>g.file===file);if(i>=0){select(i,true);details()}});
  $('pName').onchange=e=>{let s=e.target.value.trim().slice(0,20);if(s.length<2)s=P.name;P.name=s;save();profile()};
  $('pShop').onclick=()=>{closePans();shop(true)};if(sb)$('pLb').onclick=lb;
  if(user){$('pSync').onclick=()=>pull().then(()=>{toast('☁️','Синхронизировано','');profile()});$('pOut').onclick=()=>sb.auth.signOut()}
