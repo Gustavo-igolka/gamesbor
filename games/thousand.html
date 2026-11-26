@@ -997,4 +997,181 @@
       wrap.className = 'trick-card';
 
       const label = document.createElement('div');
-      label.className = 'trick-label';
+      label.className = 'trick-label';      label.textContent = state.players[player].name;
+
+      wrap.appendChild(label);
+      wrap.appendChild(createCardEl(card));
+      el.appendChild(wrap);
+    });
+  }
+
+  function renderHumanHand() {
+    const el = $('humanHand');
+    el.innerHTML = '';
+
+    const hand = state.players[0].hand;
+    const legalIds = (state.phase === 'playing' && state.currentPlayer === 0)
+      ? new Set(legalCards(0).map(c => c.id))
+      : null;
+
+    hand.forEach(card => {
+      let disabled = true;
+
+      if (state.phase === 'discard' && state.bidWinner === 0) {
+        disabled = false;
+      } else if (state.phase === 'playing' && state.currentPlayer === 0) {
+        disabled = !legalIds.has(card.id);
+      }
+
+      const selected = state.selectedDiscard.has(card.id);
+      const elCard = createCardEl(card, { selected, disabled });
+
+      if (!disabled) elCard.classList.add('clickable');
+      elCard.addEventListener('click', () => onCardClick(card));
+      el.appendChild(elCard);
+    });
+  }
+
+  function renderStatus() {
+    const el = $('status');
+    let html = '';
+
+    if (state.phase === 'bidding') {
+      html = `<b>Торг</b> · Ставка: ${state.bid ?? '—'} · Ходит: ${state.players[state.currentPlayer].name}`;
+    } else if (state.phase === 'discard') {
+      if (state.bidWinner === 0) {
+        html = `Вы выиграли торг (${state.bid}). Сбросьте 3 карты. Выбрано: ${state.selectedDiscard.size}/3`;
+      } else {
+        html = `${state.players[state.bidWinner].name} выиграл торг (${state.bid}) и сбрасывает карты...`;
+      }
+    } else if (state.phase === 'trump') {
+      html = state.bidWinner === 0
+        ? 'Выберите козырь.'
+        : `${state.players[state.bidWinner].name} выбирает козырь...`;
+    } else if (state.phase === 'playing' || state.phase === 'resolving') {
+      const who = state.currentPlayer !== null ? state.players[state.currentPlayer].name : '—';
+      html = `Козырь: ${state.trump} · Взятка ${state.trickNumber + 1}/7 · Ходит: ${who}`;
+    } else if (state.phase === 'roundEnd') {
+      html = summaryHtml();
+    } else if (state.phase === 'gameOver') {
+      html = `<b>Игра окончена.</b> Победитель: ${state.players[state.gameWinner].name} — ${state.players[state.gameWinner].score} очков.<br>`;
+      html += summaryHtml();
+    } else if (state.phase === 'redeal') {
+      html = 'Все пас — перераздача...';
+    }
+
+    el.innerHTML = html;
+  }
+
+  function renderControls() {
+    const el = $('controls');
+    el.innerHTML = '';
+    el.onclick = handleControlClick;
+
+    const add = (text, attrs = {}, disabled = false) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+
+      for (const [k, v] of Object.entries(attrs)) {
+        b.dataset[k] = v;
+      }
+
+      if (disabled) b.disabled = true;
+      el.appendChild(b);
+    };
+
+    const addText = text => {
+      const s = document.createElement('span');
+      s.textContent = text;
+      s.style.color = 'var(--muted)';
+      s.style.fontSize = '13px';
+      el.appendChild(s);
+    };
+
+    if (state.phase === 'bidding') {
+      if (state.currentPlayer === 0) {
+        if (state.bid === null) {
+          add('Сказать 100', { action: 'bid', amount: '100' });
+        } else {
+          add(`Поднять до ${state.bid + 5}`, { action: 'bid', amount: String(state.bid + 5) });
+        }
+        add('Пас', { action: 'pass' });
+      } else {
+        addText('Ход ИИ в торгах...');
+      }
+    } else if (state.phase === 'discard') {
+      if (state.bidWinner === 0) {
+        add(
+          `Сбросить 3 (${state.selectedDiscard.size}/3)`,
+          { action: 'discard' },
+          state.selectedDiscard.size !== 3
+        );
+      } else {
+        addText('ИИ сбрасывает карты...');
+      }
+    } else if (state.phase === 'trump') {
+      if (state.bidWinner === 0) {
+        SUITS.forEach(suit => {
+          add(`Козырь ${suit}`, { action: 'trump', suit });
+        });
+      } else {
+        addText('ИИ выбирает козырь...');
+      }
+    } else if (state.phase === 'playing') {
+      if (state.currentPlayer === 0) {
+        addText('Ваш ход: выберите карту');
+      } else {
+        addText('Ход ИИ...');
+      }
+    } else if (state.phase === 'resolving') {
+      addText('Взятка разыгрывается...');
+    } else if (state.phase === 'roundEnd') {
+      add('Следующий раунд', { action: 'nextRound' });
+    } else if (state.phase === 'gameOver') {
+      add('Новая игра', { action: 'newGame' });
+    } else if (state.phase === 'redeal') {
+      addText('Все пас — перераздача...');
+    }
+  }
+
+  function renderLog() {
+    const el = $('log');
+    el.innerHTML = '<h3>Журнал</h3><ul>' +
+      state.log.map(m => `<li>${m}</li>`).join('') +
+      '</ul>';
+  }
+
+  function render() {
+    renderScores();
+    renderAI();
+    renderTrick();
+    renderHumanHand();
+    renderStatus();
+    renderControls();
+    renderLog();
+    scheduleAI();
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 17. JS — ОБРАБОТЧИК КНОПОК И ЗАПУСК
+     ========================================================== */
+  function handleControlClick(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+
+    if (action === 'bid') humanBid(Number(btn.dataset.amount));
+    else if (action === 'pass') humanPass();
+    else if (action === 'discard') humanDiscard();
+    else if (action === 'trump') humanChooseTrump(btn.dataset.suit);
+    else if (action === 'nextRound') startRound();
+    else if (action === 'newGame') initGame();
+  }
+
+  $('newGameBtn').addEventListener('click', initGame);
+  initGame();
+})();
+</script>
+</body>
+</html>
