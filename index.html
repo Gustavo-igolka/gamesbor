@@ -298,7 +298,8 @@ button:focus-visible{outline:2px solid rgba(185,205,255,.8);outline-offset:3px}
 }
 #menuP .box::before,#settingsP .box::before{
   content:"";
-  position:absolute;
+  /* Фоновый слой закреплён относительно панели, а не прокручиваемого содержимого */
+  position:fixed;
   z-index:0;
   inset:0;
   pointer-events:none;
