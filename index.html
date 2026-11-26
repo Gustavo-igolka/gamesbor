@@ -287,6 +287,40 @@ button:focus-visible{outline:2px solid rgba(185,205,255,.8);outline-offset:3px}
  #tabs button,#tools button,.tile,.pill,.mi,.search-result,.pr-item,.q-claim{transition:none!important}
 }
 
+
+/* ===== SOFT RKCPLAY MENU DRAWER ===== */
+.pan .box{
+  isolation:isolate;
+  background:transparent;
+  border-radius:0;
+  border:0;
+  box-shadow:none;
+}
+.pan .box::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  inset:0 -132px 0 0;
+  pointer-events:none;
+  background:linear-gradient(90deg,
+    rgba(18,24,46,.99) 0%,
+    rgba(15,21,42,.97) 54%,
+    rgba(11,17,35,.82) 76%,
+    rgba(8,13,28,.38) 91%,
+    rgba(8,13,28,0) 100%);
+  filter:drop-shadow(18px 0 34px rgba(0,0,0,.18));
+}
+.pan.on .box::before{
+  animation:drawerGlowIn .42s ease both;
+}
+@keyframes drawerGlowIn{
+  from{opacity:.55}
+  to{opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .pan.on .box::before{animation:none}
+}
+
 </style>
 </head>
 <body>
