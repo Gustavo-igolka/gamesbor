@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тысяча — карточная игра</title>
+
+<!-- ============================================================
+     СЕКЦИЯ 1. CSS — ПЕРЕМЕННЫЕ И БАЗА
+     ============================================================ -->
+<style>
+  :root {
+    --bg: #0b1117;
+    --panel: #18232e;
+    --panel2: #22313f;
+    --text: #e8eef5;
+    --muted: #9fb0c0;
+    --accent: #f5c542;
+    --red: #e14b4b;
+    --green: #47b36b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(circle at top, #1b2a38, #0b1117 60%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 2. CSS — ШАПКА И СЧЁТ
+     ========================================================== */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: 1px;
+  }
+
+  .scores {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .score-item {
+    background: var(--panel);
+    border: 1px solid #2e4254;
+    border-radius: 10px;
+    padding: 6px 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 14px;
+  }
+
+  .score-item b { color: var(--accent); }
+  .score-item.active { outline: 2px solid var(--accent); }
+
+  button {
+    background: var(--accent);
+    color: #1b1b1b;
+    border: 0;
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 3. CSS — РАСКЛАДКА СТОЛА
+     ========================================================== */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 14px;
+  }
+
+  @media (max-width: 850px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .table {
+    background: linear-gradient(180deg, #173622, #0f2418);
+    border: 1px solid #2b5c3f;
+    border-radius: 18px;
+    padding: 14px;
+    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ai-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .ai-panel {
+    background: rgba(0,0,0,.25);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 8px 10px;
+    min-width: 160px;
+  }
+
+  .ai-name {
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .ai-meta {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .ai-backs {
+    display: flex;
+    gap: 2px;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 4. CSS — КАРТЫ
+     ========================================================== */
+  .card {
+    width: 64px;
+    height: 92px;
+    border-radius: 9px;
+    background: #f8f5ec;
+    color: #111;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 6px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.35);
+    user-select: none;
+    transition: transform .12s, outline .12s;
+    position: relative;
+  }
+
+  .card.red { color: #c62828; }
+
+  .card .rank {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .card .suit {
+    font-size: 26px;
+    align-self: flex-end;
+    line-height: 1;
+  }
+
+  .card.disabled {
+    filter: grayscale(.35) brightness(.75);
+    cursor: not-allowed;
+  }
+
+  .card.selected {
+    outline: 3px solid var(--accent);
+    transform: translateY(-10px);
+  }
+
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { transform: translateY(-6px); }
+
+  .card.back {
+    width: 28px;
+    height: 40px;
+    background: linear-gradient(135deg, #274b7a, #152b45);
+    color: #9fc2ff;
+    font-size: 20px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 5. CSS — РУКА, ВЗЯТКА, СТАТУС, КНОПКИ
+     ========================================================== */
+  .human-hand {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    min-height: 100px;
+    align-items: flex-end;
+  }
+
+  .trick {
+    flex: 1;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
+  }
+
+  .trick-placeholder {
+    color: rgba(255,255,255,.35);
+    font-size: 14px;
+  }
+
+  .trick-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .trick-label {
+    font-size: 11px;
+    color: rgba(255,255,255,.7);
+  }
+
+  .status {
+    background: rgba(0,0,0,.25);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: center;
+    font-size: 14px;
+    min-height: 44px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    min-height: 40px;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 6. CSS — ЖУРНАЛ И ТАБЛИЦА ИТОГОВ
+     ========================================================== */
+  .log {
+    background: var(--panel);
+    border: 1px solid #2e4254;
+    border-radius: 14px;
+    padding: 12px;
+    max-height: 520px;
+    overflow: auto;
+    font-size: 13px;
+  }
+
+  .log h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--accent);
+  }
+
+  .log ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .log li {
+    color: var(--muted);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    padding-bottom: 6px;
+  }
+
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  .summary-table th,
+  .summary-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    text-align: right;
+  }
+
+  .summary-table th:first-child,
+  .summary-table td:first-child {
+    text-align: left;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .badge.ok {
+    background: rgba(71,179,107,.25);
+    color: #7ee29c;
+  }
+
+  .badge.fail {
+    background: rgba(225,75,75,.25);
+    color: #ff9b9b;
+  }
+</style>
+</head>
+
+<body>
+<!-- ============================================================
+     СЕКЦИЯ 7. HTML — СТРУКТУРА
+     ============================================================ -->
+<div class="app">
+  <header>
+    <h1>Тысяча</h1>
+    <div class="scores" id="scores"></div>
+    <button id="newGameBtn">Новая игра</button>
+  </header>
+
+  <main>
+    <section class="table">
+      <div class="ai-row" id="aiRow"></div>
+      <div class="trick" id="trickArea"></div>
+      <div class="status" id="status"></div>
+      <div class="human-hand" id="humanHand"></div>
+      <div class="controls" id="controls"></div>
+    </section>
+
+    <aside class="log" id="log"></aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  /* ==========================================================
+     СЕКЦИЯ 8. JS — КОНСТАНТЫ И СОСТОЯНИЕ
+     ========================================================== */
+  const SUITS = ['♠', '♣', '♦', '♥'];
+  const RANKS = ['9', '10', 'J', 'Q', 'K', 'A'];
+  const VALUES = { '9': 0, '10': 10, 'J': 2, 'Q': 3, 'K': 4, 'A': 11 };
+  const RANK_ORDER = { '9': 0, '10': 1, 'J': 2, 'Q': 3, 'K': 4, 'A': 5 };
+  const MARRIAGE = { '♥': 100, '♦': 80, '♣': 60, '♠': 40 };
+  const FIRST_TO = 1000;
+
+  const state = {
+    players: [
+      { name: 'Вы', isHuman: true, hand: [], score: 0, tricks: [], trickCount: 0 },
+      { name: 'ИИ 1', isHuman: false, hand: [], score: 0, tricks: [], trickCount: 0 },
+      { name: 'ИИ 2', isHuman: false, hand: [], score: 0, tricks: [], trickCount: 0 }
+    ],
+    deck: [],
+    prikup: [],
+    phase: 'idle',
+    bid: null,
+    bidWinner: null,
+    activeBidders: [true, true, true],
+    currentPlayer: 0,
+    trick: [],
+    trump: null,
+    trickNumber: 0,
+    selectedDiscard: new Set(),
+    log: [],
+    roundSummary: null,
+    gameWinner: null
+  };
+
+  let aiTimer = null;
+
+  const $ = id => document.getElementById(id);
+
+  /* ==========================================================
+     СЕКЦИЯ 9. JS — УТИЛИТЫ
+     ========================================================== */
+  function createDeck() {
+    const deck = [];
+    for (const suit of SUITS) {
+      for (const rank of RANKS) {
+        deck.push({
+          id: rank + suit,
+          suit,
+          rank,
+          value: VALUES[rank]
+        });
+      }
+    }
+    return deck;
+  }
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function addLog(msg) {
+    state.log.unshift(msg);
+    if (state.log.length > 30) state.log.pop();
+  }
+
+  function createCardEl(card, opts = {}) {
+    const el = document.createElement('div');
+
+    if (opts.back) {
+      el.className = 'card back';
+      el.textContent = '🂠';
+      return el;
+    }
+
+    el.className = 'card ' + ((card.suit === '♥' || card.suit === '♦') ? 'red' : 'black');
+    if (opts.selected) el.classList.add('selected');
+    if (opts.disabled) el.classList.add('disabled');
+
+    el.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+    return el;
+  }
+
+  function handStrength(hand) {
+    let score = hand.reduce((sum, c) => sum + c.value, 0);
+    for (const suit of SUITS) {
+      const hasK = hand.some(c => c.suit === suit && c.rank === 'K');
+      const hasQ = hand.some(c => c.suit === suit && c.rank === 'Q');
+      if (hasK && hasQ) score += MARRIAGE[suit];
+    }
+    return score;
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 10. JS — СТАРТ РАУНДА И НОВОЙ ИГРЫ
+     ========================================================== */
+  function startRound() {
+    clearTimeout(aiTimer);
+
+    state.players.forEach(p => {
+      p.hand = [];
+      p.tricks = [];
+      p.trickCount = 0;
+    });
+
+    state.deck = shuffle(createDeck());
+
+    for (let round = 0; round < 7; round++) {
+      for (let p = 0; p < 3; p++) {
+        state.players[p].hand.push(state.deck.pop());
+      }
+    }
+
+    state.prikup = state.deck.splice(0, 3);
+
+    state.phase = 'bidding';
+    state.bid = null;
+    state.bidWinner = null;
+    state.activeBidders = [true, true, true];
+    state.currentPlayer = Math.floor(Math.random() * 3);
+    state.trick = [];
+    state.trump = null;
+    state.trickNumber = 0;
+    state.selectedDiscard.clear();
+    state.roundSummary = null;
+    state.gameWinner = null;
+
+    addLog(`Раунд начат. Первым торгуется: ${state.players[state.currentPlayer].name}.`);
+    render();
+  }
+
+  function initGame() {
+    state.players.forEach(p => { p.score = 0; });
+    state.log = [];
+    state.gameWinner = null;
+    addLog('Новая игра. Цель — 1000 очков.');
+    startRound();
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 11. JS — ТОРГОВЛЯ
+     ========================================================== */
+  function humanBid(amount) {
+    if (state.phase !== 'bidding' || state.currentPlayer !== 0 || !state.activeBidders[0]) return;
+    if (state.bid === null && amount < 100) return;
+    if (state.bid !== null && amount <= state.bid) return;
+
+    state.bid = amount;
+    state.bidWinner = 0;
+    addLog(`Вы говорите ${amount}.`);
+    advanceBidding();
+  }
+
+  function humanPass() {
+    if (state.phase !== 'bidding' || state.currentPlayer !== 0) return;
+    state.activeBidders[0] = false;
+    addLog('Вы пас.');
+    advanceBidding();
+  }
+
+  function aiBid(index) {
+    if (state.phase !== 'bidding' || state.currentPlayer !== index || !state.activeBidders[index]) return;
+
+    const strength = handStrength(state.players[index].hand);
+    const next = state.bid === null ? 100 : state.bid + 5;
+
+    if (next <= strength && Math.random() < 0.8) {
+      state.bid = next;
+      state.bidWinner = index;
+      addLog(`${state.players[index].name} говорит ${next}.`);
+      advanceBidding();
+    } else {
+      state.activeBidders[index] = false;
+      addLog(`${state.players[index].name} пас.`);
+      advanceBidding();
+    }
+  }
+
+  function advanceBidding() {
+    if (state.phase !== 'bidding') return;
+
+    const active = state.activeBidders
+      .map((v, i) => v ? i : null)
+      .filter(i => i !== null);
+
+    if (active.length === 0) {
+      state.phase = 'redeal';
+      addLog('Все пас. Перераздача.');
+      render();
+      setTimeout(() => {
+        if (state.phase === 'redeal') startRound();
+      }, 1200);
+      return;
+    }
+
+    if (active.length === 1 && state.bid !== null) {
+      finishBidding(active[0]);
+      return;
+    }
+
+    if (active.length === 1) {
+      state.currentPlayer = active[0];
+    } else {
+      let idx = state.currentPlayer;
+      for (let i = 1; i <= 3; i++) {
+        const cand = (idx + i) % 3;
+        if (state.activeBidders[cand]) {
+          state.currentPlayer = cand;
+          break;
+        }
+      }
+    }
+
+    render();
+  }
+
+  function finishBidding(winner) {
+    if (state.phase !== 'bidding') return;
+
+    state.bidWinner = winner;
+    state.phase = 'discard';
+    state.currentPlayer = winner;
+
+    state.players[winner].hand.push(...state.prikup);
+    state.prikup = [];
+
+    addLog(`${state.players[winner].name} выигрывает торг со ставкой ${state.bid}.`);
+    render();
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 12. JS — СБРОС КАРТ И ВЫБОР КОЗЫРЯ
+     ========================================================== */
+  function aiDiscard(index) {
+    if (state.phase !== 'discard' || state.bidWinner !== index) return;
+
+    const p = state.players[index];
+
+    const keepScore = card => {
+      let s = card.value;
+
+      const sameSuit = p.hand.filter(c => c.suit === card.suit);
+      if (card.rank === 'K' && sameSuit.some(c => c.rank === 'Q')) s += 20;
+      if (card.rank === 'Q' && sameSuit.some(c => c.rank === 'K')) s += 20;
+      if (card.rank === 'A') s += 5;
+      if (card.rank === '10') s += 3;
+
+      return s;
+    };
+
+    const discardIds = [...p.hand]
+      .sort((a, b) => keepScore(a) - keepScore(b))
+      .slice(0, 3)
+      .map(c => c.id);
+
+    p.hand = p.hand.filter(c => !discardIds.includes(c.id));
+
+    addLog(`${p.name} сбрасывает 3 карты.`);
+    state.phase = 'trump';
+    render();
+  }
+
+  function humanDiscard() {
+    if (state.phase !== 'discard' || state.bidWinner !== 0) return;
+    if (state.selectedDiscard.size !== 3) return;
+
+    const p = state.players[0];
+    p.hand = p.hand.filter(c => !state.selectedDiscard.has(c.id));
+    state.selectedDiscard.clear();
+
+    addLog('Вы сбросили 3 карты.');
+    state.phase = 'trump';
+    render();
+  }
+
+  function humanChooseTrump(suit) {
+    if (state.phase !== 'trump' || state.bidWinner !== 0) return;
+    chooseTrump(0, suit);
+  }
+
+  function aiChooseTrump(index) {
+    if (state.phase !== 'trump' || state.bidWinner !== index) return;
+
+    const p = state.players[index];
+    let bestSuit = SUITS[0];
+    let bestScore = -Infinity;
+
+    for (const suit of SUITS) {
+      const cards = p.hand.filter(c => c.suit === suit);
+      let score = cards.length * 2 + cards.reduce((a, c) => a + c.value, 0) / 10;
+
+      if (cards.some(c => c.rank === 'K') && cards.some(c => c.rank === 'Q')) {
+        score += 10;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestSuit = suit;
+      }
+    }
+
+    chooseTrump(index, bestSuit);
+  }
+
+  function chooseTrump(index, suit) {
+    if (state.phase !== 'trump' || state.bidWinner !== index) return;
+
+    state.trump = suit;
+    state.phase = 'playing';
+    state.currentPlayer = state.bidWinner;
+    state.trick = [];
+    state.trickNumber = 0;
+    state.players.forEach(p => { p.trickCount = 0; });
+
+    addLog(`${state.players[index].name} назначает козырь ${suit}.`);
+    render();
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 13. JS — ИГРОВОЙ ЦИКЛ И ВЗЯТКИ
+     ========================================================== */
+  function legalCards(playerIndex) {
+    const p = state.players[playerIndex];
+    if (state.trick.length === 0) return [...p.hand];
+
+    const ledSuit = state.trick[0].card.suit;
+    const follow = p.hand.filter(c => c.suit === ledSuit);
+    return follow.length ? follow : [...p.hand];
+  }
+
+  function beats(card, best, ledSuit, trump) {
+    if (card.suit === best.suit) {
+      return RANK_ORDER[card.rank] > RANK_ORDER[best.rank];
+    }
+    if (card.suit === trump && best.suit !== trump) return true;
+    if (best.suit === trump && card.suit !== trump) return false;
+    return false;
+  }
+
+  function onCardClick(card) {
+    if (state.phase === 'discard' && state.bidWinner === 0) {
+      if (state.selectedDiscard.has(card.id)) {
+        state.selectedDiscard.delete(card.id);
+      } else if (state.selectedDiscard.size < 3) {
+        state.selectedDiscard.add(card.id);
+      }
+      render();
+      return;
+    }
+
+    if (state.phase === 'playing' && state.currentPlayer === 0) {
+      const legal = legalCards(0).map(c => c.id);
+      if (legal.includes(card.id)) playCard(0, card);
+    }
+  }
+
+  function playCard(playerIndex, card) {
+    if (state.phase !== 'playing' || state.currentPlayer !== playerIndex) return;
+
+    const p = state.players[playerIndex];
+    const idx = p.hand.findIndex(c => c.id === card.id);
+    if (idx === -1) return;
+
+    const legal = legalCards(playerIndex).map(c => c.id);
+    if (!legal.includes(card.id)) return;
+
+    p.hand.splice(idx, 1);
+    state.trick.push({ player: playerIndex, card });
+
+    addLog(`${p.name}: ${card.rank}${card.suit}`);
+
+    if (state.trick.length === 3) {
+      state.phase = 'resolving';
+      state.currentPlayer = null;
+      render();
+      setTimeout(resolveTrick, 800);
+    } else {
+      state.currentPlayer = (playerIndex + 1) % 3;
+      render();
+    }
+  }
+
+  function resolveTrick() {
+    if (state.phase !== 'resolving') return;
+
+    const ledSuit = state.trick[0].card.suit;
+    let best = state.trick[0];
+
+    for (let i = 1; i < state.trick.length; i++) {
+      if (beats(state.trick[i].card, best.card, ledSuit, state.trump)) {
+        best = state.trick[i];
+      }
+    }
+
+    const winner = best.player;
+    const p = state.players[winner];
+
+    state.trick.forEach(({ card }) => p.tricks.push(card));
+    p.trickCount++;
+
+    addLog(`${p.name} берёт взятку.`);
+
+    state.trick = [];
+    state.trickNumber++;
+    state.phase = 'playing';
+    state.currentPlayer = winner;
+
+    if (state.players.every(pl => pl.hand.length === 0)) {
+      endRound();
+    } else {
+      render();
+    }
+  }
+
+  function aiPlay(index) {
+    if (state.phase !== 'playing' || state.currentPlayer !== index) return;
+
+    const legal = legalCards(index);
+    if (!legal.length) return;
+
+    let card;
+
+    if (state.trick.length === 0) {
+      const nonTrump = legal.filter(c => c.suit !== state.trump);
+      const pool = nonTrump.length ? nonTrump : legal;
+      card = [...pool].sort((a, b) =>
+        b.value - a.value || RANK_ORDER[b.rank] - RANK_ORDER[a.rank]
+      )[0];
+    } else {
+      const ledSuit = state.trick[0].card.suit;
+      let best = state.trick[0].card;
+
+      for (let i = 1; i < state.trick.length; i++) {
+        const c = state.trick[i].card;
+        if (beats(c, best, ledSuit, state.trump)) best = c;
+      }
+
+      const winning = legal.filter(c => beats(c, best, ledSuit, state.trump));
+
+      if (winning.length) {
+        card = [...winning].sort((a, b) =>
+          a.value - b.value || RANK_ORDER[a.rank] - RANK_ORDER[b.rank]
+        )[0];
+      } else {
+        card = [...legal].sort((a, b) =>
+          a.value - b.value || RANK_ORDER[a.rank] - RANK_ORDER[b.rank]
+        )[0];
+      }
+    }
+
+    playCard(index, card);
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 14. JS — ПОДСЧЁТ ОЧКОВ И КОНЕЦ РАУНДА
+     ========================================================== */
+  function calculateRoundScores() {
+    const cardPoints = [0, 0, 0];
+    const marriagePoints = [0, 0, 0];
+
+    state.players.forEach((p, i) => {
+      cardPoints[i] = p.tricks.reduce((sum, c) => sum + c.value, 0);
+
+      for (const suit of SUITS) {
+        const hasK = p.tricks.some(c => c.suit === suit && c.rank === 'K');
+        const hasQ = p.tricks.some(c => c.suit === suit && c.rank === 'Q');
+        if (hasK && hasQ) marriagePoints[i] += MARRIAGE[suit];
+      }
+    });
+
+    return {
+      cardPoints,
+      marriagePoints,
+      totals: cardPoints.map((v, i) => v + marriagePoints[i])
+    };
+  }
+
+  function endRound() {
+    state.phase = 'roundEnd';
+    state.currentPlayer = null;
+
+    const { cardPoints, marriagePoints, totals } = calculateRoundScores();
+    const winner = state.bidWinner;
+    const bid = state.bid;
+    const success = totals[winner] >= bid;
+
+    if (success) {
+      state.players.forEach((p, i) => {
+        p.score += totals[i];
+      });
+      addLog(`${state.players[winner].name} выполнил контракт ${bid} (+${totals[winner]}).`);
+    } else {
+      state.players.forEach((p, i) => {
+        if (i !== winner) p.score += totals[i];
+      });
+      state.players[winner].score -= bid;
+      addLog(`${state.players[winner].name} не выполнил контракт ${bid} (−${bid}).`);
+    }
+
+    state.roundSummary = {
+      bid,
+      winner,
+      success,
+      details: state.players.map((p, i) => ({
+        name: p.name,
+        cardPoints: cardPoints[i],
+        marriagePoints: marriagePoints[i],
+        total: totals[i],
+        score: p.score
+      }))
+    };
+
+    const maxScore = Math.max(...state.players.map(p => p.score));
+
+    if (maxScore >= FIRST_TO) {
+      state.phase = 'gameOver';
+      state.gameWinner = state.players.reduce((best, p, i) => {
+        return p.score > state.players[best].score ? i : best;
+      }, 0);
+      addLog(`Игра окончена. Победитель: ${state.players[state.gameWinner].name}.`);
+    }
+
+    render();
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 15. JS — ПЛАНИРОВЩИК ХОДА ИИ
+     ========================================================== */
+  function scheduleAI() {
+    clearTimeout(aiTimer);
+
+    if (state.phase === 'bidding' && state.currentPlayer !== 0) {
+      aiTimer = setTimeout(() => aiBid(state.currentPlayer), 700);
+    } else if (state.phase === 'discard' && state.bidWinner !== 0) {
+      aiTimer = setTimeout(() => aiDiscard(state.bidWinner), 700);
+    } else if (state.phase === 'trump' && state.bidWinner !== 0) {
+      aiTimer = setTimeout(() => aiChooseTrump(state.bidWinner), 700);
+    } else if (state.phase === 'playing' && state.currentPlayer !== null && state.currentPlayer !== 0) {
+      aiTimer = setTimeout(() => aiPlay(state.currentPlayer), 700);
+    }
+  }
+
+  /* ==========================================================
+     СЕКЦИЯ 16. JS — ОТРИСОВКА ИНТЕРФЕЙСА
+     ========================================================== */
+  function summaryHtml() {
+    const s = state.roundSummary;
+    if (!s) return '';
+
+    let html = `<div><b>Итоги раунда</b> · Контракт: ${s.bid} (${state.players[s.winner].name}) `;
+    html += `<span class="badge ${s.success ? 'ok' : 'fail'}">${s.success ? 'выполнен' : 'провален'}</span></div>`;
+    html += '<table class="summary-table"><thead><tr><th>Игрок</th><th>Карты</th><th>Браки</th><th>Итог</th><th>Счёт</th></tr></thead><tbody>';
+
+    s.details.forEach(d => {
+      html += `<tr><td>${d.name}</td><td>${d.cardPoints}</td><td>+${d.marriagePoints}</td><td>${d.total}</td><td>${d.score}</td></tr>`;
+    });
+
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function renderScores() {
+    const el = $('scores');
+    el.innerHTML = '';
+
+    state.players.forEach((p, i) => {
+      const div = document.createElement('div');
+      div.className = 'score-item';
+
+      if (
+        state.phase !== 'roundEnd' &&
+        state.phase !== 'gameOver' &&
+        state.currentPlayer === i
+      ) {
+        div.classList.add('active');
+      }
+
+      div.innerHTML = `<span>${p.name}</span><b>${p.score}</b>`;
+      el.appendChild(div);
+    });
+  }
+
+  function renderAI() {
+    const el = $('aiRow');
+    el.innerHTML = '';
+
+    [1, 2].forEach(i => {
+      const p = state.players[i];
+      const div = document.createElement('div');
+      div.className = 'ai-panel';
+
+      let status = '';
+
+      if (state.phase === 'bidding') {
+        status = state.activeBidders[i]
+          ? (state.bidWinner === i ? `ставка ${state.bid}` : 'в торге')
+          : 'пас';
+      } else if (state.phase === 'discard' && state.bidWinner === i) {
+        status = 'сбрасывает...';
+      } else if (state.phase === 'trump' && state.bidWinner === i) {
+        status = 'выбирает козырь...';
+      } else if (state.phase === 'playing' || state.phase === 'resolving') {
+        status = `взяток: ${p.trickCount}`;
+      } else if (state.phase === 'roundEnd' || state.phase === 'gameOver') {
+        status = `очков: ${p.score}`;
+      }
+
+      div.innerHTML = `<div class="ai-name">${p.name}</div><div class="ai-meta">${status} · карт: ${p.hand.length}</div>`;
+
+      const backs = document.createElement('div');
+      backs.className = 'ai-backs';
+
+      for (let k = 0; k < p.hand.length; k++) {
+        backs.appendChild(createCardEl({}, { back: true }));
+      }
+
+      div.appendChild(backs);
+      el.appendChild(div);
+    });
+  }
+
+  function renderTrick() {
+    const el = $('trickArea');
+    el.innerHTML = '';
+
+    if (state.trick.length === 0) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'trick-placeholder';
+      placeholder.textContent = 'Взятка';
+      el.appendChild(placeholder);
+      return;
+    }
+
+    state.trick.forEach(({ player, card }) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'trick-card';
+
+      const label = document.createElement('div');
+      label.className = 'trick-label';
