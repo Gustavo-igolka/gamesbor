@@ -75,9 +75,11 @@ input[type=range]{width:100%;accent-color:var(--pink);cursor:pointer}
    <div class="setting"><label for="speed">Скорость нот <b id="speedv">6</b></label><input id="speed" type="range" min="1" max="10" value="6"></div>
    <div class="setting"><label for="off">Сдвиг синхронизации <b id="offv">0 мс</b></label><input id="off" type="range" min="-200" max="200" value="0" step="5"></div>
    <div class="setting"><label for="volume">Громкость <b id="volumev">80%</b></label><input id="volume" type="range" min="0" max="100" value="80"></div>
+   <div class="setting"><label for="keyStyle">Стиль клавиш</label><select id="keyStyle"><option value="letters">Буквы D F J K</option><option value="arrows">Стрелки ← ↓ ↑ →</option><option value="shapes">Фигуры ○ △ □ ◇</option><option value="numbers">Цифры 1 2 3 4</option></select></div>
   </div>
   <div class="row" style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
    <label class="check"><input id="nofail" type="checkbox"> Без проигрыша</label>
+   <label class="check"><input id="botMode" type="checkbox"> 🤖 Режим «Бот»</label>
    <label class="check"><input id="autoplay" type="checkbox"> Автопауза при потере вкладки</label>
   </div>
   <p class="help">Управление: <b>D F J K</b> или нажимай на соответствующие дорожки. <b>Esc</b> — пауза. На телефоне доступны касания по дорожкам. Если постоянно опаздываешь или спешишь — настрой сдвиг.</p>
@@ -93,15 +95,18 @@ let W,H,LW,X0,hitY;
 function geo(){W=cv.width=innerWidth;H=cv.height=innerHeight;LW=Math.min(110,W/6);X0=(W-LW*4)/2;hitY=H*.84}
 geo();addEventListener('resize',geo);
 
-const KEYS=['KeyD','KeyF','KeyJ','KeyK'],LAB=['D','F','J','K'],HUE=[330,190,50,130];
+const KEYS=['KeyD','KeyF','KeyJ','KeyK'],KEYLABELS={letters:['D','F','J','K'],arrows:['←','↓','↑','→'],shapes:['○','△','□','◇'],numbers:['1','2','3','4']},HUE=[330,190,50,130];
+let LAB=KEYLABELS.letters;
+function updateKeyStyle(){LAB=KEYLABELS[$('keyStyle').value]||KEYLABELS.letters;}
 const JN=['PERFECT','GOOD','OK'],JC=['#ffd75e','#5eead4','#a5b4fc'],JS=[300,150,50],WIN=[.045,.09,.13];
 let AC,an,freq,src,masterGain,t0=0,dur=0,notes=[],first=0,state='menu',paused=false,lastBuf=null,lastName='Демо-трек';
-let score,combo,maxCombo,hp,cnt,down=[0,0,0,0],flash=[0,0,0,0],parts=[],pop=null,comboPulse=0,shake=0,fall=1.3,off=0,nofail=false;
+let score,combo,maxCombo,hp,cnt,down=[0,0,0,0],flash=[0,0,0,0],parts=[],pop=null,comboPulse=0,shake=0,fall=1.3,off=0,nofail=false,holdNotes=[null,null,null,null],botMode=false;
 const mapCache=new Map();
 
-try{const s=JSON.parse(localStorage.getItem('rg')||'{}');if(s.speed)$('speed').value=s.speed;if(s.off!=null)$('off').value=s.off;if(s.diff)$('diff').value=s.diff;if(s.volume!=null)$('volume').value=s.volume}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('rg')||'{}');if(s.speed)$('speed').value=s.speed;if(s.off!=null)$('off').value=s.off;if(s.diff)$('diff').value=s.diff;if(s.volume!=null)$('volume').value=s.volume;if(s.keyStyle)$('keyStyle').value=s.keyStyle}catch(e){}
 $('off').oninput=()=>$('offv').textContent=$('off').value;$('offv').textContent=$('off').value;
-function save(){try{localStorage.setItem('rg',JSON.stringify({speed:$('speed').value,off:$('off').value,diff:$('diff').value,volume:$('volume').value}))}catch(e){}}
+function save(){try{localStorage.setItem('rg',JSON.stringify({speed:$('speed').value,off:$('off').value,diff:$('diff').value,volume:$('volume').value,keyStyle:$('keyStyle').value}))}catch(e){}}
+updateKeyStyle();
 function status(t){res.textContent=t}
 
 function initAC(){
@@ -185,6 +190,11 @@ async function makeMap(buf,diff){
     if(diff==='hard'&&o.s>4)out.push({t:o.t,lane:(lane+2)%4,done:false});
   }
   out.sort((a,b)=>a.t-b.t);
+  // Long notes are introduced only where the lane has enough free space.
+  for(let i=0;i<out.length;i++){
+    const n=out[i],next=out[i+1],gap=next&&next.lane===n.lane?next.t-n.t:99;
+    if(gap>1.15&&rnd()<({easy:.07,normal:.14,hard:.19}[diff]))n.len=Math.min(1.65,Math.max(.55,.65+rnd()*.85),gap-.18);
+  }
   if(!mapCache.has(buf))mapCache.set(buf,{});mapCache.get(buf)[key]=out;
   return out;
 }
@@ -196,9 +206,9 @@ async function begin(buf,name='Твой трек'){
   $('loading').style.display='grid';$('loadtext').textContent='Анализирую: '+name;$('loadbar').firstElementChild.style.width='0%';
   let map;try{map=await makeMap(buf,diff)}catch(err){$('loading').style.display='none';status('Не удалось проанализировать этот трек. Попробуй другой файл.');return}$('loading').style.display='none';
   if(map.length<8){status('В этом треке не нашлось ритма. Попробуй другой.');return}
-  notes=map.map(n=>({t:n.t,lane:n.lane,done:false}));first=0;
+  notes=map.map(n=>({t:n.t,lane:n.lane,len:n.len||0,done:false,holding:false,hit:false}));first=0;
   fall=2.2-.16*(+$('speed').value);off=+$('off').value;nofail=$('nofail').checked;
-  score=0;combo=0;maxCombo=0;hp=100;cnt=[0,0,0,0];parts=[];pop=null;paused=false;
+  score=0;combo=0;maxCombo=0;hp=100;cnt=[0,0,0,0];parts=[];pop=null;paused=false;down=[0,0,0,0];holdNotes=[null,null,null,null];botMode=$('botMode').checked;
   stopSrc();await initAC();
   src=AC.createBufferSource();src.buffer=buf;src.connect(an);
   t0=AC.currentTime+2.2;src.start(t0);dur=buf.duration;
@@ -220,7 +230,20 @@ function registerMiss(l){
 }
 function togglePause(){if(state!=='play')return;paused=!paused;if(paused)AC.suspend();else AC.resume();$('pauseBtn').textContent=paused?'▶ Продолжить':'Ⅱ Пауза'}
 function leaveGame(){if(state!=='play')return;stopSrc();paused=false;state='menu';$('gamebar').style.display='none';menu.style.display='flex';status('Партия завершена досрочно.');}
+function releaseLane(l){
+  down[l]=0;
+  const n=holdNotes[l];if(!n)return;
+  holdNotes[l]=null;
+  const ts=songTime(),end=n.t+n.len;
+  n.done=true;n.holding=false;
+  if(ts>=end-.16){
+    cnt[0]++;combo++;maxCombo=Math.max(maxCombo,combo);comboPulse=1;
+    score+=Math.round(300*(1+Math.min(2,Math.floor(combo/25)*.25)));hp=Math.min(100,hp+2);
+    popup('HOLD COMPLETE','#5eead4','');burst(l,HUE[l],20);
+  }else registerMiss(l);
+}
 function press(l){
+  if(holdNotes[l])return;
   down[l]=1;flash[l]=1;
   const ts=songTime();
   for(let i=first;i<notes.length;i++){
@@ -228,6 +251,9 @@ function press(l){
     if(n.done||n.lane!==l)continue;
     const dt=ts-n.t,a=Math.abs(dt);if(a>WIN[2])continue;
     const j=a<=WIN[0]?0:a<=WIN[1]?1:2;
+    if(n.len>0){
+      n.holding=true;n.hit=true;holdNotes[l]=n;popup('HOLD!','#5eead4','УДЕРЖИВАЙ');return;
+    }
     n.done=true;cnt[j]++;combo++;maxCombo=Math.max(maxCombo,combo);comboPulse=1;
     score+=Math.round(JS[j]*(1+Math.min(2,Math.floor(combo/25)*.25)));
     hp=Math.min(100,hp+[1.5,.5,-1.5][j]);
@@ -241,7 +267,7 @@ addEventListener('keydown',e=>{
   if(paused){if(e.code==='KeyQ')leaveGame();return}
   const l=KEYS.indexOf(e.code);if(l>=0&&!e.repeat){e.preventDefault();press(l)}
 });
-addEventListener('keyup',e=>{const l=KEYS.indexOf(e.code);if(l>=0)down[l]=0});
+addEventListener('keyup',e=>{const l=KEYS.indexOf(e.code);if(l>=0)releaseLane(l)});
 $('demo').onclick=async()=>{await initAC();status('Готовлю демо-трек…');try{await begin(await renderDemo(),'Демо — Neon Pulse')}catch(e){status('Не удалось создать демо-трек.')}};
 $('file').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -254,13 +280,22 @@ $('pauseBtn').onclick=togglePause;$('exitBtn').onclick=leaveGame;
 $('speed').oninput=()=>$('speedv').textContent=$('speed').value;
 $('off').oninput=()=>{$('offv').textContent=$('off').value+' мс'};
 $('volume').oninput=()=>{$('volumev').textContent=$('volume').value+'%';if(masterGain)masterGain.gain.setTargetAtTime(+$('volume').value/100,AC.currentTime,.025);save()};
+$('keyStyle').onchange=()=>{updateKeyStyle();save()};
 $('autoplay').checked=true;
-cv.addEventListener('pointerdown',e=>{if(state!=='play'||paused)return;const x=e.clientX;if(x<X0||x>=X0+LW*4)return;const lane=Math.max(0,Math.min(3,Math.floor((x-X0)/LW)));press(lane);down[lane]=1;});
-cv.addEventListener('pointerup',()=>{down=[0,0,0,0]});cv.addEventListener('pointercancel',()=>{down=[0,0,0,0]});
+cv.addEventListener('pointerdown',e=>{if(state!=='play'||paused)return;const x=e.clientX;if(x<X0||x>=X0+LW*4)return;const lane=Math.max(0,Math.min(3,Math.floor((x-X0)/LW)));try{cv.setPointerCapture(e.pointerId)}catch(_){}press(lane);down[lane]=1;});
+cv.addEventListener('pointerup',()=>{for(let l=0;l<4;l++)if(down[l])releaseLane(l)});cv.addEventListener('pointercancel',()=>{for(let l=0;l<4;l++)if(down[l])releaseLane(l)});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&$('autoplay').checked&&state==='play'&&!paused)togglePause()});
 
 function update(dt){
   const ts=songTime();
+  if(botMode){
+    for(let i=first;i<notes.length;i++){
+      const n=notes[i];if(n.t>ts+.01)break;
+      if(!n.done&&!n.holding){press(n.lane);if(n.len>0)break;}
+    }
+    for(let l=0;l<4;l++)if(holdNotes[l]&&ts>=holdNotes[l].t+holdNotes[l].len)releaseLane(l);
+  }
+  for(let l=0;l<4;l++)if(holdNotes[l]&&!botMode&&ts>holdNotes[l].t+holdNotes[l].len+.16)releaseLane(l);
   while(first<notes.length&&(notes[first].done||notes[first].t<ts-WIN[2])){
     const n=notes[first];if(!n.done){n.done=true;registerMiss(n.lane);if(state!=='play')return}first++;
   }
@@ -302,9 +337,15 @@ function draw(){
   // ноты
   for(let i=first;i<notes.length;i++){
     const n=notes[i],d=n.t-ts;if(d>fall+.05)break;if(n.done)continue;
-    const y=hitY-d/fall*(hitY+30),x=X0+n.lane*LW+7;
+    const x=X0+n.lane*LW+7;
+    const remaining=n.holding?Math.max(0,n.t+n.len-ts):n.len;
+    const y=n.holding?hitY:hitY-d/fall*(hitY+30);
+    const h=n.len>0?remaining/fall*(hitY+30):0;
     ctx.fillStyle=`hsl(${HUE[n.lane]},90%,62%)`;ctx.shadowColor=`hsl(${HUE[n.lane]},95%,60%)`;ctx.shadowBlur=16;
-    ctx.beginPath();ctx.roundRect(x,y-13,LW-14,26,8);ctx.fill();
+    if(n.len>0){
+      ctx.beginPath();ctx.roundRect(x,y-h-13,LW-14,h+26,8);ctx.fill();
+      ctx.fillStyle='#fff';ctx.fillRect(x+5,y-h-7,LW-24,Math.max(3,h+14));
+    }else{ctx.beginPath();ctx.roundRect(x,y-13,LW-14,26,8);ctx.fill();}
   }
   ctx.shadowBlur=0;
   for(const p of parts){ctx.fillStyle=`hsla(${p.hue},90%,65%,${Math.min(1,p.life*2.5)})`;ctx.fillRect(p.x,p.y,4,4)}
