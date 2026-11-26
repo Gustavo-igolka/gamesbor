@@ -565,7 +565,7 @@ ST.prof=Object.assign({name:'Игрок'+(1000+Math.random()*9000|0),avatar:'�
 ST.ach=ST.ach||{};ST.achp=ST.achp||{};
 const save=()=>{ST.ts=Date.now();if(ST.daily)ST.tro.__daily=ST.daily;try{localStorage.setItem('rkc',JSON.stringify(ST))}catch(e){}schedPush();refreshTop()};
 const dayKey=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-const dayOrdinal=k=>{const m=/^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(k||'');return m?Date.UTC(+m[1],+m[2]-1,+m[3])/86400000:0};
+const dayOrdinal=k=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(k||'');return m?Date.UTC(+m[1],+m[2]-1,+m[3])/86400000:0};
 function dailyEnsure(){
  const today=dayKey(),d=ST.daily&&typeof ST.daily==='object'?ST.daily:{};
  const old=JSON.stringify(d),last=typeof d.lastVisit==='string'?d.lastVisit:'';
@@ -589,7 +589,6 @@ function mergeDaily(remote){
  else if(remote.lastVisit===local.lastVisit)local.streak=Math.max(+local.streak||1,+remote.streak||1);
  ST.daily=local
 }
-dailyEnsure();
 const S={cat:'all',cur:0,list:[]};let inGame=false,lastOpen=null,curFile=null,t0=0,rolling=false,tiles=[];
 
 // ---------- звук ----------
@@ -972,6 +971,7 @@ function shop(on){const p=$('shopP');if(on===undefined)on=!p.classList.contains(
 // облако (Supabase)
 const SB_URL='https://ljljtvywrmkmamhzyqha.supabase.co',SB_KEY='sb_publishable_1Sl3av1ub0piHKAM54BFDg_8wJ8hAF6';
 let sb=null,user=null,pt=0;
+dailyEnsure();
 try{if(window.supabase)sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
 function schedPush(){if(!user)return;clearTimeout(pt);pt=setTimeout(push,3000)}
 async function push(){if(!sb||!user)return;const P=ST.prof;
