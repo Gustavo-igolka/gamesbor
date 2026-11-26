@@ -1,40 +1,91 @@
 <!DOCTYPE html>
 <html lang="ru"><head><meta charset="utf-8"><title>Ритм по твоей музыке</title>
 <style>
-html,body{margin:0;height:100%;background:#07060d;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;color:#eee}
-canvas{display:block}
-#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(7,6,13,.9);text-align:center;padding:20px;box-sizing:border-box}
-h1{margin:0;font-size:48px;color:#ff5fa2;text-shadow:0 0 26px #ff5fa288}
-p{margin:0;color:#aab;max-width:560px;line-height:1.5}
-.row{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;color:#ccd}
-select,input[type=range]{accent-color:#ff5fa2}
-select{background:#1a1830;color:#eee;border:1px solid #445;padding:6px;border-radius:5px}
-button,label.b{background:#ff5fa2;color:#fff;border:0;padding:13px 26px;font-size:18px;border-radius:6px;cursor:pointer;font-weight:600}
-label.b{background:#22d3ee;color:#04141a}
-button.g{background:#3b3a58}
-button:hover,label.b:hover{filter:brightness(1.15)}
-#res{font-size:20px;color:#ffd75e;min-height:26px;line-height:1.5}
+:root{color-scheme:dark;--pink:#ff5fa2;--cyan:#4de7ed;--bg:#080914;--panel:rgba(17,19,39,.88);--muted:#a5acc8}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:#f5f6ff;font-family:Inter,Segoe UI,system-ui,sans-serif}
+body{user-select:none;-webkit-tap-highlight-color:transparent}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#menu{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:clamp(14px,3vw,34px);overflow:auto;background:radial-gradient(ellipse at 50% 5%,rgba(113,49,117,.25),transparent 55%),linear-gradient(145deg,rgba(5,7,17,.88),rgba(8,9,20,.96));backdrop-filter:blur(16px)}
+.panel{width:min(760px,100%);max-height:100%;overflow:auto;padding:clamp(20px,4vw,38px);border:1px solid rgba(255,255,255,.12);border-radius:28px;background:linear-gradient(145deg,rgba(25,27,54,.96),rgba(12,14,30,.97));box-shadow:0 28px 90px #0009,inset 0 1px #ffffff12}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.brand-mark{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:linear-gradient(135deg,var(--pink),#8d5cff);font-size:25px;box-shadow:0 8px 30px #ff5fa244}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.18em;font-weight:800}
+h1{margin:0;font-size:clamp(25px,5vw,43px);line-height:1.04;letter-spacing:-.045em}
+h1 span{color:var(--pink)}
+.intro{max-width:570px;margin:12px 0 24px;color:#b8bfd9;line-height:1.6;font-size:14px}
+#res{min-height:0;margin:0 0 14px;color:#ffe08a;font-size:14px;line-height:1.6}
+#res:empty{display:none}
+.section-title{margin:22px 0 10px;color:#8992b4;font-size:11px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.source-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button,.upload{min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:12px 17px;border:1px solid #ffffff18;border-radius:14px;background:#ffffff0b;color:#f7f7ff;font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:transform .18s,border-color .18s,background .18s}
+button:hover,.upload:hover{transform:translateY(-2px);border-color:#ffffff45;background:#ffffff14}
+button:focus-visible,.upload:focus-within,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+button.primary{border:0;background:linear-gradient(110deg,#ff579d,#a65bff);box-shadow:0 9px 28px #d94e9e30}
+button.secondary{background:linear-gradient(110deg,#1c8798,#2761a8);border:0}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.upload{background:#ffffff0b}
+.upload input{display:none}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.setting{min-width:0;padding:13px 14px;border:1px solid #ffffff12;border-radius:15px;background:#ffffff06}
+.setting label,.setting .label{display:flex;justify-content:space-between;gap:8px;margin-bottom:9px;color:#cbd0e5;font-size:12px;font-weight:700}
+.setting select{width:100%;padding:9px 10px;border:1px solid #ffffff1b;border-radius:10px;background:#1a1d39;color:#fff;font:inherit}
+input[type=range]{width:100%;accent-color:var(--pink);cursor:pointer}
+.check{display:flex;align-items:center;gap:9px;color:#cbd0e5;font-size:13px}
+.check input{accent-color:var(--pink);width:17px;height:17px}
+.help{margin:18px 0 0;color:#7f88aa;font-size:12px;line-height:1.6}
+#gamebar{position:fixed;z-index:4;top:14px;left:14px;right:14px;display:none;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
+#gamebar button{pointer-events:auto;min-height:42px;padding:9px 14px;border-radius:13px;background:#11152bd9;backdrop-filter:blur(12px)}
+#gamebar .game-actions{display:flex;gap:8px}
+#trackname{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:10px 14px;border:1px solid #ffffff18;border-radius:13px;background:#11152bd9;color:#dce1f6;font-size:12px}
+#loading{display:none;position:fixed;z-index:8;inset:0;place-items:center;background:#080914dd;backdrop-filter:blur(12px);text-align:center;padding:25px}
+#loading .load-card{width:min(360px,100%);padding:25px;border:1px solid #ffffff20;border-radius:22px;background:#151831}
+#loadbar{height:7px;margin-top:16px;overflow:hidden;border-radius:9px;background:#ffffff18}
+#loadbar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--pink),var(--cyan));transition:width .15s}
+@media(max-width:600px){
+ #menu{align-items:flex-start;padding:12px}
+ .panel{margin:auto 0;padding:20px 16px;border-radius:22px}
+ .brand{margin-bottom:17px}.brand-mark{width:42px;height:42px;border-radius:14px}
+ .intro{font-size:13px;margin:10px 0 18px}
+ .source-grid{grid-template-columns:1fr}
+ .settings{grid-template-columns:1fr 1fr;gap:8px}
+ .setting{padding:11px 10px}
+ #gamebar{top:8px;left:8px;right:8px}
+ #gamebar button{min-height:38px;padding:8px 11px;font-size:12px}
+ #trackname{max-width:43vw;font-size:11px;padding:9px}
+}
+@media(max-height:650px) and (min-width:601px){#menu{align-items:flex-start}.panel{margin:auto 0}.brand{margin-bottom:12px}.intro{margin:8px 0 14px}.section-title{margin:14px 0 8px}.help{margin-top:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 </style></head><body>
 <canvas id="c"></canvas>
 <div id="menu">
-  <h1>РИТМ ПО ТВОЕЙ МУЗЫКЕ</h1>
+ <main class="panel">
+  <div class="brand"><div class="brand-mark">♫</div><div><small>PERSONAL RHYTHM ENGINE</small><h1>РИТМ <span>ТВОЕЙ</span> МУЗЫКИ</h1></div></div>
+  <p class="intro">Преврати любимый трек в ритм-игру. Загрузи аудио — движок проанализирует ударные и частоты, а затем построит карту нот. Попадай в такт и собирай комбо.</p>
   <div id="res"></div>
-  <p>Загрузи любой трек — игра сама найдёт в нём биты и построит из них ноты. Жми <b>D F J K</b>, когда нота доходит до линии. <b>Esc</b> — пауза.</p>
-  <div class="row">
-    <span>Сложность: <select id="diff"><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option></select></span>
-    <span>Скорость нот: <input id="speed" type="range" min="1" max="10" value="6"></span>
+  <div class="section-title">Выбери музыку</div>
+  <div class="source-grid">
+   <button id="demo" class="primary">▶ Играть демо-трек</button>
+   <label class="upload">♫ Загрузить свой трек<input id="file" type="file" accept="audio/*"></label>
   </div>
-  <div class="row">
-    <span>Сдвиг (мс): <input id="off" type="range" min="-200" max="200" value="0" step="5"> <b id="offv">0</b></span>
-    <label><input id="nofail" type="checkbox"> без проигрыша</label>
+  <div id="trackinfo" class="help">Поддерживаются аудиофайлы, которые может декодировать браузер.</div>
+  <div class="section-title">Настройки партии</div>
+  <div class="settings">
+   <div class="setting"><label for="diff">Сложность</label><select id="diff"><option value="easy">Лёгкая</option><option value="normal" selected>Нормальная</option><option value="hard">Сложная</option></select></div>
+   <div class="setting"><label for="speed">Скорость нот <b id="speedv">6</b></label><input id="speed" type="range" min="1" max="10" value="6"></div>
+   <div class="setting"><label for="off">Сдвиг синхронизации <b id="offv">0 мс</b></label><input id="off" type="range" min="-200" max="200" value="0" step="5"></div>
+   <div class="setting"><label for="volume">Громкость <b id="volumev">80%</b></label><input id="volume" type="range" min="0" max="100" value="80"></div>
   </div>
-  <div class="row">
-    <button id="demo">Играть демо-трек</button>
-    <label class="b">Загрузить свой трек<input id="file" type="file" accept="audio/*" hidden></label>
-    <button id="again" class="g" style="display:none">Ещё раз этот трек</button>
+  <div class="row" style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px">
+   <label class="check"><input id="nofail" type="checkbox"> Без проигрыша</label>
+   <label class="check"><input id="autoplay" type="checkbox"> Автопауза при потере вкладки</label>
   </div>
-  <p style="font-size:14px">Если жмёшь стабильно поздно или рано — подвинь «Сдвиг»: влево, если жмёшь поздно.</p>
+  <p class="help">Управление: <b>D F J K</b> или нажимай на соответствующие дорожки. <b>Esc</b> — пауза. На телефоне доступны касания по дорожкам. Если постоянно опаздываешь или спешишь — настрой сдвиг.</p>
+  <button id="again" class="secondary" style="display:none;width:100%;margin-top:16px">↻ Сыграть этот трек ещё раз</button>
+ </main>
 </div>
+<div id="gamebar"><div id="trackname">Трек</div><div class="game-actions"><button id="pauseBtn">Ⅱ Пауза</button><button id="exitBtn">✕ В меню</button></div></div>
+<div id="loading"><div class="load-card"><b id="loadtext">Анализирую музыку…</b><div id="loadbar"><i></i></div><p class="help">Чем длиннее трек, тем больше времени займёт анализ.</p></div></div>
 <script>
 const cv=document.getElementById('c'),ctx=cv.getContext('2d'),$=id=>document.getElementById(id);
 const menu=$('menu'),res=$('res');
@@ -44,17 +95,17 @@ geo();addEventListener('resize',geo);
 
 const KEYS=['KeyD','KeyF','KeyJ','KeyK'],LAB=['D','F','J','K'],HUE=[330,190,50,130];
 const JN=['PERFECT','GOOD','OK'],JC=['#ffd75e','#5eead4','#a5b4fc'],JS=[300,150,50],WIN=[.045,.09,.13];
-let AC,an,freq,src,t0=0,dur=0,notes=[],first=0,state='menu',paused=false,lastBuf=null;
+let AC,an,freq,src,masterGain,t0=0,dur=0,notes=[],first=0,state='menu',paused=false,lastBuf=null,lastName='Демо-трек';
 let score,combo,maxCombo,hp,cnt,down=[0,0,0,0],flash=[0,0,0,0],parts=[],pop=null,comboPulse=0,shake=0,fall=1.3,off=0,nofail=false;
 const mapCache=new Map();
 
-try{const s=JSON.parse(localStorage.getItem('rg')||'{}');if(s.speed)$('speed').value=s.speed;if(s.off!=null)$('off').value=s.off;if(s.diff)$('diff').value=s.diff}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('rg')||'{}');if(s.speed)$('speed').value=s.speed;if(s.off!=null)$('off').value=s.off;if(s.diff)$('diff').value=s.diff;if(s.volume!=null)$('volume').value=s.volume}catch(e){}
 $('off').oninput=()=>$('offv').textContent=$('off').value;$('offv').textContent=$('off').value;
-function save(){try{localStorage.setItem('rg',JSON.stringify({speed:$('speed').value,off:$('off').value,diff:$('diff').value}))}catch(e){}}
+function save(){try{localStorage.setItem('rg',JSON.stringify({speed:$('speed').value,off:$('off').value,diff:$('diff').value,volume:$('volume').value}))}catch(e){}}
 function status(t){res.textContent=t}
 
 function initAC(){
-  if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();an=AC.createAnalyser();an.fftSize=1024;an.smoothingTimeConstant=.6;freq=new Uint8Array(an.frequencyBinCount);an.connect(AC.destination)}
+  if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();an=AC.createAnalyser();an.fftSize=1024;an.smoothingTimeConstant=.6;freq=new Uint8Array(an.frequencyBinCount);masterGain=AC.createGain();masterGain.gain.value=(+$('volume').value)/100;an.connect(masterGain);masterGain.connect(AC.destination)}
   return AC.resume();
 }
 function stopSrc(){if(src){try{src.onended=null;src.stop()}catch(e){}try{src.disconnect()}catch(e){}src=null}}
@@ -139,10 +190,11 @@ async function makeMap(buf,diff){
 }
 
 /* ---------- игра ---------- */
-async function begin(buf){
-  lastBuf=buf;save();
+async function begin(buf,name='Твой трек'){
+  lastBuf=buf;lastName=name;$('trackname').textContent=name;$('trackinfo').textContent='Последний трек: '+name;save();
   const diff=$('diff').value;
-  const map=await makeMap(buf,diff);
+  $('loading').style.display='grid';$('loadtext').textContent='Анализирую: '+name;$('loadbar').firstElementChild.style.width='0%';
+  let map;try{map=await makeMap(buf,diff)}catch(err){$('loading').style.display='none';status('Не удалось проанализировать этот трек. Попробуй другой файл.');return}$('loading').style.display='none';
   if(map.length<8){status('В этом треке не нашлось ритма. Попробуй другой.');return}
   notes=map.map(n=>({t:n.t,lane:n.lane,done:false}));first=0;
   fall=2.2-.16*(+$('speed').value);off=+$('off').value;nofail=$('nofail').checked;
@@ -150,11 +202,11 @@ async function begin(buf){
   stopSrc();await initAC();
   src=AC.createBufferSource();src.buffer=buf;src.connect(an);
   t0=AC.currentTime+2.2;src.start(t0);dur=buf.duration;
-  state='play';menu.style.display='none';
+  state='play';menu.style.display='none';$('gamebar').style.display='flex';
 }
 function songTime(){return AC.currentTime-t0-(AC.outputLatency||AC.baseLatency||0)+off/1000}
 function finish(failed){
-  if(state!=='play')return;state='menu';stopSrc();paused=false;
+  if(state!=='play')return;state='menu';stopSrc();paused=false;$('gamebar').style.display='none';
   const n=cnt[0]+cnt[1]+cnt[2]+cnt[3],acc=n?(300*cnt[0]+150*cnt[1]+50*cnt[2])/(300*n)*100:0;
   const g=acc>=95?'S':acc>=88?'A':acc>=78?'B':acc>=65?'C':'D';
   res.innerHTML=(failed?'Провал. ':'Трек пройден! ')+'Оценка <b>'+g+'</b> · точность '+acc.toFixed(1)+'%<br>Счёт '+score+' · макс. комбо '+maxCombo+'<br>Perfect '+cnt[0]+' · Good '+cnt[1]+' · OK '+cnt[2]+' · Miss '+cnt[3];
@@ -166,6 +218,8 @@ function registerMiss(l){
   cnt[3]++;combo=0;hp-=7;popup('MISS','#ff5470','');shake=8;flash[l]=-1;
   if(hp<=0&&!nofail)finish(true);
 }
+function togglePause(){if(state!=='play')return;paused=!paused;if(paused)AC.suspend();else AC.resume();$('pauseBtn').textContent=paused?'▶ Продолжить':'Ⅱ Пауза'}
+function leaveGame(){if(state!=='play')return;stopSrc();paused=false;state='menu';$('gamebar').style.display='none';menu.style.display='flex';status('Партия завершена досрочно.');}
 function press(l){
   down[l]=1;flash[l]=1;
   const ts=songTime();
@@ -183,19 +237,27 @@ function press(l){
 }
 addEventListener('keydown',e=>{
   if(state!=='play')return;
-  if(e.code==='Escape'){paused=!paused;paused?AC.suspend():AC.resume();return}
-  if(paused){if(e.code==='KeyQ'){paused=false;AC.resume();stopSrc();state='menu';status('');menu.style.display='flex'}return}
+  if(e.code==='Escape'){togglePause();return}
+  if(paused){if(e.code==='KeyQ')leaveGame();return}
   const l=KEYS.indexOf(e.code);if(l>=0&&!e.repeat){e.preventDefault();press(l)}
 });
 addEventListener('keyup',e=>{const l=KEYS.indexOf(e.code);if(l>=0)down[l]=0});
-$('demo').onclick=async()=>{await initAC();status('Готовлю демо-трек…');await begin(await renderDemo())};
+$('demo').onclick=async()=>{await initAC();status('Готовлю демо-трек…');try{await begin(await renderDemo(),'Демо — Neon Pulse')}catch(e){status('Не удалось создать демо-трек.')}};
 $('file').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   await initAC();status('Читаю файл…');
   let b;try{b=await AC.decodeAudioData(await f.arrayBuffer())}catch(err){status('Не удалось прочитать этот файл.');return}
-  await begin(b);
+  await begin(b,f.name);
 };
-$('again').onclick=()=>{if(lastBuf)begin(lastBuf)};
+$('again').onclick=()=>{if(lastBuf)begin(lastBuf,lastName)};
+$('pauseBtn').onclick=togglePause;$('exitBtn').onclick=leaveGame;
+$('speed').oninput=()=>$('speedv').textContent=$('speed').value;
+$('off').oninput=()=>{$('offv').textContent=$('off').value+' мс'};
+$('volume').oninput=()=>{$('volumev').textContent=$('volume').value+'%';if(masterGain)masterGain.gain.setTargetAtTime(+$('volume').value/100,AC.currentTime,.025);save()};
+$('autoplay').checked=true;
+cv.addEventListener('pointerdown',e=>{if(state!=='play'||paused)return;const x=e.clientX;if(x<X0||x>=X0+LW*4)return;const lane=Math.max(0,Math.min(3,Math.floor((x-X0)/LW)));press(lane);down[lane]=1;});
+cv.addEventListener('pointerup',()=>{down=[0,0,0,0]});cv.addEventListener('pointercancel',()=>{down=[0,0,0,0]});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&$('autoplay').checked&&state==='play'&&!paused)togglePause()});
 
 function update(dt){
   const ts=songTime();
