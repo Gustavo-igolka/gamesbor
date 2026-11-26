@@ -508,7 +508,7 @@ const GAMES=[
   how:["WASD — движение, мышь — прицел, ЛКМ — атака","1, 2, 3 — способности; Esc — пауза","Enter — начать бой; ← / → — выбрать героя в меню","Управление можно переназначить в настройках игры"]},
 
 ];
-const CATS=[['all','Все'],['recent','Недавние'],['fav','Избранное'],['horror','Хоррор'],['arcade','Аркады'],['strat','Стратегии'],['logic','Логика'],['race','Гонки'],['cards','Карточные'],['music','Музыка'],['apps','Приложения']];
+const CATS=[['all','Все'],['popular','Популярное'],['new','Новинки'],['recent','Недавние'],['fav','Избранное'],['horror','Хоррор'],['arcade','Аркады'],['strat','Стратегии'],['logic','Логика'],['race','Гонки'],['cards','Карточные'],['music','Музыка'],['apps','Приложения']];
 const EMPTY={recent:'Ты ещё ни во что не играл',fav:'Нажми ☆ или F, чтобы добавить игру сюда'};
 const TRO=[['first','🥉','Первый шаг','Запусти любую игру'],['fav','🥉','Любимчик','Добавь игру в избранное'],['dice','🥉','Рисковый','Выбери игру рулеткой'],
  ['three','🥈','Любопытный','Запусти три разные игры'],['long','🥈','Не оторваться','Играй 10 минут подряд'],['all','🥇','Коллекционер','Запусти все игры'],['plat','🏆','Платина','Получи все остальные трофеи']];
@@ -703,6 +703,8 @@ function troPanel(on){const p=$('troP');if(on===undefined)on=!p.classList.contai
 // ---------- каталог ----------
 const getList=()=>{const L=baseList();return ST.devOnly?L.filter(g=>!g.dev||g.dev.includes(DEV)):L};
 function baseList(){const c=S.cat,st=ST.stats;
+ if(c==='popular')return GAMES.filter(g=>st[g.file]&&st[g.file].n>0).sort((a,b)=>(st[b.file].n||0)-(st[a.file].n||0));
+ if(c==='new')return GAMES.filter(g=>g.new);
  if(c==='recent')return GAMES.filter(g=>st[g.file]&&st[g.file].last).sort((a,b)=>st[b.file].last-st[a.file].last);
  if(c==='fav')return GAMES.filter(g=>ST.fav[g.file]);
  return c==='all'?GAMES:GAMES.filter(g=>g.cat===c)}
@@ -713,7 +715,7 @@ function setCat(c,s){S.cat=c;[...$('tabs').children].forEach(b=>{const on=b.data
 function searchPanel(on){const p=$('searchP');if(on===false){closePans();return}
  $('searchBox').innerHTML=`<h3>Поиск игр</h3><small>Ищи по названию, жанру и описанию</small>
  <input id="gameSearchInput" type="search" placeholder="Например: стратегия, музыка..." autocomplete="off">
- <div class="search-tools"><select id="searchCat" aria-label="Категория"><option value="all">Все категории</option>${CATS.filter(c=>!['recent','fav','all'].includes(c[0])).map(c=>`<option value="${c[0]}">${esc(c[1])}</option>`).join('')}</select>
+ <div class="search-tools"><select id="searchCat" aria-label="Категория"><option value="all">Все категории</option>${CATS.filter(c=>!['recent','fav','all','popular','new'].includes(c[0])).map(c=>`<option value="${c[0]}">${esc(c[1])}</option>`).join('')}</select>
  <select id="searchSort" aria-label="Сортировка"><option value="default">По умолчанию</option><option value="name">По названию</option><option value="popular">По популярности</option><option value="recent">Недавно запускались</option></select></div>
  <small id="searchCount"></small><div class="search-results" id="searchResults"></div>
  <div class="row"><button class="pill" id="searchClose">Закрыть</button></div>`;
