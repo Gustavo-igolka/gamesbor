@@ -324,7 +324,7 @@ button:focus-visible{outline:2px solid rgba(185,205,255,.8);outline-offset:3px}
 
 <div id="season" aria-hidden="true"></div>
 <div id="top"><button id="brand" aria-label="Меню RKCPlay">RKCPlay ▾</button>
-<div id="tools"><button id="bSearch" aria-label="Поиск игр" title="Поиск игр (/)">🔎</button><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
+<div id="tools"><button id="bSearch" aria-label="Поиск игр" title="Поиск игр (/)">🔎</button><button id="bSettings" aria-label="Настройки" title="Настройки">⚙️</button><button id="bDice" aria-label="Случайная игра" title="Случайная игра (R)">🎲</button><button id="bDev" aria-label="Фильтр устройства"></button><button id="bShop" aria-label="Магазин" title="Магазин (S)">🛒</button><button id="bProf" aria-label="Профиль" title="Профиль (P)">👤</button><button id="bTro" aria-label="Трофеи" title="Трофеи (T)">🏆</button><button id="bMute" aria-label="Звук" title="Звук (M)">🔊</button><button id="bFs" aria-label="Во весь экран" title="Во весь экран">⛶</button><span id="coinb"></span><span id="clock"></span></div></div>
 <nav id="tabs" aria-label="Разделы"></nav>
 
 <div id="stage">
@@ -339,6 +339,7 @@ button:focus-visible{outline:2px solid rgba(185,205,255,.8);outline-offset:3px}
 
 <div id="searchP" class="pan"><div id="searchBox" class="box"></div></div>
 <div id="menuP" class="pan"><div id="menuBox" class="box"></div></div>
+<div id="settingsP" class="pan"><div id="settingsBox" class="box"></div></div>
 <div id="tosP" class="pan"><div id="tosBox" class="box"></div></div>
 <div id="troP" class="pan"><div id="troBox" class="box"></div></div>
 <div id="questP" class="pan"><div id="questBox" class="box"></div></div>
@@ -1033,7 +1034,7 @@ let sx0=null,sy0=0;addEventListener('touchstart',e=>{sx0=e.touches[0].clientX;sy
 addEventListener('touchend',e=>{if(sx0===null||inGame||pans().length)return;const dx=e.changedTouches[0].clientX-sx0,dy=e.changedTouches[0].clientY-sy0;sx0=null;
  if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy))select(S.cur+(dx<0?1:-1),true);
  else if(Math.abs(dy)>70&&Math.abs(dy)>Math.abs(dx)*1.5){const ci=CATS.findIndex(c=>c[0]===S.cat);setCat(CATS[(ci+(dy<0?1:CATS.length-1))%CATS.length][0],true)}},{passive:true});
-$('bSearch').onclick=()=>searchPanel();$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('bShop').onclick=()=>shop();$('bDev').onclick=()=>{ST.devOnly=!ST.devOnly;save();devBtn();setCat(S.cat);toast(DEV==='touch'?'📱':'💻',ST.devOnly?'Только игры для этого устройства':'Показаны все игры','')};document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
+$('bSearch').onclick=()=>searchPanel();$('bSettings').onclick=settingsPanel;$('play').onclick=launch;$('moreb').onclick=details;$('bProf').onclick=profile;$('favb').onclick=toggleFav;$('bDice').onclick=dice;$('bTro').onclick=()=>troPanel();$('bShop').onclick=()=>shop();$('bDev').onclick=()=>{ST.devOnly=!ST.devOnly;save();devBtn();setCat(S.cat);toast(DEV==='touch'?'📱':'💻',ST.devOnly?'Только игры для этого устройства':'Показаны все игры','')};document.querySelectorAll('.pan').forEach(p=>p.onclick=e=>{if(e.target===p)closePans()});
 function mute(){ST.mute=!ST.mute;save();$('bMute').textContent=ST.mute?'🔇':'🔊';if(!ST.mute)sOk()}
 $('bMute').onclick=mute;$('bMute').textContent=ST.mute?'🔇':'🔊';
 if(document.fullscreenEnabled)$('bFs').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();else $('bFs').style.display='none';
@@ -1149,26 +1150,35 @@ new MutationObserver(poke).observe(player,{attributes:true,attributeFilter:['cla
 function applyPrefs(){document.body.classList.remove('tsS','tsL');if(ST.tileSz==='s')document.body.classList.add('tsS');if(ST.tileSz==='l')document.body.classList.add('tsL');
  document.body.classList.toggle('rm',!!ST.rm);applySeason();if(!inGame)select(S.cur)}
 const MENU_KEYS=['◀ ▶ — выбрать игру','▲ ▼ — раздел','Enter — играть','I — подробнее','F — избранное','R — случайная игра','T — трофеи сайта','S — магазин','P — профиль','M — звук','Q — это меню'];
-function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');
- if(!on){closePans();return}
+function settingsPanel(){
  const opt=(k,items,cur)=>items.map(x=>`<button class="pill${String(cur)===String(x[0])?' sel':''}" data-set="${k}:${x[0]}">${x[1]}</button>`).join('');
  const afk=ST.afkSec===undefined?60:ST.afkSec;
- $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры, профиль и настройки</small>
- <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи сайта</button><button class="mi" data-go="daily"><i>☀️</i>Ежедневная активность</button><button class="mi" data-go="quest"><i>🎯</i>Общие испытания</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
- <h4>Настройки</h4>
- <div class="mset"><span>Звук</span><div class="row">${opt('snd',[[1,'Вкл'],[0,'Выкл']],ST.mute?0:1)}</div></div>
+ $('settingsBox').innerHTML=`<h3>Настройки</h3><small>Персонализируй внешний вид и поведение RKCPlay</small>
+ <h4>Интерфейс</h4>
  <div class="mset"><span>Размер плиток</span><div class="row">${opt('tile',[['s','Мелкие'],['m','Средние'],['l','Крупные']],ST.tileSz||'m')}</div></div>
  <div class="mset"><span>Меньше анимаций</span><div class="row">${opt('rm',[[1,'Да'],[0,'Нет']],ST.rm?1:0)}</div></div>
+ <h4>Звук и активность</h4>
+ <div class="mset"><span>Звук</span><div class="row">${opt('snd',[[1,'Вкл'],[0,'Выкл']],ST.mute?0:1)}</div></div>
  <div class="mset"><span>АФК-экран через</span><div class="row">${opt('afk',[[30,'30 с'],[60,'1 мин'],[180,'3 мин'],[0,'Никогда']],afk)}</div></div>
+ <h4>Оформление</h4>
  <div class="mset"><span>Сезонный режим</span><div class="row">${opt('season',[['auto','Авто'],['off','Выкл'],['halloween','🎃'],['winter','❄️'],['love','💗'],['spring','🌸']],ST.season||'auto')}</div></div>
+ <div class="row"><button class="pill" id="settingsClose">Закрыть</button></div>`;
+ const B=$('settingsBox');
+ B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
+  if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
+  save();applyPrefs();settingsPanel();if(k==='snd'&&!ST.mute)sOk()});
+ $('settingsClose').onclick=closePans;
+ $('settingsP').classList.add('on');$('panClose').classList.add('on');snd(600,.1)
+}
+function menu(on){const p=$('menuP');if(on===undefined)on=!p.classList.contains('on');
+ if(!on){closePans();return}
+ $('menuBox').innerHTML=`<h3>RKCPlay</h3><small>Игры и разделы платформы</small>
+ <div style="margin-top:10px"><button class="mi" data-go="shop"><i>🛒</i>Магазин</button><button class="mi" data-go="prof"><i>👤</i>Профиль</button><button class="mi" data-go="tro"><i>🏆</i>Трофеи сайта</button><button class="mi" data-go="daily"><i>☀️</i>Ежедневная активность</button><button class="mi" data-go="quest"><i>🎯</i>Общие испытания</button>${sb?'<button class="mi" data-go="lb"><i>🏅</i>Рейтинг</button>':''}</div>
  <h4>Управление</h4><ul>${MENU_KEYS.map(k=>'<li>'+k+'</li>').join('')}</ul>
  <div class="row"><button class="pill" id="mClose">Закрыть</button></div>
  <div class="mft"><b>RKC Studio</b>Студия-разработчик RKCPlay<br><button id="mTos">Пользовательское соглашение</button></div>`;
  const B=$('menuBox');
  B.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;closePans();setTimeout(()=>({shop:()=>shop(true),prof:profile,tro:()=>troPanel(true),daily:dailyPanel,quest:questPanel,lb}[g])(),60)});
- B.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const[k,v]=b.dataset.set.split(':');
-  if(k==='snd'){ST.mute=v==='0';$('bMute').textContent=ST.mute?'🔇':'🔊'}else if(k==='tile')ST.tileSz=v;else if(k==='rm')ST.rm=v==='1';else if(k==='afk'){ST.afkSec=+v;poke()}else if(k==='season')ST.season=v;
-  save();applyPrefs();menu(true);if(k==='snd'&&!ST.mute)sOk()});
  $('mClose').onclick=()=>menu(false);$('mTos').onclick=tos;
  p.classList.add('on');$('panClose').classList.add('on');snd(600,.1)}
 function tos(){closePans();setTimeout(()=>{
