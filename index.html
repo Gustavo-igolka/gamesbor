@@ -573,13 +573,13 @@ function dailyEnsure(){
  else if(last!==today){const gap=dayOrdinal(today)-dayOrdinal(last);d.streak=gap===1?Math.max(1,+d.streak||1)+1:1;d.lastVisit=today}
  if(d.date!==today){d.date=today;d.launches=0;d.games={};d.playMs=0;d.claimed=[]}
  d.launches=Math.max(0,Number(d.launches)||0);d.playMs=Math.max(0,Number(d.playMs)||0);
- d.games=d.games&&typeof d.games==='object'?d.games:{};d.claimed=Array.isArray(d.claimed)?d.claimed.filter(x=>typeof x==='string'):[];
+ d.games=d.games&&typeof d.games==='object'&&!Array.isArray(d.games)?d.games:{};d.claimed=Array.isArray(d.claimed)?d.claimed.filter(x=>typeof x==='string'):[];
  ST.daily=d;if(JSON.stringify(d)!==old)save();return d
 }
 function mergeDaily(remote){
- if(!remote||typeof remote!=='object'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(remote.date||''))return;
+ if(!remote||typeof remote!=='object'||!/^\d{4}-\d{2}-\d{2}$/.test(remote.date||''))return;
  const local=ST.daily||{},rd=remote.date,ld=local.date||'';
- if(!ld||rd>ld){ST.daily={...remote,games:{...(remote.games||{})},claimed:[...(remote.claimed||[])]};return}
+ if(!ld||rd>ld){ST.daily={...remote,games:remote.games&&typeof remote.games==='object'&&!Array.isArray(remote.games)?{...remote.games}:{},claimed:Array.isArray(remote.claimed)?remote.claimed.filter(x=>typeof x==='string'):[]};return}
  if(rd<ld){
   if(local.lastVisit===dayKey()&&(+local.streak||0)===1&&!(+local.launches||0)&&!(+local.playMs||0)&&!Object.keys(local.games||{}).length&&!(local.claimed||[]).length){
    local.lastVisit=remote.lastVisit||rd;local.streak=Math.max(1,+remote.streak||1)
@@ -763,7 +763,7 @@ function importProfile(txt){let d;try{const o=JSON.parse(txt);if(o.app!=='rkc'||
  for(const id in d.tro||{})if(ids.has(id)){const v=num(d.tro[id]);if(v&&(!ST.tro[id]||v<ST.tro[id]))ST.tro[id]=v}mergeDaily(d.daily||d.tro?.__daily)
  for(const f in d.ach||{})if(files.has(f)){ST.ach[f]=ST.ach[f]||{};for(const id in d.ach[f])if(!ST.ach[f][id])ST.ach[f][id]=d.ach[f][id]}
  for(const f in d.achp||{})if(files.has(f)){ST.achp[f]=ST.achp[f]||{};for(const id in d.achp[f])ST.achp[f][id]=Math.max(ST.achp[f][id]||0,num(d.achp[f][id]))}
- mergeDaily(d.daily);ST.xp=Math.max(ST.xp,num(d.xp));ST.coins=Math.max(ST.coins,num(d.coins));if(Array.isArray(d.owned))ST.owned=[...new Set([...ST.owned,...d.owned.filter(x=>typeof x==='string')])];
+ ST.xp=Math.max(ST.xp,num(d.xp));ST.coins=Math.max(ST.coins,num(d.coins));if(Array.isArray(d.owned))ST.owned=[...new Set([...ST.owned,...d.owned.filter(x=>typeof x==='string')])];
  save();closePans();setCat(S.cat);toast('✅','Профиль загружен','Данные объединены с текущими')}
 $('pfile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(importProfile);e.target.value=''};
 function dailyPanel(){
