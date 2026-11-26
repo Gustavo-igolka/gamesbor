@@ -157,7 +157,7 @@ async function makeMap(buf,diff){
     const o=f*Hp;for(let i=0;i<N;i++){re[i]=mono[o+i]*hann[i];im[i]=0}
     fft(re,im);
     for(let k=1;k<=b3;k++){const m=Math.log(1+Math.hypot(re[k],im[k])*8),d=m-prev[k];prev[k]=m;if(d>0)fl[k<=b1?0:k<=b2?1:2][f]+=d}
-    if(f%400===0){status('Анализ трека… '+Math.round(f/frames*100)+'%');await tick()}
+    if(f%400===0){const pct=Math.round(f/frames*100);$('loadtext').textContent='Анализирую музыку… '+pct+'%';$('loadbar').firstElementChild.style.width=pct+'%';await tick()}
   }
   const thr={easy:2.1,normal:1.7,hard:1.4}[diff],gap={easy:.34,normal:.22,hard:.14}[diff];
   const ons=[];
